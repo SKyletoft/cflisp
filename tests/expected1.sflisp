@@ -1,0 +1,13 @@
+main	ORG	$20
+nullptr	PSHA
+x	PSHA
+	LDA	#0
+	STA	SP, -1
+	LDA	#5
+	STA	SP, 0
+	CMPA	#5
+	BNE	main_1
+	LDA	#3
+	STA	SP, 0
+main_1	LDA	SP, 0
+	STA	SP, -1
