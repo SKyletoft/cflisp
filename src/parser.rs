@@ -2,7 +2,7 @@
 
 pub type SourceTree<'a> = Vec<Token<'a>>;
 
-type Function<'a> = (&'a str, Vec<Type>);
+type Function<'a> = (&'a str, Vec<Variable<'a>>);
 type Variable<'a> = (&'a str, Type);
 
 use crate::*;
@@ -67,6 +67,7 @@ enum Token<'a> {
 	For,
 	While,
 	NoArgs,
+	Args(Vec<Variable<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,7 +124,21 @@ fn simplify_lines<'a>(
 	variables: &mut Vec<Variable>,
 ) -> Result<Vec<Vec<Token<'a>>>, ParseError> {
 	dbg!(tokens);
-	let ret = match tokens {
+	let ret: Vec<Vec<Token<'a>>> = match tokens {
+		[Decl(t), Name(name), Assign, ..] => {
+			let inner = tokens[4..].to_owned();
+			simplify_lines(&inner, functions, variables)?;
+			let line = vec![
+				Decl(*t),
+				Name(name),
+				Assign,
+				Block(vec![Statement {
+					typ: *t,
+					tokens: inner,
+				}]),
+			];
+			vec![line]
+		}
 		//int x = {...}
 		[Decl(t), Name(name), Assign, Block(b)] => {
 			let new_var: Variable = (name, *t);
@@ -135,6 +150,7 @@ fn simplify_lines<'a>(
 				return Err(ParseError(line!()));
 			}
 			eprintln!("Blocks don't return, as of now");
+			//variables.push(new_var);
 			return Err(ParseError(line!()));
 		}
 		//int x = 5
@@ -151,10 +167,41 @@ fn simplify_lines<'a>(
 				eprintln!("Type error. You can only assign ints to ints");
 				return Err(ParseError(line!()));
 			}
+			variables.push(new_var);
+			vec![
+				vec![Decl(*t), Name(name)],
+				vec![Name(name), Assign, Num(*b)],
+			]
 		}
-		[Decl(t), Name(name)] => {}
-		[Decl(t), Name(name), Parens(p), Block(b)] => {}
-		[Decl(t), Name(name), NoArgs, Block(b)] => {}
+		//int x
+		[Decl(t), Name(name)] => {
+			let new_var: Variable = (name, *t);
+			if variables.contains(&new_var) {
+				eprintln!(
+					"Variable already exists. You probably meant to assign to it, \
+					you can remove the type at the beginning of the line"
+				);
+				return Err(ParseError(line!()));
+			}
+			if *t != Int {
+				eprintln!("Type error. You can only assign ints to ints");
+				return Err(ParseError(line!()));
+			}
+			variables.push(new_var);
+			vec![vec![Decl(*t), Name(name)]]
+		}
+		[Decl(t), Name(name), Args(p), Block(b)] => {
+			let new_func: Function = (name, *p);
+			if functions.contains(&new_func) {
+				eprintln!(
+					"Function already exists with those parametres. You probably meant to assign to it, \
+					you can remove the type at the beginning of the line"
+				);
+				return Err(ParseError(line!()));
+			}
+			functions.push(new_func);
+			vec![]
+		}
 		[Name(name), Assign, Block(b)] => {}
 		[Name(name), Assign, Name(b)] => {}
 		[Name(name), Assign, Num(b)] => {}
@@ -199,7 +246,7 @@ fn parse_tokens<'a>(strs: &[&'a str]) -> Result<Vec<Token<'a>>, ParseError> {
 			"|" => BitOr,
 			"||" => Or,
 			"return" => Return,
-			"()" => NoArgs,
+			"()" => Args(vec![]),
 			n if n.starts_with('&') => Deref(n),
 			n if n.starts_with('(') => {
 				dbg!(n);
