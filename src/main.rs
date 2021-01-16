@@ -1,10 +1,14 @@
+#![allow(dead_code)] //Remove once everything actually works
+
 pub mod error;
 use error::ParseError;
+pub mod helper;
 pub mod parser;
+pub mod types;
 
 fn main() {
 	let args = std::env::args().skip(1).collect::<Vec<_>>();
-	let flags = args
+	let _flags = args
 		.iter()
 		.filter(|s| s.starts_with('-'))
 		.map(|s| s.as_str())
@@ -30,6 +34,9 @@ fn main() {
 
 struct Flags;
 
-fn compile(tree: &Vec<parser::Statement>) -> Result<String, ()> {
-	Err(())
+fn compile(_tree: &[types::LanguageElement]) -> Result<String, ParseError> {
+	Err(ParseError(
+		line!(),
+		"Parse finished, continued to compilation. Cancelling",
+	))
 }
