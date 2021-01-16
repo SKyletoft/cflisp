@@ -50,6 +50,7 @@ pub(crate) enum Token<'a> {
 	Array,
 	StringLit,
 	Char(char),
+	Bool(bool),
 	Apostrophe,
 	AdrOf,
 	Deref(&'a str),
@@ -109,6 +110,8 @@ impl<'a> Token<'a> {
 			"^" => Xor,
 			"!" => Not,
 			"~" => Not,
+			"true" => Bool(true),
+			"false" => Bool(false),
 			"return" => Return,
 			"()" => Args(vec![]),
 			n if n.starts_with('&') => Deref(n),
@@ -170,7 +173,7 @@ impl<'a> Token<'a> {
 				if res.contains(&NewLine) {
 					return Err(ParseError(line!(), "Statement ended early?"));
 				}
-				StatementToken::from_tokens(res)
+				StatementToken::from_tokens(&res)
 			}
 		} else {
 			Err(ParseError(
@@ -192,7 +195,7 @@ impl<'a> Token<'a> {
 				let mut token_parsed = Vec::with_capacity(short.len());
 				for slice in short {
 					let as_tokens = Token::parse_str_to_vec(slice)?;
-					let as_statement = StatementToken::from_tokens(as_tokens)?;
+					let as_statement = StatementToken::from_tokens(&as_tokens)?;
 					token_parsed.push(as_statement);
 				}
 				Ok(token_parsed)
@@ -245,7 +248,10 @@ impl<'a> Token<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementToken<'a> {
-	Name(&'a str),
+	Num(isize),
+	Bool(bool),
+	Char(char),
+	Var(&'a str),
 	FunctionCall(&'a str, Vec<Token<'a>>),
 	Add,
 	Sub,
@@ -259,16 +265,20 @@ pub(crate) enum StatementToken<'a> {
 	LShift,
 	LT,
 	GT,
-	Eq,
+	Cmp,
 	Not,
+	Parentheses(Vec<StatementToken<'a>>),
 }
 
 impl<'a> StatementToken<'a> {
-	fn from_tokens(tokens: Vec<Token<'a>>) -> Result<Statement<'a>, ParseError> {
+	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
 		let mut res = Vec::new();
 		for token in tokens {
 			let new = match token {
-				Token::Name(n) => StatementToken::Name(n),
+				Token::Bool(b) => StatementToken::Bool(*b),
+				Token::Num(n) => StatementToken::Num(*n),
+				Token::Char(c) => StatementToken::Char(*c),
+				Token::Name(n) => StatementToken::Var(n),
 				Token::Add => StatementToken::Add,
 				Token::Sub => StatementToken::Sub,
 				Token::Mul => StatementToken::Mul,
@@ -282,17 +292,26 @@ impl<'a> StatementToken<'a> {
 				Token::RShift => StatementToken::RShift,
 				Token::LT => StatementToken::LT,
 				Token::GT => StatementToken::GT,
-				Token::Cmp => StatementToken::Eq,
+				Token::Cmp => StatementToken::Cmp,
+				Token::UnparsedBlock(b) => {
+					let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+					let as_statement = StatementToken::from_tokens(&tokenised)?;
+					StatementToken::Parentheses(as_statement)
+				}
 				Token::Parens(p) => {
 					//If a name is followed by parentheses, interpret is as
 					// a function call.
 					let last = res.len() - 1;
-					if let StatementToken::Name(n) = res[last] {
-						res[last] = StatementToken::FunctionCall(n, p);
+					if let StatementToken::Var(n) = res[last] {
+						res[last] = StatementToken::FunctionCall(n, p.clone());
+						continue;
+					} else {
+						StatementToken::Parentheses(StatementToken::from_tokens(p)?)
 					}
-					continue;
 				}
-				_ => return Err(ParseError(line!(), "Token is not valid in this context")),
+				_ => {
+					return Err(ParseError(line!(), "Token is not valid in this context"));
+				}
 			};
 			res.push(new);
 		}
@@ -385,6 +404,21 @@ pub(crate) enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	Not {
+		lhs: Box<StatementElement<'a>>,
+	},
+	GT {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	LT {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	Cmp {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
 	FunctionCall {
 		name: &'a str,
 		parametres: Vec<StatementElement<'a>>,
@@ -393,4 +427,104 @@ pub(crate) enum StatementElement<'a> {
 	Num(isize),
 	Char(char),
 	Bool(bool),
+}
+
+type OpFnPtr<'a> = fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>;
+#[derive(Debug, Clone, PartialEq)]
+enum MaybeParsed<'a> {
+	Parsed(StatementElement<'a>),
+	Unparsed(StatementToken<'a>),
+}
+use MaybeParsed::*;
+
+impl<'a> StatementElement<'a> {
+	pub(crate) fn from_tokens(
+		tokens: Vec<StatementToken<'a>>,
+	) -> Result<StatementElement<'a>, ParseError> {
+		dbg!(&tokens);
+		let mut tokens = tokens
+			.into_iter()
+			.map(|t| match t {
+				StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
+				StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
+				StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
+				StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
+				t => Unparsed(t),
+			})
+			.collect::<Vec<_>>();
+		let operations: [(MaybeParsed, OpFnPtr); 4] = [
+			(Unparsed(StatementToken::Mul), |l, r| {
+				StatementElement::Mul {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::Div), |l, r| {
+				StatementElement::Div {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::Add), |l, r| {
+				StatementElement::Add {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::Sub), |l, r| {
+				StatementElement::Sub {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+		];
+		for token in tokens.iter_mut() {
+			if let Unparsed(StatementToken::Parentheses(p)) = token {
+				let next = StatementElement::from_tokens(p.clone())?;
+				*token = Parsed(next);
+			}
+		}
+		for (from, to) in operations.iter() {
+			do_operation(&mut tokens, from, *to)?;
+		}
+		if tokens.len() != 1 {
+			return Err(ParseError(line!(), "Internal tree construction error"));
+		}
+		if let Parsed(elem) = tokens.remove(0) {
+			Ok(elem)
+		} else {
+			Err(ParseError(
+				line!(),
+				"Internal error: Last element in statement parsing vector was unparsed",
+			))
+		}
+	}
+}
+
+fn do_operation<'a>(
+	tokens: &mut Vec<MaybeParsed<'a>>,
+	op_from: &MaybeParsed,
+	op_to: fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>,
+) -> Result<(), ParseError> {
+	while let Some(idx) = tokens.iter().position(|t| t == op_from) {
+		if idx == 0 || idx + 1 == tokens.len() {
+			return Err(ParseError(
+			line!(),
+			"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
+		));
+		}
+		let right = tokens.remove(idx + 1);
+		let left = tokens.remove(idx - 1);
+		if let (Parsed(lhs), Parsed(rhs)) = (right, left) {
+			//The removal of the left item offset the index by one
+			tokens[idx - 1] = Parsed(op_to(lhs, rhs));
+		} else {
+			return Err(ParseError(
+				line!(),
+				"Couldn't construct tree from statement. Element that \
+			should've been parsed first has not been parsed",
+			));
+		}
+	}
+	Ok(())
 }
