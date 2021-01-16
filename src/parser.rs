@@ -1,4 +1,5 @@
 use crate::*;
+use helper::remove_parentheses;
 use types::{
 	LanguageElement, StatementElement, StatementToken, StatementToken::*, Token, Token::*, Type,
 	Type::*,
@@ -54,11 +55,50 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
-			[If, Parens(_), ..] => {
-				todo!()
+			[Token::Name(n), Assign, ..] => {
+				let rhs = &tokens[2..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::VariableAssignment {
+					name: *n,
+					value: rhs_parsed,
+				}
+			}
+			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration { typ: *t, name: *n },
+			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let then_parsed = parse(helper::remove_parentheses(code))?;
+				LanguageElement::IfStatement {
+					condition: condition_parsed,
+					then: then_parsed,
+					else_then: None,
+				}
+			}
+			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let then_parsed = parse(helper::remove_parentheses(then_code))?;
+				let else_parsed = parse(helper::remove_parentheses(else_code))?;
+				LanguageElement::IfStatement {
+					condition: condition_parsed,
+					then: then_parsed,
+					else_then: Some(else_parsed),
+				}
+			}
+			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let then_parsed = parse(then_code)?;
+				let else_if_tokens = &tokens[5..];
+				let else_if_parsed = construct_structure_from_tokens(else_if_tokens)?;
+				LanguageElement::IfStatement {
+					condition: condition_parsed,
+					then: then_parsed,
+					else_then: Some(vec![else_if_parsed]),
+				}
 			}
 			_ => {
-				dbg!(tokens);
 				return Err(ParseError(
 					line!(),
 					"Couldn't match tokens into LanguageElement pattern",

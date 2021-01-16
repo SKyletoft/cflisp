@@ -347,18 +347,20 @@ pub(crate) enum LanguageElement<'a> {
 	},
 	IfStatement {
 		condition: StatementElement<'a>,
-		then: Box<Block<'a>>,
-		else_then: Option<Box<Block<'a>>>,
+		then: Block<'a>,
+		else_then: Option<Block<'a>>,
 	},
-	///`init` must be a VariableDeclarationAssignment
+	///`init` must be a VariableDeclarationAssignment,
+	/// `after` must only contain VariableAssignment
 	For {
 		init: Box<LanguageElement<'a>>,
 		condition: StatementElement<'a>,
-		body: Box<Block<'a>>,
+		after: Block<'a>,
+		body: Block<'a>,
 	},
 	While {
 		condition: StatementElement<'a>,
-		body: Box<Block<'a>>,
+		body: Block<'a>,
 	},
 }
 
@@ -441,7 +443,6 @@ impl<'a> StatementElement<'a> {
 	pub(crate) fn from_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
-		dbg!(&tokens);
 		let mut tokens = tokens
 			.into_iter()
 			.map(|t| match t {
@@ -452,7 +453,7 @@ impl<'a> StatementElement<'a> {
 				t => Unparsed(t),
 			})
 			.collect::<Vec<_>>();
-		let operations: [(MaybeParsed, OpFnPtr); 4] = [
+		let operations: [(MaybeParsed, OpFnPtr); 10] = [
 			(Unparsed(StatementToken::Mul), |l, r| {
 				StatementElement::Mul {
 					lhs: Box::new(l),
@@ -473,6 +474,36 @@ impl<'a> StatementElement<'a> {
 			}),
 			(Unparsed(StatementToken::Sub), |l, r| {
 				StatementElement::Sub {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::LT), |l, r| StatementElement::LT {
+				lhs: Box::new(l),
+				rhs: Box::new(r),
+			}),
+			(Unparsed(StatementToken::GT), |l, r| StatementElement::GT {
+				lhs: Box::new(l),
+				rhs: Box::new(r),
+			}),
+			(Unparsed(StatementToken::Cmp), |l, r| {
+				StatementElement::Cmp {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::And), |l, r| {
+				StatementElement::And {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::Or), |l, r| StatementElement::Or {
+				lhs: Box::new(l),
+				rhs: Box::new(r),
+			}),
+			(Unparsed(StatementToken::Xor), |l, r| {
+				StatementElement::Xor {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}

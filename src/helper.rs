@@ -27,6 +27,7 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 				let slice = &s[start..=i];
 				if keep_closure(slice) {
 					vec.push(slice);
+					vec.push(";");
 				}
 				start = i + 1;
 				curlies -= 1;

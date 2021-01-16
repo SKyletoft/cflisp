@@ -28,6 +28,8 @@ fn main() {
 		source.push('\n');
 	}
 	let parsed = parser::parse(&source /*&flags*/).expect("Parse error");
+	dbg!(&parsed);
+	return;
 	let compiled = compile(&parsed).expect("Compiler error");
 	std::fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
 }
