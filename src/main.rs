@@ -1,5 +1,6 @@
 use std::{env, fs};
 
+pub mod compile_flisp;
 pub mod error;
 pub mod helper;
 pub mod language_element;
@@ -9,7 +10,7 @@ pub mod statement_token;
 pub mod token;
 pub mod types;
 
-use error::ParseError;
+use error::{CompileError, ParseError};
 use language_element::LanguageElement;
 use statement_token::StatementToken;
 use token::Token;
@@ -38,16 +39,8 @@ fn main() {
 	}
 	let parsed = parser::parse(&source /*&flags*/).expect("Parse error");
 	dbg!(&parsed);
-	return;
-	let compiled = compile(&parsed).expect("Compiler error");
+	let compiled = compile_flisp::compile(&parsed).expect("Compiler error");
 	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
 }
 
 struct Flags;
-
-fn compile(_tree: &[LanguageElement]) -> Result<String, ParseError> {
-	Err(ParseError(
-		line!(),
-		"Parse finished, continued to compilation. Cancelling",
-	))
-}
