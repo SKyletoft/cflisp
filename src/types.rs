@@ -435,7 +435,6 @@ impl<'a> StatementElement<'a> {
 	pub(crate) fn from_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
-		dbg!(&tokens);
 		let mut working_tokens = Vec::new();
 		for token in tokens.into_iter() {
 			working_tokens.push(match token {
