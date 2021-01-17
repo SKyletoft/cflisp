@@ -1,8 +1,17 @@
 pub mod error;
-use error::ParseError;
 pub mod helper;
+pub mod language_element;
 pub mod parser;
+pub mod statement_element;
+pub mod statement_token;
+pub mod token;
 pub mod types;
+
+use error::ParseError;
+use language_element::LanguageElement;
+use statement_token::StatementToken;
+use token::Token;
+use types::Variable;
 
 fn main() {
 	let args = std::env::args().skip(1).collect::<Vec<_>>();
@@ -34,7 +43,7 @@ fn main() {
 
 struct Flags;
 
-fn compile(_tree: &[types::LanguageElement]) -> Result<String, ParseError> {
+fn compile(_tree: &[LanguageElement]) -> Result<String, ParseError> {
 	Err(ParseError(
 		line!(),
 		"Parse finished, continued to compilation. Cancelling",

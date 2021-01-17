@@ -42,7 +42,7 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 					vec.push(slice);
 				}
 				start = i;
-				curlies += 1;
+				brackets += 1;
 			}
 			(0, _, 0, 0, '[') => {
 				brackets += 1;
@@ -111,9 +111,9 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 				if keep_closure(slice) {
 					vec.push(slice);
 				}
-				vec.push(";");
-				start = i + 1;
-			}
+				vec.push(&s[i..i + 1]); //Might be clearer to replace the slice with hardcoded ";"
+				start = i + 1;          // but that would ruin cache locality, if we pretend to care
+			}                           // about performance all of a sudden
 
 			(0, 0, 0, 1, '\\') => {
 				escape = true;
@@ -139,5 +139,5 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 
 pub fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
-	&s[1..s.len() - 1]
+	s[1..s.len() - 1].trim()
 }

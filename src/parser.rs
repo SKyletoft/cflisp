@@ -1,5 +1,8 @@
 use crate::*;
-use types::{LanguageElement, StatementElement, StatementToken, Token, Token::*};
+use language_element::LanguageElement;
+use statement_element::StatementElement;
+use statement_token::StatementToken;
+use token::{Token, Token::*};
 
 pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
@@ -129,6 +132,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				}
 			}
 			_ => {
+				dbg!(tokens);
 				return Err(ParseError(
 					line!(),
 					"Couldn't match tokens into LanguageElement pattern",
