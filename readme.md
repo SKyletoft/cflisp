@@ -8,10 +8,10 @@ Can currently parse a subset of C. Full ISO-C compliance is not planned. The goa
 //  tests/test1.c
 
 int main() {
-	int* ptr = 0;
-	int x    = 5;
-	if (x == 5) { x = 3; }
-	*ptr = x;
+    int* ptr = 0;
+    int x    = 5;
+    if (x == 5) { x = 3; }
+    *ptr = x;
 }
 ```
 
