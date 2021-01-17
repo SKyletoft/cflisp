@@ -20,7 +20,6 @@ pub(crate) enum Type {
 	BoolPtr,
 	Void,
 	VoidPtr,
-	Unknown,
 }
 
 ///All possible tokens in the source (after comments have been removed)
@@ -30,11 +29,6 @@ pub(crate) enum Token<'a> {
 	If,
 	Else,
 	Assign,
-	AssignId(usize),
-	AssignName(&'a str),
-	FunctionCall(&'a str, Vec<&'a str>),
-	VariableName(&'a str),
-	VariableId(usize),
 	Add,
 	Sub,
 	Mul,
@@ -45,26 +39,19 @@ pub(crate) enum Token<'a> {
 	LT,
 	RShift,
 	LShift,
-	Block(Vec<Statement<'a>>),
-	Parens(Vec<Token<'a>>),
 	Array,
 	StringLit,
 	Char(char),
 	Bool(bool),
-	Apostrophe,
-	AdrOf,
+	AdrOf(&'a str),
 	Deref(&'a str),
 	Name(&'a str),
-	Star,
-	Ampersand,
 	And,
 	Or,
 	Return,
 	Num(isize),
-	Void,
 	For,
 	While,
-	NoArgs,
 	Args(Vec<Variable<'a>>),
 	UnparsedBlock(&'a str),
 	NewLine,
@@ -85,13 +72,15 @@ impl<'a> Token<'a> {
 		let token = match name {
 			";" => NewLine,
 			"int" => Decl(Type::Int),
-			"bool" => Decl(Type::Int),
-			"char" => Decl(Type::Int),
-			"uint" => Decl(Type::Int),
+			"bool" => Decl(Type::Bool),
+			"char" => Decl(Type::Char),
+			"uint" => Decl(Type::Uint),
 			"int*" => Decl(Type::IntPtr),
-			"bool*" => Decl(Type::IntPtr),
-			"char*" => Decl(Type::IntPtr),
-			"uint*" => Decl(Type::IntPtr),
+			"bool*" => Decl(Type::BoolPtr),
+			"char*" => Decl(Type::CharPtr),
+			"uint*" => Decl(Type::UintPtr),
+			"void" => Decl(Type::Void),
+			"void*" => Decl(Type::VoidPtr),
 			"if" => If,
 			"else" => Else,
 			"=" => Assign,
@@ -113,8 +102,13 @@ impl<'a> Token<'a> {
 			"true" => Bool(true),
 			"false" => Bool(false),
 			"return" => Return,
+			"<<" => LShift,
+			">>" => RShift,
 			"()" => Args(vec![]),
-			n if n.starts_with('&') => Deref(n),
+			"for" => For,
+			"while" => While,
+			n if n.starts_with('&') => AdrOf(n),
+			n if n.starts_with('*') => Deref(n),
 			n if n.starts_with('(') || n.starts_with('{') || n.starts_with('[') => UnparsedBlock(n),
 			n if n.starts_with('"') => {
 				return Err(ParseError(line!(), "Strings are not supported (yet?)"));
@@ -252,7 +246,7 @@ pub(crate) enum StatementToken<'a> {
 	Bool(bool),
 	Char(char),
 	Var(&'a str),
-	FunctionCall(&'a str, Vec<Token<'a>>),
+	FunctionCall(&'a str, Vec<Vec<StatementToken<'a>>>),
 	Add,
 	Sub,
 	Mul,
@@ -274,6 +268,7 @@ impl<'a> StatementToken<'a> {
 	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
 		let mut res = Vec::new();
 		for token in tokens {
+			let last = res.len().wrapping_sub(1);
 			let new = match token {
 				Token::Bool(b) => StatementToken::Bool(*b),
 				Token::Num(n) => StatementToken::Num(*n),
@@ -294,19 +289,16 @@ impl<'a> StatementToken<'a> {
 				Token::GT => StatementToken::GT,
 				Token::Cmp => StatementToken::Cmp,
 				Token::UnparsedBlock(b) => {
-					let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
-					let as_statement = StatementToken::from_tokens(&tokenised)?;
-					StatementToken::Parentheses(as_statement)
-				}
-				Token::Parens(p) => {
-					//If a name is followed by parentheses, interpret is as
-					// a function call.
-					let last = res.len() - 1;
-					if let StatementToken::Var(n) = res[last] {
-						res[last] = StatementToken::FunctionCall(n, p.clone());
+					if let Some(StatementToken::Var(n)) = res.get(last) {
+						res[last] = StatementToken::FunctionCall(
+							n,
+							Token::parse_arguments_tokens(UnparsedBlock(b))?,
+						);
 						continue;
 					} else {
-						StatementToken::Parentheses(StatementToken::from_tokens(p)?)
+						let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+						let as_statement = StatementToken::from_tokens(&tokenised)?;
+						StatementToken::Parentheses(as_statement)
 					}
 				}
 				_ => {
@@ -443,17 +435,25 @@ impl<'a> StatementElement<'a> {
 	pub(crate) fn from_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
-		let mut tokens = tokens
-			.into_iter()
-			.map(|t| match t {
+		dbg!(&tokens);
+		let mut working_tokens = Vec::new();
+		for token in tokens.into_iter() {
+			working_tokens.push(match token {
 				StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
 				StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
 				StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
 				StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
+				StatementToken::FunctionCall(name, ts) => {
+					let mut parametres = Vec::with_capacity(ts.len());
+					for t in ts {
+						parametres.push(StatementElement::from_tokens(t)?);
+					}
+					Parsed(StatementElement::FunctionCall { name, parametres })
+				}
 				t => Unparsed(t),
-			})
-			.collect::<Vec<_>>();
-		let operations: [(MaybeParsed, OpFnPtr); 10] = [
+			});
+		}
+		let operations: [(MaybeParsed, OpFnPtr); 13] = [
 			(Unparsed(StatementToken::Mul), |l, r| {
 				StatementElement::Mul {
 					lhs: Box::new(l),
@@ -466,6 +466,12 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(r),
 				}
 			}),
+			(Unparsed(StatementToken::Mod), |l, r| {
+				StatementElement::Mod {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
 			(Unparsed(StatementToken::Add), |l, r| {
 				StatementElement::Add {
 					lhs: Box::new(l),
@@ -474,6 +480,18 @@ impl<'a> StatementElement<'a> {
 			}),
 			(Unparsed(StatementToken::Sub), |l, r| {
 				StatementElement::Sub {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::LShift), |l, r| {
+				StatementElement::LShift {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::RShift), |l, r| {
+				StatementElement::RShift {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}
@@ -498,30 +516,50 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(r),
 				}
 			}),
-			(Unparsed(StatementToken::Or), |l, r| StatementElement::Or {
-				lhs: Box::new(l),
-				rhs: Box::new(r),
-			}),
 			(Unparsed(StatementToken::Xor), |l, r| {
 				StatementElement::Xor {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}
 			}),
+			(Unparsed(StatementToken::Or), |l, r| StatementElement::Or {
+				lhs: Box::new(l),
+				rhs: Box::new(r),
+			}),
 		];
-		for token in tokens.iter_mut() {
+		for token in working_tokens.iter_mut() {
 			if let Unparsed(StatementToken::Parentheses(p)) = token {
 				let next = StatementElement::from_tokens(p.clone())?;
 				*token = Parsed(next);
 			}
 		}
-		for (from, to) in operations.iter() {
-			do_operation(&mut tokens, from, *to)?;
+		while let Some(idx) = working_tokens
+			.iter()
+			.position(|t| t == &Unparsed(StatementToken::Not))
+		{
+			if idx + 1 == working_tokens.len() {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
+				));
+			}
+			let next = working_tokens.remove(idx + 1);
+			let notted = match next {
+				Unparsed(t) => StatementElement::from_tokens(vec![t])?,
+				Parsed(t) => t,
+			};
+			working_tokens[idx] = Parsed(StatementElement::Not {
+				lhs: Box::new(notted),
+			});
 		}
-		if tokens.len() != 1 {
+		for (from, to) in operations.iter() {
+			do_operation(&mut working_tokens, from, *to)?;
+		}
+		if working_tokens.len() != 1 {
+			dbg!(working_tokens);
 			return Err(ParseError(line!(), "Internal tree construction error"));
 		}
-		if let Parsed(elem) = tokens.remove(0) {
+		if let Parsed(elem) = working_tokens.remove(0) {
 			Ok(elem)
 		} else {
 			Err(ParseError(

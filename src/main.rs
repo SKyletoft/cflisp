@@ -1,5 +1,3 @@
-#![allow(dead_code)] //Remove once everything actually works
-
 pub mod error;
 use error::ParseError;
 pub mod helper;

@@ -1,9 +1,5 @@
 use crate::*;
-use helper::remove_parentheses;
-use types::{
-	LanguageElement, StatementElement, StatementToken, StatementToken::*, Token, Token::*, Type,
-	Type::*,
-};
+use types::{LanguageElement, StatementElement, StatementToken, Token, Token::*};
 
 pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
@@ -96,6 +92,40 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					condition: condition_parsed,
 					then: then_parsed,
 					else_then: Some(vec![else_if_parsed]),
+				}
+			}
+			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
+				let split = init_cond_post.split(';').collect::<Vec<_>>();
+				if split.len() != 3 {
+					return Err(ParseError(
+						line!(),
+						"For loop didn't contain three sections!",
+					));
+				}
+				let mut init_vec = parse(split[0])?;
+				if init_vec.len() == 1 {
+					return Err(ParseError(line!(), "For loop init failed"));
+				}
+				let init_parsed = init_vec.pop().expect("Above check failed?");
+				let post_vec = parse(split[2])?;
+				let condition = Token::parse_statement_tokens(UnparsedBlock(split[1]))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let body_parsed = parse(helper::remove_parentheses(code))?;
+
+				LanguageElement::For {
+					init: Box::new(init_parsed),
+					condition: condition_parsed,
+					after: post_vec,
+					body: body_parsed,
+				}
+			}
+			[While, UnparsedBlock(cond), UnparsedBlock(code)] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let body_parsed = parse(helper::remove_parentheses(code))?;
+				LanguageElement::While {
+					condition: condition_parsed,
+					body: body_parsed,
 				}
 			}
 			_ => {
