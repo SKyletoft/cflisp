@@ -78,41 +78,74 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
+	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {
+		let res = match token {
+			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
+			StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
+			StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
+			StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
+			StatementToken::FunctionCall(name, ts) => {
+				let parametres = ts
+					.into_iter()
+					.map(StatementElement::from_tokens)
+					.collect::<Result<Vec<_>, _>>()?;
+				Parsed(StatementElement::FunctionCall { name, parametres })
+			}
+			StatementToken::Array(arr) => {
+				let elements = arr
+					.into_iter()
+					.map(StatementElement::from_tokens)
+					.collect::<Result<Vec<_>, _>>()?;
+				Parsed(StatementElement::Array(elements))
+			}
+			StatementToken::ArrayAccess { ptr, idx } => {
+				Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
+					lhs: Box::new(StatementElement::Var(ptr)),
+					rhs: Box::new(StatementElement::from_tokens(idx)?),
+				})))
+			}
+			StatementToken::Deref(ptr) => Parsed(StatementElement::Deref(Box::new(
+				StatementElement::from_tokens(ptr)?,
+			))),
+			t => Unparsed(t),
+		};
+		Ok(res)
+	}
+
 	pub(crate) fn from_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
-		dbg!(&tokens);
-		let mut working_tokens = Vec::new();
-		for token in tokens.into_iter() {
-			working_tokens.push(match token {
-				StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
-				StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
-				StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
-				StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
-				StatementToken::FunctionCall(name, ts) => {
-					let parametres = ts
-						.into_iter()
-						.map(StatementElement::from_tokens)
-						.collect::<Result<Vec<_>, _>>()?;
-					Parsed(StatementElement::FunctionCall { name, parametres })
-				}
-				StatementToken::Array(arr) => {
-					let elements = arr
-						.into_iter()
-						.map(StatementElement::from_tokens)
-						.collect::<Result<Vec<_>, _>>()?;
-					Parsed(StatementElement::Array(elements))
-				}
-				StatementToken::ArrayAccess { ptr, idx } => {
-					Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
-						lhs: Box::new(StatementElement::Var(ptr)),
-						rhs: Box::new(StatementElement::from_tokens(idx)?),
-					})))
-				}
-				t => Unparsed(t),
+		let mut working_tokens: Vec<MaybeParsed<'a>> = tokens
+			.into_iter()
+			.map(StatementElement::from_token)
+			.collect::<Result<_, _>>()?;
+
+		for token in working_tokens.iter_mut() {
+			if let Unparsed(StatementToken::Parentheses(p)) = token {
+				let next = StatementElement::from_tokens(p.clone())?;
+				*token = Parsed(next);
+			}
+		}
+
+		while let Some(idx) = working_tokens
+			.iter()
+			.position(|t| t == &Unparsed(StatementToken::Not))
+		{
+			if idx + 1 == working_tokens.len() {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
+				));
+			}
+			let next = working_tokens.remove(idx + 1);
+			let notted = match next {
+				Unparsed(t) => StatementElement::from_tokens(vec![t])?,
+				Parsed(t) => t,
+			};
+			working_tokens[idx] = Parsed(StatementElement::Not {
+				lhs: Box::new(notted),
 			});
 		}
-		dbg!(&working_tokens);
 		let operations: [(MaybeParsed, OpFnPtr); 13] = [
 			(Unparsed(StatementToken::Mul), |l, r| {
 				StatementElement::Mul {
@@ -187,31 +220,6 @@ impl<'a> StatementElement<'a> {
 				rhs: Box::new(r),
 			}),
 		];
-		for token in working_tokens.iter_mut() {
-			if let Unparsed(StatementToken::Parentheses(p)) = token {
-				let next = StatementElement::from_tokens(p.clone())?;
-				*token = Parsed(next);
-			}
-		}
-		while let Some(idx) = working_tokens
-			.iter()
-			.position(|t| t == &Unparsed(StatementToken::Not))
-		{
-			if idx + 1 == working_tokens.len() {
-				return Err(ParseError(
-					line!(),
-					"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
-				));
-			}
-			let next = working_tokens.remove(idx + 1);
-			let notted = match next {
-				Unparsed(t) => StatementElement::from_tokens(vec![t])?,
-				Parsed(t) => t,
-			};
-			working_tokens[idx] = Parsed(StatementElement::Not {
-				lhs: Box::new(notted),
-			});
-		}
 		for (from, to) in operations.iter() {
 			do_operation(&mut working_tokens, from, *to)?;
 		}
@@ -238,10 +246,11 @@ fn do_operation<'a>(
 ) -> Result<(), ParseError> {
 	while let Some(idx) = tokens.iter().position(|t| t == op_from) {
 		if idx == 0 || idx + 1 == tokens.len() {
+			dbg!(tokens);
 			return Err(ParseError(
-			line!(),
-			"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
-		));
+				line!(),
+				"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
+			));
 		}
 		let right = tokens.remove(idx + 1);
 		let left = tokens.remove(idx - 1);

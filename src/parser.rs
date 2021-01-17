@@ -3,6 +3,7 @@ use language_element::LanguageElement;
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
+use types::Type;
 
 pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
@@ -28,7 +29,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
 				let code_parsed = construct_block(&code_tokenised)?;
 				LanguageElement::FunctionDeclaration {
-					typ: *t,
+					typ: t.clone(),
 					name: *n,
 					args: args.clone(),
 					block: code_parsed,
@@ -38,10 +39,39 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
 				let code_parsed = parse(code)?;
 				LanguageElement::FunctionDeclaration {
-					typ: *t,
+					typ: t.clone(),
 					name: *n,
 					args: args_parsed,
 					block: code_parsed,
+				}
+			}
+			[Decl(t), Deref(d), Assign, ..] => {
+				let mut typ = t.clone();
+				let mut r = d;
+				let mut name = "";
+				while let [UnparsedBlock(b)] = r.as_ref() {
+					typ = Type::Ptr(Box::new(typ));
+					if let [Token::Name(n)] = Token::parse_str_to_vec(b)?.as_slice() {
+						name = *n;
+						break;
+					} else if let [Token::Deref(d)] = r.as_ref() {
+						r = d;
+					} else {
+						dbg!(tokens);
+						return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
+					}
+				}
+				if name.is_empty() {
+					dbg!(tokens);
+					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
+				}
+				let rhs = &tokens[3..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::VariableDecarationAssignment {
+					typ,
+					name,
+					value: rhs_parsed,
 				}
 			}
 			[Decl(t), Token::Name(n), Assign, ..] => {
@@ -49,7 +79,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableDecarationAssignment {
-					typ: *t,
+					typ: t.clone(),
 					name: *n,
 					value: rhs_parsed,
 				}
@@ -63,7 +93,20 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
-			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration { typ: *t, name: *n },
+			[Deref(d), Assign, ..] => {
+				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(d.as_ref())?)?;
+				let rhs = &tokens[2..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::PointerAssignment {
+					ptr,
+					value: rhs_parsed,
+				}
+			}
+			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
+				typ: t.clone(),
+				name: *n,
+			},
 			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;

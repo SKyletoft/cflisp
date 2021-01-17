@@ -1,3 +1,5 @@
+use std::{env, fs};
+
 pub mod error;
 pub mod helper;
 pub mod language_element;
@@ -14,7 +16,7 @@ use token::Token;
 use types::Variable;
 
 fn main() {
-	let args = std::env::args().skip(1).collect::<Vec<_>>();
+	let args = env::args().skip(1).collect::<Vec<_>>();
 	let _flags = args
 		.iter()
 		.filter(|s| s.starts_with('-'))
@@ -31,14 +33,14 @@ fn main() {
 	}
 	let mut source = String::new();
 	for file in files {
-		source.push_str(&std::fs::read_to_string(file).expect("IO Error: Could not read file"));
+		source.push_str(&fs::read_to_string(file).expect("IO Error: Could not read file"));
 		source.push('\n');
 	}
 	let parsed = parser::parse(&source /*&flags*/).expect("Parse error");
 	dbg!(&parsed);
 	return;
 	let compiled = compile(&parsed).expect("Compiler error");
-	std::fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
+	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
 }
 
 struct Flags;

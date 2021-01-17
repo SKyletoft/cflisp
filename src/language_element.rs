@@ -17,6 +17,10 @@ pub(crate) enum LanguageElement<'a> {
 		name: &'a str,
 		value: StatementElement<'a>,
 	},
+	PointerAssignment {
+		ptr: StatementElement<'a>,
+		value: StatementElement<'a>,
+	},
 	FunctionDeclaration {
 		typ: Type,
 		name: &'a str,
@@ -28,8 +32,9 @@ pub(crate) enum LanguageElement<'a> {
 		then: Block<'a>,
 		else_then: Option<Block<'a>>,
 	},
-	///`init` must be a VariableDeclarationAssignment,
-	/// `after` must only contain VariableAssignment
+	///`init` must be a `VariableDeclarationAssignment`,
+	///
+	/// `after` must only contain `VariableAssignment`
 	For {
 		init: Box<LanguageElement<'a>>,
 		condition: StatementElement<'a>,

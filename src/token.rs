@@ -19,12 +19,10 @@ pub(crate) enum Token<'a> {
 	LT,
 	RShift,
 	LShift,
-	Array(Vec<&'a str>),
-	StringLit,
 	Char(char),
 	Bool(bool),
 	AdrOf(&'a str),
-	Deref(&'a str),
+	Deref(Box<[Token<'a>; 1]>),
 	Name(&'a str),
 	And,
 	Or,
@@ -45,7 +43,24 @@ impl<'a> Token<'a> {
 			.into_iter()
 			.map(Token::parse)
 			.collect::<Result<_, _>>()
+			.map(Token::fix_deref)
 	}
+
+	fn fix_deref(mut vec: Vec<Token<'a>>) -> Vec<Token<'a>> {
+		let mut i = 0;
+		while i < vec.len() {
+			if vec[i] == Token::Mul
+				&& matches!(vec.get(i + 1), Some(UnparsedBlock(_)))
+				&& vec.get(i.wrapping_sub(1)).map(Token::is_op) != Some(false)
+			{
+				let following = vec.remove(i + 1);
+				vec[i] = Token::Deref(Box::new([following]));
+			}
+			i += 1;
+		}
+		vec
+	}
+
 	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
 		let token = match name {
 			";" => NewLine,
@@ -53,12 +68,12 @@ impl<'a> Token<'a> {
 			"bool" => Decl(Type::Bool),
 			"char" => Decl(Type::Char),
 			"uint" => Decl(Type::Uint),
-			"int*" => Decl(Type::IntPtr),
-			"bool*" => Decl(Type::BoolPtr),
-			"char*" => Decl(Type::CharPtr),
-			"uint*" => Decl(Type::UintPtr),
 			"void" => Decl(Type::Void),
-			"void*" => Decl(Type::VoidPtr),
+			"int*" => Decl(Type::Ptr(Box::new(Type::Int))),
+			"bool*" => Decl(Type::Ptr(Box::new(Type::Bool))),
+			"char*" => Decl(Type::Ptr(Box::new(Type::Char))),
+			"uint*" => Decl(Type::Ptr(Box::new(Type::Uint))),
+			"void*" => Decl(Type::Ptr(Box::new(Type::Void))),
 			"if" => If,
 			"else" => Else,
 			"=" => Assign,
@@ -86,7 +101,7 @@ impl<'a> Token<'a> {
 			"for" => For,
 			"while" => While,
 			n if n.starts_with('&') => AdrOf(&n[1..]),
-			n if n.starts_with('*') => Deref(&n[1..]),
+			n if n.starts_with('*') => Deref(Box::new([UnparsedBlock(&n[1..])])),
 			n if n.starts_with('(') || n.starts_with('{') || n.starts_with('[') => UnparsedBlock(n),
 			n if n.starts_with('"') => {
 				return Err(ParseError(line!(), "Strings are not supported (yet?)"));
@@ -200,7 +215,10 @@ impl<'a> Token<'a> {
 					.zip(tokens.iter().skip(1).step_by(2))
 				{
 					if let (Decl(t), Name(n)) = (type_token, name_token) {
-						arguments.push(Variable { typ: *t, name: *n })
+						arguments.push(Variable {
+							typ: t.clone(),
+							name: *n,
+						})
 					} else {
 						return Err(ParseError(line!(), "Couldn't parse argument list"));
 					}
@@ -213,5 +231,15 @@ impl<'a> Token<'a> {
 				"Expected arguments. Didn't find block. Are you forgetting the opening (?",
 			))
 		}
+	}
+	fn is_op(&self) -> bool {
+		matches!(
+			self,
+			Add | Sub
+				| Mul | Div | Mod
+				| Cmp | GT | LT | RShift
+				| LShift | And | Or
+				| Xor | Not | Assign
+		)
 	}
 }

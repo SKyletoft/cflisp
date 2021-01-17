@@ -24,7 +24,7 @@ pub(crate) enum StatementToken<'a> {
 	Not,
 	Parentheses(Vec<StatementToken<'a>>),
 	AdrOf(&'a str),
-	Deref,
+	Deref(Vec<StatementToken<'a>>),
 	ArrayAccess {
 		ptr: &'a str,
 		idx: Vec<StatementToken<'a>>,
@@ -57,9 +57,7 @@ impl<'a> StatementToken<'a> {
 				Token::GT => StatementToken::GT,
 				Token::Cmp => StatementToken::Cmp,
 				Token::AdrOf(n) => StatementToken::AdrOf(n),
-				Token::Deref(_) => {
-					todo!()
-				}
+				Token::Deref(b) => StatementToken::Deref(StatementToken::from_tokens(b.as_ref())?),
 				Token::UnparsedBlock(b) => {
 					if b.starts_with('(') && b.ends_with(')') {
 						if let Some(StatementToken::Var(n)) = res.get(last) {
@@ -101,10 +99,13 @@ impl<'a> StatementToken<'a> {
 						}
 						StatementToken::Array(v)
 					} else {
-						return Err(ParseError(line!(), "Token is not valid in this context"));
+						StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(
+							b,
+						)?])?)
 					}
 				}
 				_ => {
+					dbg!(token);
 					return Err(ParseError(line!(), "Token is not valid in this context"));
 				}
 			};
