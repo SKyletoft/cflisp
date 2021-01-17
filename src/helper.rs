@@ -111,9 +111,9 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 				if keep_closure(slice) {
 					vec.push(slice);
 				}
-				vec.push(&s[i..i + 1]); //Might be clearer to replace the slice with hardcoded ";"
-				start = i + 1;          // but that would ruin cache locality, if we pretend to care
-			}                           // about performance all of a sudden
+				vec.push(&s[i..i + 1]);
+				start = i + 1;
+			}
 
 			(0, 0, 0, 1, '\\') => {
 				escape = true;
