@@ -141,7 +141,9 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				}
 			}
 			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
-				let split = init_cond_post.split(';').collect::<Vec<_>>();
+				let split = helper::remove_parentheses(init_cond_post)
+					.split(';')
+					.collect::<Vec<_>>();
 				if split.len() != 3 {
 					return Err(ParseError(
 						line!(),
@@ -149,7 +151,8 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					));
 				}
 				let mut init_vec = parse(split[0])?;
-				if init_vec.len() == 1 {
+				if init_vec.len() != 1 {
+					dbg!(init_vec);
 					return Err(ParseError(line!(), "For loop init failed"));
 				}
 				let init_parsed = init_vec.pop().expect("Above check failed?");
@@ -189,7 +192,92 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 pub(crate) fn type_check(
 	block: &[LanguageElement],
 	upper_variables: &[Variable],
-	functions: &[Function],
+	outer_functions: &[Function],
 ) -> bool {
-	todo!()
+	let mut variables = upper_variables.to_owned();
+	let mut functions = outer_functions.to_owned();
+
+	for line in block {
+		match line {
+			LanguageElement::VariableDeclaration { typ, name } => variables.push(Variable {
+				typ: typ.clone(),
+				name: *name,
+			}),
+			LanguageElement::VariableAssignment { name: _, value } => {
+				if !value.type_check(&variables, &functions) {
+					return false;
+				}
+			}
+			LanguageElement::VariableDecarationAssignment { typ, name, value } => {
+				variables.push(Variable {
+					typ: typ.clone(),
+					name: *name,
+				});
+				if !value.type_check(&variables, &functions) {
+					return false;
+				}
+			}
+			LanguageElement::PointerAssignment { ptr, value } => {
+				if !ptr.type_check(&variables, &functions)
+					|| !value.type_check(&variables, &functions)
+				{
+					return false;
+				}
+			}
+			LanguageElement::FunctionDeclaration {
+				typ,
+				name,
+				args,
+				block,
+			} => {
+				functions.push(Function {
+					return_type: typ.clone(),
+					name: *name,
+					parametres: args.clone(),
+				});
+				if !type_check(block, &variables, &functions) {
+					return false;
+				}
+			}
+			LanguageElement::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => {
+				if !condition.type_check(&variables, &functions)
+					|| !type_check(then, &variables, &functions)
+					|| !else_then
+						.as_deref()
+						.map(|v| type_check(v, &variables, &functions))
+						.unwrap_or(true)
+				{
+					return false;
+				}
+			}
+			LanguageElement::For {
+				init,
+				condition,
+				after,
+				body,
+			} => {
+				let init_as_slice = std::slice::from_ref(init.as_ref());
+				if !condition.type_check(&variables, &functions)
+					|| !type_check(init_as_slice, &variables, &functions)
+					|| !type_check(after, &variables, &functions)
+					|| !type_check(body, &variables, &functions)
+				{
+					return false;
+				}
+			}
+			LanguageElement::While { condition, body } => {
+				if !condition.type_check(&variables, &functions)
+					|| !type_check(body, &variables, &functions)
+				{
+					return false;
+				}
+			}
+		}
+	}
+
+	true
 }

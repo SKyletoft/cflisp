@@ -5,6 +5,8 @@ pub(crate) struct Variable<'a> {
 	pub(crate) typ: Type,
 	pub(crate) name: &'a str,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Function<'a> {
 	pub(crate) return_type: Type,
 	pub(crate) name: &'a str,
