@@ -110,17 +110,14 @@ impl<'a> Token<'a> {
 			n if n.starts_with('\'') && n.len() == 3 && n.ends_with('\'') => {
 				Token::Char(n.as_bytes()[1] as char)
 			}
-			n => {
-				if n.starts_with(|n: char| n == '-' || n.is_ascii_digit())
-					&& n.chars().skip(1).all(|r| r.is_ascii_digit())
-				{
-					Num(n.parse::<isize>().map_err(|_| {
-						ParseError(line!(), "Number parse error: Is the number too large?")
-					})?)
-				} else {
-					Token::Name(n)
-				}
+			n if n.starts_with(|c: char| c == '-' || c.is_ascii_digit())
+				&& n.chars().skip(1).all(|r| r.is_ascii_digit()) =>
+			{
+				Num(n.parse::<isize>().map_err(|_| {
+					ParseError(line!(), "Number parse error: Is the number too large?")
+				})?)
 			}
+			n => Token::Name(n),
 		};
 		Ok(token)
 	}
