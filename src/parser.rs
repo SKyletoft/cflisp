@@ -3,7 +3,7 @@ use language_element::LanguageElement;
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
-use types::Type;
+use types::{Function, Type};
 
 pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
@@ -184,4 +184,12 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 		}
 	};
 	Ok(element)
+}
+
+pub(crate) fn type_check(
+	block: &[LanguageElement],
+	upper_variables: &[Variable],
+	functions: &[Function],
+) -> bool {
+	todo!()
 }

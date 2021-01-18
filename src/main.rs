@@ -38,6 +38,11 @@ fn main() {
 		source.push('\n');
 	}
 	let parsed = parser::parse(&source /*&flags*/).expect("Parse error");
+	let ok = parser::type_check(&parsed, &[], &[]);
+	if !ok {
+		eprintln!("Error: type check error");
+		return;
+	}
 	dbg!(&parsed);
 	let compiled = compile_flisp::compile(&parsed).expect("Compiler error");
 	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
