@@ -232,6 +232,7 @@ impl<'a> Token<'a> {
 			))
 		}
 	}
+
 	fn is_op(&self) -> bool {
 		matches!(
 			self,

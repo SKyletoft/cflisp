@@ -71,6 +71,7 @@ pub(crate) enum StatementElement<'a> {
 }
 
 type OpFnPtr<'a> = fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>;
+
 #[derive(Debug, Clone, PartialEq)]
 enum MaybeParsed<'a> {
 	Parsed(StatementElement<'a>),
@@ -85,6 +86,7 @@ impl<'a> StatementElement<'a> {
 			StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
 			StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
 			StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
+			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(n)),
 			StatementToken::FunctionCall(name, ts) => {
 				let parametres = ts
 					.into_iter()
@@ -108,7 +110,6 @@ impl<'a> StatementElement<'a> {
 			StatementToken::Deref(ptr) => Parsed(StatementElement::Deref(Box::new(
 				StatementElement::from_tokens(ptr)?,
 			))),
-			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(n)),
 			t => Unparsed(t),
 		};
 		Ok(res)
