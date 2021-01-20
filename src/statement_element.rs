@@ -246,8 +246,8 @@ impl<'a> StatementElement<'a> {
 		&self,
 		functions: &'a [Function<'a>],
 		variables: &'a [Variable<'a>],
-	) -> Type {
-		match self {
+	) -> Result<Type, ParseError> {
+		let res = match self {
 			StatementElement::Num(_) => Type::Int,
 			StatementElement::Char(_) => Type::Char,
 			StatementElement::Bool(_) => Type::Bool,
@@ -268,22 +268,34 @@ impl<'a> StatementElement<'a> {
 			StatementElement::FunctionCall {
 				name,
 				parametres: _,
-			} => functions
-				.iter()
-				.find(|f| &f.name == name)
-				.map(|f| f.return_type.clone())
-				.unwrap_or(Type::Void),
-			StatementElement::Var(name) => variables
-				.iter()
-				.find(|f| &f.name == name)
-				.map(|v| v.typ.clone())
-				.unwrap_or(Type::Void),
+			} => {
+				if let Some(t) = functions
+					.iter()
+					.find(|f| &f.name == name)
+					.map(|f| f.return_type.clone())
+				{
+					t
+				} else {
+					return Err(ParseError(line!(), "Cannot resolve function!"));
+				}
+			}
+			StatementElement::Var(name) => {
+				if let Some(t) = variables
+					.iter()
+					.find(|f| &f.name == name)
+					.map(|v| v.typ.clone())
+				{
+					t
+				} else {
+					return Err(ParseError(line!(), "Cannot resolve variable!"));
+				}
+			}
 			StatementElement::Array(arr) => Type::Ptr(Box::new(
 				arr.get(0)
 					.map(|s| s.type_of(functions, variables))
-					.unwrap_or(Type::Void),
+					.unwrap_or(Ok(Type::Void))?,
 			)),
-			StatementElement::Deref(t) => t.as_ref().type_of(functions, variables),
+			StatementElement::Deref(t) => t.as_ref().type_of(functions, variables)?,
 			StatementElement::AdrOf(name) => Type::Ptr(Box::new(
 				variables
 					.iter()
@@ -291,78 +303,93 @@ impl<'a> StatementElement<'a> {
 					.map(|v| v.typ.clone())
 					.unwrap_or(Type::Void),
 			)),
-		}
+		};
+		Ok(res)
 	}
 
-	pub(crate) fn type_check(&self, variables: &[Variable], functions: &[Function]) -> bool {
-		match self {
+	pub(crate) fn type_check(
+		&self,
+		variables: &[Variable],
+		functions: &[Function],
+	) -> Result<bool, ParseError> {
+		let res = match self {
 			StatementElement::FunctionCall { name, parametres } => {
 				if let Some(f) = functions.iter().find(|f| &f.name == name) {
-					f.parametres.len() == parametres.len()
-						&& f.parametres
+					let len_eq = f.parametres.len() == parametres.len();
+					let types_are_eq = {
+						for (l, r) in f
+							.parametres
 							.iter()
 							.map(|v| &v.typ)
 							.zip(parametres.iter().map(|p| p.type_of(functions, variables)))
-							.all(|(l, r)| l == &r)
+						{
+							if l != &r? {
+								return Ok(false);
+							}
+						}
+						true
+					};
+					len_eq && types_are_eq
 				} else {
 					false
 				}
 			}
 			StatementElement::Add { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Sub { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Mul { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Div { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Mod { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::LShift { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::RShift { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::And { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Or { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Xor { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::GT { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::LT { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
 			StatementElement::Cmp { lhs, rhs } => {
-				lhs.as_ref().type_check(variables, functions)
-					&& rhs.as_ref().type_check(variables, functions)
+				lhs.as_ref().type_check(variables, functions)?
+					&& rhs.as_ref().type_check(variables, functions)?
 			}
-			StatementElement::Not { lhs } => lhs.as_ref().type_check(variables, functions),
+			StatementElement::Not { lhs } => lhs.as_ref().type_check(variables, functions)?,
 			_ => true,
-		}
+		};
+		Ok(res)
 	}
 }
 

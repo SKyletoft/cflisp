@@ -193,7 +193,7 @@ pub(crate) fn type_check(
 	block: &[LanguageElement],
 	upper_variables: &[Variable],
 	outer_functions: &[Function],
-) -> bool {
+) -> Result<bool, ParseError> {
 	let mut variables = upper_variables.to_owned();
 	let mut functions = outer_functions.to_owned();
 
@@ -204,8 +204,8 @@ pub(crate) fn type_check(
 				name: *name,
 			}),
 			LanguageElement::VariableAssignment { name: _, value } => {
-				if !value.type_check(&variables, &functions) {
-					return false;
+				if !value.type_check(&variables, &functions)? {
+					return Ok(false);
 				}
 			}
 			LanguageElement::VariableDecarationAssignment { typ, name, value } => {
@@ -213,15 +213,15 @@ pub(crate) fn type_check(
 					typ: typ.clone(),
 					name: *name,
 				});
-				if !value.type_check(&variables, &functions) {
-					return false;
+				if !value.type_check(&variables, &functions)? {
+					return Ok(false);
 				}
 			}
 			LanguageElement::PointerAssignment { ptr, value } => {
-				if !ptr.type_check(&variables, &functions)
-					|| !value.type_check(&variables, &functions)
+				if !ptr.type_check(&variables, &functions)?
+					|| !value.type_check(&variables, &functions)?
 				{
-					return false;
+					return Ok(false);
 				}
 			}
 			LanguageElement::FunctionDeclaration {
@@ -235,8 +235,8 @@ pub(crate) fn type_check(
 					name: *name,
 					parametres: args.clone(),
 				});
-				if !type_check(block, &variables, &functions) {
-					return false;
+				if !type_check(block, &variables, &functions)? {
+					return Ok(false);
 				}
 			}
 			LanguageElement::IfStatement {
@@ -244,14 +244,14 @@ pub(crate) fn type_check(
 				then,
 				else_then,
 			} => {
-				if !condition.type_check(&variables, &functions)
-					|| !type_check(then, &variables, &functions)
+				if !condition.type_check(&variables, &functions)?
+					|| !type_check(then, &variables, &functions)?
 					|| !else_then
 						.as_deref()
 						.map(|v| type_check(v, &variables, &functions))
-						.unwrap_or(true)
+						.unwrap_or(Ok(true))?
 				{
-					return false;
+					return Ok(false);
 				}
 			}
 			LanguageElement::For {
@@ -261,23 +261,23 @@ pub(crate) fn type_check(
 				body,
 			} => {
 				let init_as_slice = std::slice::from_ref(init.as_ref());
-				if !condition.type_check(&variables, &functions)
-					|| !type_check(init_as_slice, &variables, &functions)
-					|| !type_check(after, &variables, &functions)
-					|| !type_check(body, &variables, &functions)
+				if !condition.type_check(&variables, &functions)?
+					|| !type_check(init_as_slice, &variables, &functions)?
+					|| !type_check(after, &variables, &functions)?
+					|| !type_check(body, &variables, &functions)?
 				{
-					return false;
+					return Ok(false);
 				}
 			}
 			LanguageElement::While { condition, body } => {
-				if !condition.type_check(&variables, &functions)
-					|| !type_check(body, &variables, &functions)
+				if !condition.type_check(&variables, &functions)?
+					|| !type_check(body, &variables, &functions)?
 				{
-					return false;
+					return Ok(false);
 				}
 			}
 		}
 	}
 
-	true
+	Ok(true)
 }

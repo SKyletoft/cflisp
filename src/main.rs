@@ -38,7 +38,7 @@ fn main() {
 		source.push('\n');
 	}
 	let parsed = parser::parse(&source).expect("Parse error");
-	let ok = parser::type_check(&parsed, &[], &[]);
+	let ok = parser::type_check(&parsed, &[], &[]).expect("Name error");
 	if !ok {
 		eprintln!("Error: type check error");
 		return;
