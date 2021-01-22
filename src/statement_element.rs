@@ -81,6 +81,36 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
+	pub(crate) fn size(&self) -> usize {
+		match self {
+			StatementElement::Add { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Sub { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Mul { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Div { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Mod { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::LShift { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::RShift { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::And { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Or { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Xor { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::GT { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::LT { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
+			StatementElement::Not { lhs } => lhs.as_ref().size(),
+			StatementElement::FunctionCall {
+				name: _,
+				parametres,
+			} => parametres.len(),
+			StatementElement::Var(_) => 1,
+			StatementElement::Num(_) => 1,
+			StatementElement::Char(_) => 1,
+			StatementElement::Bool(_) => 1,
+			StatementElement::Array(_) => 1,
+			StatementElement::Deref(_) => 1,
+			StatementElement::AdrOf(_) => 1,
+		}
+	}
+
 	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {
 		let res = match token {
 			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),

@@ -2,6 +2,7 @@ use std::{env, fs};
 
 pub mod compile_flisp;
 pub mod error;
+pub mod flisp_instructions;
 pub mod helper;
 pub mod language_element;
 pub mod parser;
