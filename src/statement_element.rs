@@ -1,5 +1,6 @@
 use crate::*;
-use types::{Function, Type};
+use flisp_instructions::{Addressing, Instruction};
+use types::{Block, DepthType, Function, Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementElement<'a> {
@@ -63,12 +64,14 @@ pub(crate) enum StatementElement<'a> {
 		parametres: Vec<StatementElement<'a>>,
 	},
 	Var(&'a str),
+	VarLabel(usize),
 	Num(isize),
 	Char(char),
 	Bool(bool),
 	Array(Vec<StatementElement<'a>>),
 	Deref(Box<StatementElement<'a>>),
 	AdrOf(&'a str),
+	AdrOfLabel(usize),
 }
 
 type OpFnPtr<'a> = fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>;
@@ -81,6 +84,71 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
+	pub(crate) fn as_a_instruction(&self, adr: Addressing) -> Result<Instruction, CompileError> {
+		let res = match self {
+			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
+			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::Mul { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Div { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Mod { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::LShift { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::RShift { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::And { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Or { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Xor { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Not { lhs } => unimplemented!(),
+			StatementElement::GT { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::LT { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Cmp { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::FunctionCall {
+				name: _,
+				parametres: _,
+			} => unimplemented!(),
+			StatementElement::Var(_) => unimplemented!(),
+			StatementElement::VarLabel(_) => unimplemented!(),
+			StatementElement::Num(_) => unimplemented!(),
+			StatementElement::Char(_) => unimplemented!(),
+			StatementElement::Bool(_) => unimplemented!(),
+			StatementElement::Array(_) => unimplemented!(),
+			StatementElement::Deref(_) => unimplemented!(),
+			StatementElement::AdrOf(_) => unimplemented!(),
+			StatementElement::AdrOfLabel(_) => unimplemented!(),
+		};
+		Ok(res)
+	}
+
+	pub(crate) fn value_or_recursive(&self) -> DepthType {
+		match self {
+			StatementElement::Add { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Sub { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Mul { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Div { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Mod { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::LShift { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::RShift { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::And { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Or { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Xor { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Not { lhs: _ } => DepthType::RecursiveOne,
+			StatementElement::GT { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::LT { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::Cmp { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
+			StatementElement::FunctionCall {
+				name: _,
+				parametres: _,
+			} => DepthType::RecursiveTwo,
+			StatementElement::Var(_) => DepthType::Value,
+			StatementElement::VarLabel(_) => DepthType::Value,
+			StatementElement::Num(_) => DepthType::Value,
+			StatementElement::Char(_) => DepthType::Value,
+			StatementElement::Bool(_) => DepthType::Value,
+			StatementElement::Array(_) => DepthType::Value,
+			StatementElement::Deref(_) => DepthType::Value,
+			StatementElement::AdrOf(_) => DepthType::Value,
+			StatementElement::AdrOfLabel(_) => DepthType::RecursiveOne,
+		}
+	}
+
 	pub(crate) fn size(&self) -> usize {
 		match self {
 			StatementElement::Add { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
@@ -108,6 +176,40 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Array(_) => 1,
 			StatementElement::Deref(_) => 1,
 			StatementElement::AdrOf(_) => 1,
+			StatementElement::VarLabel(_) => 1,
+			StatementElement::AdrOfLabel(_) => 1,
+		}
+	}
+
+	pub(crate) fn depth(&self) -> usize {
+		match self {
+			StatementElement::Add { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Sub { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Mul { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Div { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Mod { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::LShift { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::RShift { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::And { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Or { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Xor { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::GT { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::LT { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
+			StatementElement::Not { lhs } => lhs.as_ref().size(),
+			StatementElement::FunctionCall {
+				name: _,
+				parametres,
+			} => parametres.iter().map(StatementElement::depth).sum(),
+			StatementElement::Var(_) => 1,
+			StatementElement::Num(_) => 1,
+			StatementElement::Char(_) => 1,
+			StatementElement::Bool(_) => 1,
+			StatementElement::Array(_) => 1,
+			StatementElement::Deref(_) => 1,
+			StatementElement::AdrOf(_) => 1,
+			StatementElement::VarLabel(_) => 1,
+			StatementElement::AdrOfLabel(_) => 1,
 		}
 	}
 
@@ -298,28 +400,20 @@ impl<'a> StatementElement<'a> {
 			StatementElement::FunctionCall {
 				name,
 				parametres: _,
-			} => {
-				if let Some(t) = functions
-					.iter()
-					.find(|f| &f.name == name)
-					.map(|f| f.return_type.clone())
-				{
-					t
-				} else {
-					return Err(ParseError(line!(), "Cannot resolve function!"));
-				}
-			}
-			StatementElement::Var(name) => {
-				if let Some(t) = variables
-					.iter()
-					.find(|f| &f.name == name)
-					.map(|v| v.typ.clone())
-				{
-					t
-				} else {
-					return Err(ParseError(line!(), "Cannot resolve variable!"));
-				}
-			}
+			} => functions
+				.iter()
+				.find(|f| &f.name == name)
+				.map(|f| f.return_type.clone())
+				.ok_or(ParseError(line!(), "Cannot resolve function!"))?,
+			StatementElement::Var(name) => variables
+				.iter()
+				.find(|f| &f.name == name)
+				.map(|v| v.typ.clone())
+				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
+			StatementElement::VarLabel(n) => variables
+				.get(*n)
+				.map(|v| v.typ.clone())
+				.ok_or(ParseError(line!(), "Internal: invalid label"))?,
 			StatementElement::Array(arr) => Type::Ptr(Box::new(
 				arr.get(0)
 					.map(|s| s.type_of(functions, variables))
@@ -331,8 +425,12 @@ impl<'a> StatementElement<'a> {
 					.iter()
 					.find(|f| &f.name == name)
 					.map(|v| v.typ.clone())
-					.unwrap_or(Type::Void),
+					.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 			)),
+			StatementElement::AdrOfLabel(n) => variables
+				.get(*n)
+				.map(|v| v.typ.clone())
+				.ok_or(ParseError(line!(), "Internal: invalid label"))?,
 		};
 		Ok(res)
 	}
@@ -450,4 +548,25 @@ fn do_operation<'a>(
 		}
 	}
 	Ok(())
+}
+
+pub(crate) fn move_declarations_first(block: &mut Block) {
+	let give_value = |element: &LanguageElement| -> usize {
+		match element {
+			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,
+			LanguageElement::VariableDecarationAssignment {
+				typ: _,
+				name: _,
+				value: _,
+			} => 0,
+			LanguageElement::FunctionDeclaration {
+				typ: _,
+				name: _,
+				args: _,
+				block: _,
+			} => 0,
+			_ => 1,
+		}
+	};
+	block.sort_by_key(give_value);
 }

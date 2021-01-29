@@ -17,6 +17,7 @@ pub(crate) fn construct_block<'a>(
 	for token in tokens.split(|t| t == &NewLine).filter(|t| !t.is_empty()) {
 		res.push(construct_structure_from_tokens(token)?);
 	}
+	statement_element::move_declarations_first(&mut res);
 	Ok(res)
 }
 
