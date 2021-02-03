@@ -4,6 +4,8 @@ pub(crate) enum Register {
 	Y,
 }
 
+pub(crate) type CommentedInstruction<'a> = (Instruction, &'a str);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Instruction {
 	LDA(Addressing),
@@ -42,7 +44,7 @@ impl Instruction {
 pub(crate) enum Addressing {
 	Data(isize),
 	Adr(isize),
-	SP(isize),
+	SP(usize),
 	Xn(isize),
 	Yn(isize),
 }

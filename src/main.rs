@@ -47,6 +47,7 @@ fn main() {
 		println!("type check passed");
 	}
 	dbg!(&parsed);
+	return;
 	let compiled = compile_flisp::compile(&parsed /*&flags*/).expect("Compiler error");
 	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
 }
