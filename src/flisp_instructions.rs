@@ -18,8 +18,12 @@ pub(crate) enum Instruction {
 	ASR(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
+	JMP(Addressing),
+	BEQ(Addressing),
+	LEASP(Addressing),
 	PSHA,
 	PULA,
+	TSTA,
 	AddToStack,      //LEA SP,-1
 	RemoveFromStack, //LEA SP,1
 	Label(String),
@@ -37,21 +41,26 @@ impl Instruction {
 			| Instruction::ASR(a)
 			| Instruction::EORA(a)
 			| Instruction::SUBA(a)
-			| Instruction::STA(a) => Some(*a),
+			| Instruction::JMP(a)
+			| Instruction::BEQ(a)
+			| Instruction::LEASP(a)
+			| Instruction::STA(a) => Some(a.clone()),
 			Instruction::AddToStack
 			| Instruction::RemoveFromStack
 			| Instruction::Label(_)
 			| Instruction::PSHA
-			| Instruction::PULA => None,
+			| Instruction::PULA
+			| Instruction::TSTA => None,
 		}
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Addressing {
 	Data(isize),
 	Adr(isize),
 	SP(isize),
 	Xn(isize),
 	Yn(isize),
+	Label(String),
 }

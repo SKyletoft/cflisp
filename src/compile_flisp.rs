@@ -14,6 +14,7 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		"global",
 		&mut 0,
 	)?;
+	dbg!(instructions);
 	todo!()
 }
 
@@ -80,36 +81,58 @@ pub(crate) fn compile_element<'a>(
 				return Err(CompileError(line!(), "Function with duplicate name!"));
 			}
 			functions.insert(*name, args.as_slice());
-			compile_elements(block, variables, global_variables, functions, name, &mut 0)?
+			let mut args_count = args.len() as isize;
+			let mut fun = compile_elements(
+				block,
+				variables,
+				global_variables,
+				functions,
+				name,
+				&mut args_count,
+			)?;
+			if args_count != 0 {
+				fun.push((Instruction::LEASP(Addressing::SP(-args_count)), None));
+			}
+			fun
 		}
 		LanguageElement::IfStatement {
 			condition,
 			then,
 			else_then,
 		} => {
-			let cond = compile_statement(condition, variables, global_variables, stack_size)?;
-			let then_block = compile_elements(
+			let line_id_str = line_id.to_string();
+			let then_str = "if-then-".to_string() + scope_name + &line_id_str;
+			let else_str = "if-else-".to_string() + scope_name + &line_id_str;
+			let end_str = "if-end-".to_string() + scope_name + &line_id_str;
+			let mut cond = compile_statement(condition, variables, global_variables, stack_size)?;
+			cond.push((Instruction::TSTA, None));
+			let mut then_block = compile_elements(
 				then.as_slice(),
 				variables,
 				global_variables,
 				functions,
-				&("if-then-".to_string() + &line_id.to_string()),
+				&then_str,
 				stack_size,
 			)?;
-			let else_block = if let Some(v) = else_then {
-				Some(compile_elements(
+			if let Some(v) = else_then {
+				let mut else_block = compile_elements(
 					v.as_slice(),
 					variables,
 					global_variables,
 					functions,
-					&("if-else-".to_string() + &line_id.to_string()),
+					&else_str,
 					stack_size,
-				)?)
+				)?;
+				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
+				cond.append(&mut then_block);
+				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
+				cond.append(&mut else_block);
 			} else {
-				None
-			};
-
-			todo!()
+				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+				cond.append(&mut then_block);
+			}
+			cond.push((Instruction::Label(end_str), None));
+			cond
 		}
 		LanguageElement::For {
 			init,
@@ -225,10 +248,29 @@ fn compile_statement_inner<'a>(
 				"Internal: Function call in statement. Should've been moved out?",
 			));
 		}
-		StatementElement::Var(_) => unimplemented!(),
-		StatementElement::Num(_) => unimplemented!(),
-		StatementElement::Char(_) => unimplemented!(),
-		StatementElement::Bool(_) => unimplemented!(),
+		StatementElement::Var(name) => {
+			let adr = if let Some((_, adr)) = variables.get(name) {
+				Addressing::SP(*adr)
+			} else if let Some((_, adr)) = global_variables.get(name) {
+				Addressing::Adr(*adr)
+			} else {
+				eprintln!("Error: {}", name);
+				return Err(CompileError(
+					line!(),
+					"Name resolution failed? Shouldn't be checked by now?",
+				));
+			};
+			vec![(Instruction::LDA(adr), Some(*name))]
+		}
+		StatementElement::Num(n) => {
+			vec![(Instruction::LDA(Addressing::Data(*n)), None)]
+		}
+		StatementElement::Char(c) => {
+			vec![(Instruction::LDA(Addressing::Data(*c as isize)), None)]
+		}
+		StatementElement::Bool(b) => {
+			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
+		}
 		StatementElement::Array(_) => unimplemented!(),
 		StatementElement::Deref(_) => unimplemented!(),
 		StatementElement::AdrOf(_) => unimplemented!(),
