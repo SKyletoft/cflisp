@@ -18,7 +18,7 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 	todo!()
 }
 
-pub(crate) fn compile_element<'a>(
+fn compile_element<'a>(
 	element: &'a LanguageElement,
 	variables: &mut HashMap<&'a str, (Type, isize)>,
 	global_variables: &mut HashMap<&'a str, (Type, isize)>,
@@ -51,7 +51,7 @@ pub(crate) fn compile_element<'a>(
 			statement.push((Instruction::STA(adr), None));
 			statement
 		}
-		LanguageElement::VariableDecarationAssignment { typ, name, value } => {
+		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
 			if variables.contains_key(name) {
 				return Err(CompileError(line!(), "Name already exists in scope!"));
 			}
@@ -82,9 +82,10 @@ pub(crate) fn compile_element<'a>(
 			}
 			functions.insert(*name, args.as_slice());
 			let mut args_count = args.len() as isize;
+			let mut local_variables = HashMap::new();
 			let mut fun = compile_elements(
 				block,
-				variables,
+				&mut local_variables,
 				global_variables,
 				functions,
 				name,
@@ -101,9 +102,9 @@ pub(crate) fn compile_element<'a>(
 			else_then,
 		} => {
 			let line_id_str = line_id.to_string();
-			let then_str = "if-then-".to_string() + scope_name + &line_id_str;
-			let else_str = "if-else-".to_string() + scope_name + &line_id_str;
-			let end_str = "if-end-".to_string() + scope_name + &line_id_str;
+			let then_str = "if-then-".to_string() + scope_name + "-" + &line_id_str;
+			let else_str = "if-else-".to_string() + scope_name + "-" + &line_id_str;
+			let end_str = "if-end-".to_string() + scope_name + "-" + &line_id_str;
 			let mut cond = compile_statement(condition, variables, global_variables, stack_size)?;
 			cond.push((Instruction::TSTA, None));
 			let mut then_block = compile_elements(
@@ -157,7 +158,7 @@ fn compile_elements<'a>(
 	for line in block.iter().enumerate().map(|(i, e)| {
 		compile_element(
 			e,
-			&mut HashMap::new(),
+			variables,
 			global_variables,
 			functions,
 			scope_name,
@@ -195,9 +196,6 @@ fn compile_statement_inner<'a>(
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	if statement.size() > 20 {
-		return Err(CompileError(line!(), "Statement is too complex"));
-	}
 	let instructions = match statement {
 		StatementElement::Add { lhs, rhs }
 		| StatementElement::Sub { lhs, rhs }
@@ -234,7 +232,7 @@ fn compile_statement_inner<'a>(
 					)),
 					_ => return Err(CompileError(line!(), "Internal: Depth caluclation failed?")),
 				}?;
-				let merge = (statement.as_a_instruction(addressing), None);
+				let merge = (statement.as_flisp_instruction(addressing), None);
 				instructions.push(merge);
 			}
 			instructions

@@ -1,6 +1,6 @@
 use crate::*;
 
-pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
+pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 	let keep_closure = |slice: &str| slice.chars().any(|c| !c.is_whitespace());
 	let mut vec = Vec::new();
 	let mut parentheses = 0;
@@ -138,7 +138,7 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 	}
 }
 
-pub fn remove_parentheses(s: &str) -> &str {
+pub(crate) fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
 	s[1..s.len() - 1].trim()
 }

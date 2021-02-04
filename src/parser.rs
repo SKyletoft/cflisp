@@ -10,9 +10,7 @@ pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, Par
 	construct_block(&tokens)
 }
 
-pub(crate) fn construct_block<'a>(
-	tokens: &[Token<'a>],
-) -> Result<Vec<LanguageElement<'a>>, ParseError> {
+fn construct_block<'a>(tokens: &[Token<'a>]) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let mut res = Vec::new();
 	//REVISIT LATER. SPLITTING AT NEWLINE CAUSES ERRORS WITH ELSE BLOCKS
 	for token in tokens.split(|t| t == &NewLine).filter(|t| !t.is_empty()) {
@@ -22,7 +20,7 @@ pub(crate) fn construct_block<'a>(
 	Ok(res)
 }
 
-pub(crate) fn construct_structure_from_tokens<'a>(
+fn construct_structure_from_tokens<'a>(
 	tokens: &[Token<'a>],
 ) -> Result<LanguageElement<'a>, ParseError> {
 	let element = {
@@ -73,7 +71,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				let rhs = &tokens[3..];
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDecarationAssignment {
+				LanguageElement::VariableDeclarationAssignment {
 					typ,
 					name,
 					value: rhs_parsed,
@@ -84,7 +82,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 				let rhs = &tokens[3..];
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDecarationAssignment {
+				LanguageElement::VariableDeclarationAssignment {
 					typ: t.clone(),
 					name: *n,
 					value: rhs_parsed,
@@ -222,7 +220,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
-			LanguageElement::VariableDecarationAssignment { typ, name, value } => {
+			LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
 				variables.push(Variable {
 					typ: typ.clone(),
 					name: *name,

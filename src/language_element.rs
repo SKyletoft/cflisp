@@ -12,7 +12,7 @@ pub(crate) enum LanguageElement<'a> {
 		name: &'a str,
 		value: StatementElement<'a>,
 	},
-	VariableDecarationAssignment {
+	VariableDeclarationAssignment {
 		typ: Type,
 		name: &'a str,
 		value: StatementElement<'a>,

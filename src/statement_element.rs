@@ -82,7 +82,7 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
-	pub(crate) fn as_a_instruction(&self, adr: Addressing) -> Instruction {
+	pub(crate) fn as_flisp_instruction(&self, adr: Addressing) -> Instruction {
 		match self {
 			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
 			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
@@ -91,13 +91,13 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Mod { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::LShift { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::RShift { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::And { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Or { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Xor { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Not { lhs: _ } => unimplemented!(),
+			StatementElement::And { lhs: _, rhs: _ } => Instruction::ANDA(adr),
+			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
+			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
+			StatementElement::Not { lhs: _ } => Instruction::COMA,
 			StatementElement::GT { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::LT { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Cmp { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::FunctionCall {
 				name: _,
 				parametres: _,
@@ -112,52 +112,22 @@ impl<'a> StatementElement<'a> {
 		}
 	}
 
-	pub(crate) fn size(&self) -> usize {
-		match self {
-			StatementElement::Add { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Sub { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Mul { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Div { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Mod { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::LShift { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::RShift { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::And { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Or { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Xor { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::GT { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::LT { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().size() + rhs.as_ref().size(),
-			StatementElement::Not { lhs } => lhs.as_ref().size(),
-			StatementElement::FunctionCall {
-				name: _,
-				parametres,
-			} => parametres.len(),
-			StatementElement::Var(_) => 1,
-			StatementElement::Num(_) => 1,
-			StatementElement::Char(_) => 1,
-			StatementElement::Bool(_) => 1,
-			StatementElement::Array(_) => 1,
-			StatementElement::Deref(_) => 1,
-			StatementElement::AdrOf(_) => 1,
-		}
-	}
-
 	pub(crate) fn depth(&self) -> usize {
 		match self {
-			StatementElement::Add { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Sub { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Mul { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Div { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Mod { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::LShift { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::RShift { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::And { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Or { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Xor { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::GT { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::LT { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().size().max(rhs.as_ref().size()),
-			StatementElement::Not { lhs } => lhs.as_ref().size(),
+			StatementElement::Add { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Sub { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Mul { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Div { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Mod { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::LShift { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::RShift { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::And { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Or { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Xor { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::GT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::LT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Not { lhs } => lhs.as_ref().depth(),
 			StatementElement::FunctionCall {
 				name: _,
 				parametres,
@@ -333,7 +303,7 @@ impl<'a> StatementElement<'a> {
 		}
 	}
 
-	pub(crate) fn type_of(
+	fn type_of(
 		&self,
 		functions: &'a [Function<'a>],
 		variables: &'a [Variable<'a>],
@@ -505,7 +475,7 @@ pub(crate) fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,
-			LanguageElement::VariableDecarationAssignment {
+			LanguageElement::VariableDeclarationAssignment {
 				typ: _,
 				name: _,
 				value: _,

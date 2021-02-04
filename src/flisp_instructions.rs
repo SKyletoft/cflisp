@@ -16,6 +16,7 @@ pub(crate) enum Instruction {
 	ANDA(Addressing),
 	ASL(Addressing),
 	ASR(Addressing),
+	ORA(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
 	JMP(Addressing),
@@ -24,6 +25,7 @@ pub(crate) enum Instruction {
 	PSHA,
 	PULA,
 	TSTA,
+	COMA,
 	AddToStack,      //LEA SP,-1
 	RemoveFromStack, //LEA SP,1
 	Label(String),
@@ -44,10 +46,12 @@ impl Instruction {
 			| Instruction::JMP(a)
 			| Instruction::BEQ(a)
 			| Instruction::LEASP(a)
+			| Instruction::ORA(a)
 			| Instruction::STA(a) => Some(a.clone()),
 			Instruction::AddToStack
 			| Instruction::RemoveFromStack
 			| Instruction::Label(_)
+			| Instruction::COMA
 			| Instruction::PSHA
 			| Instruction::PULA
 			| Instruction::TSTA => None,
