@@ -14,15 +14,15 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		"global",
 		&mut 0,
 	)?;
-	println!("Instructions: [");
+	let mut output = String::new();
 	for ic in instructions {
 		match ic {
-			(inst, Some(comm)) => println!("        {}\t {}", inst, comm),
-			(inst, None) => println!("        {}", inst),
+			(inst, Some(comm)) => output.push_str(&format!("        {}\t ;{}\n", inst, comm)),
+			(inst, None) => output.push_str(&format!("        {}\n", inst)),
 		}
 	}
-	println!("]");
-	todo!()
+	println!("Instructions: [\n{}]", output);
+	Ok(output)
 }
 
 fn compile_element<'a>(
