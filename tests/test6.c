@@ -6,5 +6,5 @@ int main() {
 		int foo = 6;
 		printf("%d\n", foo); // 6
 	} while (0);
-	printf("%d\n", foo); // 5
+	printf("%d\n", foo); // ?
 }

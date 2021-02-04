@@ -128,7 +128,6 @@ pub fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 		vec.push(slice);
 	}
 	if parentheses == 0 && brackets == 0 && quotes == 0 {
-		dbg!(&vec);
 		Ok(vec)
 	} else {
 		dbg!(s);

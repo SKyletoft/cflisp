@@ -1,6 +1,6 @@
 use crate::*;
 use flisp_instructions::{Addressing, Instruction};
-use types::{Block, DepthType, Function, Type};
+use types::{Block, Function, Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementElement<'a> {
@@ -64,14 +64,12 @@ pub(crate) enum StatementElement<'a> {
 		parametres: Vec<StatementElement<'a>>,
 	},
 	Var(&'a str),
-	VarLabel(usize),
 	Num(isize),
 	Char(char),
 	Bool(bool),
 	Array(Vec<StatementElement<'a>>),
 	Deref(Box<StatementElement<'a>>),
 	AdrOf(&'a str),
-	AdrOfLabel(usize),
 }
 
 type OpFnPtr<'a> = fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>;
@@ -84,8 +82,8 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
-	pub(crate) fn as_a_instruction(&self, adr: Addressing) -> Result<Instruction, CompileError> {
-		let res = match self {
+	pub(crate) fn as_a_instruction(&self, adr: Addressing) -> Instruction {
+		match self {
 			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
 			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Mul { lhs: _, rhs: _ } => unimplemented!(),
@@ -96,7 +94,7 @@ impl<'a> StatementElement<'a> {
 			StatementElement::And { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::Or { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::Xor { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Not { lhs } => unimplemented!(),
+			StatementElement::Not { lhs: _ } => unimplemented!(),
 			StatementElement::GT { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::LT { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::Cmp { lhs: _, rhs: _ } => unimplemented!(),
@@ -105,47 +103,12 @@ impl<'a> StatementElement<'a> {
 				parametres: _,
 			} => unimplemented!(),
 			StatementElement::Var(_) => unimplemented!(),
-			StatementElement::VarLabel(_) => unimplemented!(),
 			StatementElement::Num(_) => unimplemented!(),
 			StatementElement::Char(_) => unimplemented!(),
 			StatementElement::Bool(_) => unimplemented!(),
 			StatementElement::Array(_) => unimplemented!(),
 			StatementElement::Deref(_) => unimplemented!(),
 			StatementElement::AdrOf(_) => unimplemented!(),
-			StatementElement::AdrOfLabel(_) => unimplemented!(),
-		};
-		Ok(res)
-	}
-
-	pub(crate) fn value_or_recursive(&self) -> DepthType {
-		match self {
-			StatementElement::Add { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Sub { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Mul { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Div { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Mod { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::LShift { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::RShift { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::And { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Or { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Xor { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Not { lhs: _ } => DepthType::RecursiveOne,
-			StatementElement::GT { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::LT { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::Cmp { lhs: _, rhs: _ } => DepthType::RecursiveTwo,
-			StatementElement::FunctionCall {
-				name: _,
-				parametres: _,
-			} => DepthType::RecursiveTwo,
-			StatementElement::Var(_) => DepthType::Value,
-			StatementElement::VarLabel(_) => DepthType::Value,
-			StatementElement::Num(_) => DepthType::Value,
-			StatementElement::Char(_) => DepthType::Value,
-			StatementElement::Bool(_) => DepthType::Value,
-			StatementElement::Array(_) => DepthType::Value,
-			StatementElement::Deref(_) => DepthType::Value,
-			StatementElement::AdrOf(_) => DepthType::Value,
-			StatementElement::AdrOfLabel(_) => DepthType::RecursiveOne,
 		}
 	}
 
@@ -176,8 +139,6 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Array(_) => 1,
 			StatementElement::Deref(_) => 1,
 			StatementElement::AdrOf(_) => 1,
-			StatementElement::VarLabel(_) => 1,
-			StatementElement::AdrOfLabel(_) => 1,
 		}
 	}
 
@@ -208,8 +169,6 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Array(_) => 1,
 			StatementElement::Deref(_) => 1,
 			StatementElement::AdrOf(_) => 1,
-			StatementElement::VarLabel(_) => 1,
-			StatementElement::AdrOfLabel(_) => 1,
 		}
 	}
 
@@ -410,10 +369,6 @@ impl<'a> StatementElement<'a> {
 				.find(|f| &f.name == name)
 				.map(|v| v.typ.clone())
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
-			StatementElement::VarLabel(n) => variables
-				.get(*n)
-				.map(|v| v.typ.clone())
-				.ok_or(ParseError(line!(), "Internal: invalid label"))?,
 			StatementElement::Array(arr) => Type::Ptr(Box::new(
 				arr.get(0)
 					.map(|s| s.type_of(functions, variables))
@@ -427,10 +382,6 @@ impl<'a> StatementElement<'a> {
 					.map(|v| v.typ.clone())
 					.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 			)),
-			StatementElement::AdrOfLabel(n) => variables
-				.get(*n)
-				.map(|v| v.typ.clone())
-				.ok_or(ParseError(line!(), "Internal: invalid label"))?,
 		};
 		Ok(res)
 	}

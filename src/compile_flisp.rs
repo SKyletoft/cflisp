@@ -1,47 +1,116 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use crate::*;
 use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use statement_element::StatementElement;
-use types::{Function, Type, Variable};
+use types::{Type, Variable};
 
 pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileError> {
-	Err(CompileError(line!(), "Nothing yet"))
+	let instructions = compile_elements(
+		program,
+		&mut HashMap::new(),
+		&mut HashMap::new(),
+		&mut HashMap::new(),
+		"global",
+		&mut 0,
+	)?;
+	todo!()
 }
 
 pub(crate) fn compile_element<'a>(
 	element: &'a LanguageElement,
-	variables: &mut HashMap<&'a str, (Type, usize)>,
-	global_variables: &mut HashMap<&'a str, (Type, usize)>,
-	functions: &mut HashMap<&'a str, Type>,
+	variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &mut HashMap<&'a str, (Type, isize)>,
+	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
-	mut stack_size: usize,
+	stack_size: &mut isize,
+	line_id: usize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
 		LanguageElement::VariableDeclaration { typ, name } => {
 			if variables.contains_key(name) {
 				return Err(CompileError(line!(), "Name already exists in scope!"));
 			}
-			variables.insert(*name, (typ.clone(), stack_size));
-			stack_size += 1;
-			vec![(Instruction::AddToStack, *name)]
+			variables.insert(*name, (typ.clone(), *stack_size));
+			*stack_size += 1;
+			vec![(Instruction::AddToStack, Some(*name))]
 		}
 		LanguageElement::VariableAssignment { name, value } => {
-			todo!()//let statement = compile_statement(value)?;
+			let adr = if let Some(&(_, stack_address)) = variables.get(name) {
+				Addressing::SP(stack_address)
+			} else if let Some(&(_, stack_address)) = global_variables.get(name) {
+				Addressing::Adr(stack_address)
+			} else {
+				return Err(CompileError(
+					line!(),
+					"Name resolution failed? Shouldn't be checked by now?",
+				));
+			};
+			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
+			statement.push((Instruction::STA(adr), None));
+			statement
 		}
-		LanguageElement::VariableDecarationAssignment { typ, name, value } => todo!(),
-		LanguageElement::PointerAssignment { ptr, value } => todo!(),
+		LanguageElement::VariableDecarationAssignment { typ, name, value } => {
+			if variables.contains_key(name) {
+				return Err(CompileError(line!(), "Name already exists in scope!"));
+			}
+			variables.insert(*name, (typ.clone(), *stack_size));
+			*stack_size += 1;
+			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
+			statement.push((Instruction::PSHA, None));
+			statement
+		}
+		LanguageElement::PointerAssignment { ptr, value } => {
+			let get_adr = compile_statement(ptr, variables, global_variables, stack_size)?;
+			let mut value = compile_statement(value, variables, global_variables, stack_size)?;
+			let mut statement = get_adr;
+			statement.push((Instruction::STA(Addressing::SP(-1)), None));
+			statement.push((Instruction::LDX(Addressing::SP(-1)), None));
+			statement.append(&mut value);
+			statement.push((Instruction::STA(Addressing::Xn(0)), None));
+			statement
+		}
 		LanguageElement::FunctionDeclaration {
-			typ,
+			typ: _,
 			name,
 			args,
 			block,
-		} => todo!(),
+		} => {
+			if functions.contains_key(name) {
+				return Err(CompileError(line!(), "Function with duplicate name!"));
+			}
+			functions.insert(*name, args.as_slice());
+			compile_elements(block, variables, global_variables, functions, name, &mut 0)?
+		}
 		LanguageElement::IfStatement {
 			condition,
 			then,
 			else_then,
-		} => todo!(),
+		} => {
+			let cond = compile_statement(condition, variables, global_variables, stack_size)?;
+			let then_block = compile_elements(
+				then.as_slice(),
+				variables,
+				global_variables,
+				functions,
+				&("if-then-".to_string() + &line_id.to_string()),
+				stack_size,
+			)?;
+			let else_block = if let Some(v) = else_then {
+				Some(compile_elements(
+					v.as_slice(),
+					variables,
+					global_variables,
+					functions,
+					&("if-else-".to_string() + &line_id.to_string()),
+					stack_size,
+				)?)
+			} else {
+				None
+			};
+
+			todo!()
+		}
 		LanguageElement::For {
 			init,
 			condition,
@@ -50,38 +119,59 @@ pub(crate) fn compile_element<'a>(
 		} => todo!(),
 		LanguageElement::While { condition, body } => todo!(),
 	};
-	todo!()
+	Ok(res)
 }
 
-pub(crate) fn compile_statement<'a>(
-	statements: &[StatementElement],
-	variables: &mut HashMap<&'a str, (Type, usize)>,
-	global_variables: &HashMap<&'a str, (Type, usize)>,
-	mut stack: usize,
-) -> Result<Vec<Instruction>, CompileError> {
-	let max_depth = statements
-		.iter()
-		.map(StatementElement::depth)
-		.max()
-		.unwrap_or(0);
-	let mut block = vec![Instruction::AddToStack; max_depth];
-	let mut clear_extra = vec![Instruction::RemoveFromStack; max_depth];
-	for instructions in statements
-		.iter()
-		.map(|statement| compile_statement_inner(statement, variables, global_variables, stack))
-	{
-		block.append(&mut instructions?);
+fn compile_elements<'a>(
+	block: &'a [LanguageElement],
+	variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &mut HashMap<&'a str, (Type, isize)>,
+	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
+	scope_name: &str,
+	stack_size: &mut isize,
+) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
+	for line in block.iter().enumerate().map(|(i, e)| {
+		compile_element(
+			e,
+			&mut HashMap::new(),
+			global_variables,
+			functions,
+			scope_name,
+			stack_size,
+			i,
+		)
+	}) {
+		instructions.append(&mut line?);
 	}
+	Ok(instructions)
+}
+
+fn compile_statement<'a>(
+	statement: &'a StatementElement,
+	variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, (Type, isize)>,
+	stack_size: &mut isize,
+) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+	let depth = statement.depth();
+	let mut block = vec![(Instruction::AddToStack, Some("Figure out later")); depth];
+	let mut clear_extra = vec![(Instruction::RemoveFromStack, None); depth];
+	block.append(&mut compile_statement_inner(
+		statement,
+		variables,
+		global_variables,
+		stack_size,
+	)?);
 	block.append(&mut clear_extra);
 	Ok(block)
 }
 
 fn compile_statement_inner<'a>(
-	statement: &StatementElement,
-	variables: &mut HashMap<&'a str, (Type, usize)>,
-	global_variables: &HashMap<&'a str, (Type, usize)>,
-	mut stack: usize,
-) -> Result<Vec<Instruction>, CompileError> {
+	statement: &'a StatementElement,
+	variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, (Type, isize)>,
+	stack_size: &mut isize,
+) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	if statement.size() > 20 {
 		return Err(CompileError(line!(), "Statement is too complex"));
 	}
@@ -101,25 +191,27 @@ fn compile_statement_inner<'a>(
 		| StatementElement::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
-			let (left, right) = if left_depth >= right_depth {
-				(lhs.as_ref(), rhs.as_ref())
+			let (left, right, depth) = if left_depth >= right_depth {
+				(lhs.as_ref(), rhs.as_ref(), right_depth)
 			} else {
-				(rhs.as_ref(), lhs.as_ref())
+				(rhs.as_ref(), lhs.as_ref(), left_depth)
 			};
-			let mut instructions = compile_statement_inner(left, variables, global_variables, stack)?;
-			if right.depth() > 1 {
-				instructions.push(Instruction::STA(Addressing::SP(stack)));
-				stack += 1;
+			let mut instructions =
+				compile_statement_inner(left, variables, global_variables, stack_size)?;
+			if depth > 1 {
+				instructions.push((Instruction::STA(Addressing::SP(*stack_size)), None));
+				*stack_size += 1;
 			} else {
-				let right_instructions = compile_statement_inner(right, variables, global_variables, stack)?;
+				let right_instructions =
+					compile_statement_inner(right, variables, global_variables, stack_size)?;
 				let addressing = match right_instructions.as_slice() {
-					[instruction] => instruction.address().ok_or(CompileError(
+					[(instruction, _)] => instruction.address().ok_or(CompileError(
 						line!(),
 						"Internal: Invalid right hand instruction?",
 					)),
 					_ => return Err(CompileError(line!(), "Internal: Depth caluclation failed?")),
 				}?;
-				let merge = statement.as_a_instruction(addressing)?;
+				let merge = (statement.as_a_instruction(addressing), None);
 				instructions.push(merge);
 			}
 			instructions
@@ -134,7 +226,6 @@ fn compile_statement_inner<'a>(
 			));
 		}
 		StatementElement::Var(_) => unimplemented!(),
-		StatementElement::VarLabel(_) => unimplemented!(),
 		StatementElement::Num(_) => unimplemented!(),
 		StatementElement::Char(_) => unimplemented!(),
 		StatementElement::Bool(_) => unimplemented!(),
@@ -142,7 +233,6 @@ fn compile_statement_inner<'a>(
 		StatementElement::Deref(_) => unimplemented!(),
 		StatementElement::AdrOf(_) => unimplemented!(),
 		StatementElement::Not { lhs: _ } => unimplemented!(),
-		StatementElement::AdrOfLabel(_) => unimplemented!(),
 	};
 	Ok(instructions)
 }

@@ -52,4 +52,4 @@ fn main() {
 	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
 }
 
-struct Flags;
+//struct Flags;

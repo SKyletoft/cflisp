@@ -27,9 +27,3 @@ pub(crate) enum Type {
 	Void,
 	Ptr(Box<Type>),
 }
-
-pub(crate) enum DepthType {
-	Value,
-	RecursiveOne,
-	RecursiveTwo,
-}

@@ -4,9 +4,9 @@ pub(crate) enum Register {
 	Y,
 }
 
-pub(crate) type CommentedInstruction<'a> = (Instruction, &'a str);
+pub(crate) type CommentedInstruction<'a> = (Instruction, Option<&'a str>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Instruction {
 	LDA(Addressing),
 	LDX(Addressing),
@@ -18,12 +18,15 @@ pub(crate) enum Instruction {
 	ASR(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
-	AddToStack,
-	RemoveFromStack,
+	PSHA,
+	PULA,
+	AddToStack,      //LEA SP,-1
+	RemoveFromStack, //LEA SP,1
+	Label(String),
 }
 
 impl Instruction {
-	pub(crate) fn address(self) -> Option<Addressing> {
+	pub(crate) fn address(&self) -> Option<Addressing> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -34,8 +37,12 @@ impl Instruction {
 			| Instruction::ASR(a)
 			| Instruction::EORA(a)
 			| Instruction::SUBA(a)
-			| Instruction::STA(a) => Some(a),
-			Instruction::AddToStack | Instruction::RemoveFromStack => None,
+			| Instruction::STA(a) => Some(*a),
+			Instruction::AddToStack
+			| Instruction::RemoveFromStack
+			| Instruction::Label(_)
+			| Instruction::PSHA
+			| Instruction::PULA => None,
 		}
 	}
 }
@@ -44,7 +51,7 @@ impl Instruction {
 pub(crate) enum Addressing {
 	Data(isize),
 	Adr(isize),
-	SP(usize),
+	SP(isize),
 	Xn(isize),
 	Yn(isize),
 }

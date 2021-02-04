@@ -5,4 +5,11 @@ int main() {
 	int a  = *435;
 	int z  = *(x + 1 * 1);
 	int *c = &a;
+	if (a == b) {
+		int d = 1;
+	} else if (a == (b + 1)) {
+		int d = 2;
+	} else {
+		int d = 3;
+	}
 }

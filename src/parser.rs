@@ -14,6 +14,7 @@ pub(crate) fn construct_block<'a>(
 	tokens: &[Token<'a>],
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let mut res = Vec::new();
+	//REVISIT LATER. SPLITTING AT NEWLINE CAUSES ERRORS WITH ELSE BLOCKS
 	for token in tokens.split(|t| t == &NewLine).filter(|t| !t.is_empty()) {
 		res.push(construct_structure_from_tokens(token)?);
 	}
@@ -26,6 +27,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 ) -> Result<LanguageElement<'a>, ParseError> {
 	let element = {
 		match tokens {
+			//Function declaration
 			[Decl(t), Token::Name(n), Args(args), UnparsedBlock(code)] => {
 				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
 				let code_parsed = construct_block(&code_tokenised)?;
@@ -36,6 +38,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					block: code_parsed,
 				}
 			}
+			//Function declaration?
 			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
 				let code_parsed = parse(code)?;
@@ -46,6 +49,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					block: code_parsed,
 				}
 			}
+			//Pointer variabler declaration
 			[Decl(t), Deref(d), Assign, ..] => {
 				let mut typ = t.clone();
 				let mut r = d;
@@ -75,6 +79,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+			//Variable declaration
 			[Decl(t), Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[3..];
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
@@ -85,6 +90,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+			//Variable assignment
 			[Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[2..];
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
@@ -94,6 +100,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+			//Pointer assignment
 			[Deref(d), Assign, ..] => {
 				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(d.as_ref())?)?;
 				let rhs = &tokens[2..];
@@ -104,31 +111,12 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+			//Variable declaration (without init)
 			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
 				typ: t.clone(),
 				name: *n,
 			},
-			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(code))?;
-				LanguageElement::IfStatement {
-					condition: condition_parsed,
-					then: then_parsed,
-					else_then: None,
-				}
-			}
-			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(then_code))?;
-				let else_parsed = parse(helper::remove_parentheses(else_code))?;
-				LanguageElement::IfStatement {
-					condition: condition_parsed,
-					then: then_parsed,
-					else_then: Some(else_parsed),
-				}
-			}
+			//If else if
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
@@ -141,6 +129,30 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					else_then: Some(vec![else_if_parsed]),
 				}
 			}
+			//If else
+			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let then_parsed = parse(helper::remove_parentheses(then_code))?;
+				let else_parsed = parse(helper::remove_parentheses(else_code))?;
+				LanguageElement::IfStatement {
+					condition: condition_parsed,
+					then: then_parsed,
+					else_then: Some(else_parsed),
+				}
+			}
+			//If
+			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
+				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let then_parsed = parse(helper::remove_parentheses(code))?;
+				LanguageElement::IfStatement {
+					condition: condition_parsed,
+					then: then_parsed,
+					else_then: None,
+				}
+			}
+			//For
 			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
 				let split = helper::remove_parentheses(init_cond_post)
 					.split(';')
@@ -169,6 +181,7 @@ pub(crate) fn construct_structure_from_tokens<'a>(
 					body: body_parsed,
 				}
 			}
+			//While
 			[While, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
