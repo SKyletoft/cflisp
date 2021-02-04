@@ -1,3 +1,5 @@
+use crate::*;
+
 pub(crate) enum Register {
 	A,
 	X,
@@ -29,6 +31,34 @@ pub(crate) enum Instruction {
 	AddToStack,      //LEA SP,-1
 	RemoveFromStack, //LEA SP,1
 	Label(String),
+}
+
+impl fmt::Display for Instruction {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Instruction::LDA(a) => write!(f, "LDA     {}", *a),
+			Instruction::LDX(a) => write!(f, "LDX     {}", *a),
+			Instruction::LDY(a) => write!(f, "LDY     {}", *a),
+			Instruction::ADDA(a) => write!(f, "ADDA    {}", *a),
+			Instruction::SUBA(a) => write!(f, "SUBA    {}", *a),
+			Instruction::ANDA(a) => write!(f, "ANDA    {}", *a),
+			Instruction::ASL(a) => write!(f, "ASLA    {}", *a),
+			Instruction::ASR(a) => write!(f, "ASRA    {}", *a),
+			Instruction::ORA(a) => write!(f, "ORA     {}", *a),
+			Instruction::EORA(a) => write!(f, "EORA    {}", *a),
+			Instruction::STA(a) => write!(f, "STA     {}", *a),
+			Instruction::JMP(a) => write!(f, "JMP     {}", *a),
+			Instruction::BEQ(a) => write!(f, "BEQ     {}", *a),
+			Instruction::LEASP(a) => write!(f, "LEASP   {}", *a),
+			Instruction::PSHA => write!(f, "PSHA    "),
+			Instruction::PULA => write!(f, "PULA    "),
+			Instruction::TSTA => write!(f, "TSTA    "),
+			Instruction::COMA => write!(f, "COMA    "),
+			Instruction::AddToStack => write!(f, "LEASP   SP, -1"),
+			Instruction::RemoveFromStack => write!(f, "LEASP   SP, 1"),
+			Instruction::Label(l) => write!(f, "{}", l),
+		}
+	}
 }
 
 impl Instruction {
@@ -67,4 +97,17 @@ pub(crate) enum Addressing {
 	Xn(isize),
 	Yn(isize),
 	Label(String),
+}
+
+impl fmt::Display for Addressing {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Addressing::Data(d) => write!(f, "%#{:02X}", *d as u8),
+			Addressing::Adr(d) => write!(f, "%{:02X}", *d as u8),
+			Addressing::SP(d) => write!(f, "SP, %{:02X}", *d as u8),
+			Addressing::Xn(d) => write!(f, "X, %{:02X}", *d as u8),
+			Addressing::Yn(d) => write!(f, "Y, %{:02X}", *d as u8),
+			Addressing::Label(l) => write!(f, "{}", l),
+		}
+	}
 }

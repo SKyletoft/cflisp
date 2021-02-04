@@ -14,7 +14,14 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		"global",
 		&mut 0,
 	)?;
-	dbg!(instructions);
+	println!("Instructions: [");
+	for ic in instructions {
+		match ic {
+			(inst, Some(comm)) => println!("        {}\t {}", inst, comm),
+			(inst, None) => println!("        {}", inst),
+		}
+	}
+	println!("]");
 	todo!()
 }
 
