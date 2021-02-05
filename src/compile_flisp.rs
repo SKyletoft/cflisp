@@ -14,11 +14,18 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		"global",
 		&mut 0,
 	)?;
+	if instructions
+		.iter()
+		.filter(|(instruction, _)| !matches!(instruction, Instruction::Label(_)))
+		.count() > 255
+	{
+		return Err(CompileError(line!(), "Program is to large for digiflisp!"));
+	}
 	let mut output = String::new();
 	for ic in instructions {
 		match ic {
-			(inst, Some(comm)) => output.push_str(&format!("        {}\t ;{}\n", inst, comm)),
-			(inst, None) => output.push_str(&format!("        {}\n", inst)),
+			(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}\n", inst, comm)),
+			(inst, None) => output.push_str(&format!("{:X}\n", inst)),
 		}
 	}
 	println!("Instructions: [\n{}]", output);
@@ -49,6 +56,7 @@ fn compile_element<'a>(
 			} else if let Some(&(_, stack_address)) = global_variables.get(name) {
 				Addressing::Adr(stack_address)
 			} else {
+				dbg!(element);
 				return Err(CompileError(
 					line!(),
 					"Name resolution failed? Shouldn't be checked by now?",
@@ -65,7 +73,7 @@ fn compile_element<'a>(
 			variables.insert(*name, (typ.clone(), *stack_size));
 			*stack_size += 1;
 			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
-			statement.push((Instruction::PSHA, None));
+			statement.push((Instruction::PSHA, Some(*name)));
 			statement
 		}
 		LanguageElement::PointerAssignment { ptr, value } => {
@@ -85,7 +93,10 @@ fn compile_element<'a>(
 			block,
 		} => {
 			if functions.contains_key(name) {
-				return Err(CompileError(line!(), "Function with duplicate name!"));
+				return Err(CompileError(
+					line!(),
+					"Function name already exists in scope!",
+				));
 			}
 			functions.insert(*name, args.as_slice());
 			let mut args_count = args.len() as isize;
@@ -185,15 +196,23 @@ fn compile_statement<'a>(
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let depth = statement.depth();
-	let mut block = vec![(Instruction::AddToStack, Some("Figure out later")); depth];
-	let mut clear_extra = vec![(Instruction::RemoveFromStack, None); depth];
-	block.append(&mut compile_statement_inner(
-		statement,
-		variables,
-		global_variables,
-		stack_size,
-	)?);
-	block.append(&mut clear_extra);
+	let mut statement_instructions =
+		compile_statement_inner(statement, variables, global_variables, stack_size)?;
+	let block = if depth > 1 {
+		let mut block = vec![(
+			Instruction::LEASP(Addressing::SP(depth as isize - 1)),
+			Some("Reserving memory for statement"),
+		)];
+		block.append(&mut statement_instructions);
+		block.append(&mut vec![(
+			Instruction::LEASP(Addressing::SP(depth as isize + 1)),
+			Some("Clearing memory for statement"),
+		)]);
+		block
+	} else {
+		statement_instructions
+	};
+
 	Ok(block)
 }
 
@@ -237,7 +256,10 @@ fn compile_statement_inner<'a>(
 						line!(),
 						"Internal: Invalid right hand instruction?",
 					)),
-					_ => return Err(CompileError(line!(), "Internal: Depth caluclation failed?")),
+					_ => {
+						dbg!(statement);
+						return Err(CompileError(line!(), "Internal: Depth caluclation failed?"));
+					}
 				}?;
 				let merge = (statement.as_flisp_instruction(addressing), None);
 				instructions.push(merge);
@@ -248,6 +270,7 @@ fn compile_statement_inner<'a>(
 			name: _,
 			parametres: _,
 		} => {
+			dbg!(statement);
 			return Err(CompileError(
 				line!(),
 				"Internal: Function call in statement. Should've been moved out?",
@@ -255,7 +278,7 @@ fn compile_statement_inner<'a>(
 		}
 		StatementElement::Var(name) => {
 			let adr = if let Some((_, adr)) = variables.get(name) {
-				Addressing::SP(*adr)
+				Addressing::SP(*stack_size - *adr)
 			} else if let Some((_, adr)) = global_variables.get(name) {
 				Addressing::Adr(*adr)
 			} else {

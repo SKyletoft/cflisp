@@ -36,26 +36,53 @@ pub(crate) enum Instruction {
 impl fmt::Display for Instruction {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Instruction::LDA(a) => write!(f, "LDA     {}", *a),
-			Instruction::LDX(a) => write!(f, "LDX     {}", *a),
-			Instruction::LDY(a) => write!(f, "LDY     {}", *a),
-			Instruction::ADDA(a) => write!(f, "ADDA    {}", *a),
-			Instruction::SUBA(a) => write!(f, "SUBA    {}", *a),
-			Instruction::ANDA(a) => write!(f, "ANDA    {}", *a),
-			Instruction::ASL(a) => write!(f, "ASLA    {}", *a),
-			Instruction::ASR(a) => write!(f, "ASRA    {}", *a),
-			Instruction::ORA(a) => write!(f, "ORA     {}", *a),
-			Instruction::EORA(a) => write!(f, "EORA    {}", *a),
-			Instruction::STA(a) => write!(f, "STA     {}", *a),
-			Instruction::JMP(a) => write!(f, "JMP     {}", *a),
-			Instruction::BEQ(a) => write!(f, "BEQ     {}", *a),
-			Instruction::LEASP(a) => write!(f, "LEASP   {}", *a),
-			Instruction::PSHA => write!(f, "PSHA    "),
-			Instruction::PULA => write!(f, "PULA    "),
-			Instruction::TSTA => write!(f, "TSTA    "),
-			Instruction::COMA => write!(f, "COMA    "),
-			Instruction::AddToStack => write!(f, "LEASP   SP, -1"),
-			Instruction::RemoveFromStack => write!(f, "LEASP   SP, 1"),
+			Instruction::LDA(a) => write!(f, "\tLDA\t{}", *a),
+			Instruction::LDX(a) => write!(f, "\tLDX\t{}", *a),
+			Instruction::LDY(a) => write!(f, "\tLDY\t{}", *a),
+			Instruction::ADDA(a) => write!(f, "\tADDA\t{}", *a),
+			Instruction::SUBA(a) => write!(f, "\tSUBA\t{}", *a),
+			Instruction::ANDA(a) => write!(f, "\tANDA\t{}", *a),
+			Instruction::ASL(a) => write!(f, "\tASLA\t{}", *a),
+			Instruction::ASR(a) => write!(f, "\tASRA\t{}", *a),
+			Instruction::ORA(a) => write!(f, "\tORA\t{}", *a),
+			Instruction::EORA(a) => write!(f, "\tEORA\t{}", *a),
+			Instruction::STA(a) => write!(f, "\tSTA\t{}", *a),
+			Instruction::JMP(a) => write!(f, "\tJMP\t{}", *a),
+			Instruction::BEQ(a) => write!(f, "\tBEQ\t{}", *a),
+			Instruction::LEASP(a) => write!(f, "\tLEASP\t{}", *a),
+			Instruction::PSHA => write!(f, "\tPSHA\t"),
+			Instruction::PULA => write!(f, "\tPULA\t"),
+			Instruction::TSTA => write!(f, "\tTSTA\t"),
+			Instruction::COMA => write!(f, "\tCOMA\t"),
+			Instruction::AddToStack => write!(f, "\tLEASP\t{}", Addressing::SP(-1)),
+			Instruction::RemoveFromStack => write!(f, "\tLEASP\t{}", Addressing::SP(-1)),
+			Instruction::Label(l) => write!(f, "{}", l),
+		}
+	}
+}
+impl fmt::UpperHex for Instruction {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Instruction::LDA(a) => write!(f, "\tLDA\t{:X}", *a),
+			Instruction::LDX(a) => write!(f, "\tLDX\t{:X}", *a),
+			Instruction::LDY(a) => write!(f, "\tLDY\t{:X}", *a),
+			Instruction::ADDA(a) => write!(f, "\tADDA\t{:X}", *a),
+			Instruction::SUBA(a) => write!(f, "\tSUBA\t{:X}", *a),
+			Instruction::ANDA(a) => write!(f, "\tANDA\t{:X}", *a),
+			Instruction::ASL(a) => write!(f, "\tASLA\t{:X}", *a),
+			Instruction::ASR(a) => write!(f, "\tASRA\t{:X}", *a),
+			Instruction::ORA(a) => write!(f, "\tORA\t{:X}", *a),
+			Instruction::EORA(a) => write!(f, "\tEORA\t{:X}", *a),
+			Instruction::STA(a) => write!(f, "\tSTA\t{:X}", *a),
+			Instruction::JMP(a) => write!(f, "\tJMP\t{:X}", *a),
+			Instruction::BEQ(a) => write!(f, "\tBEQ\t{:X}", *a),
+			Instruction::LEASP(a) => write!(f, "\tLEASP\t{:X}", *a),
+			Instruction::PSHA => write!(f, "\tPSHA\t"),
+			Instruction::PULA => write!(f, "\tPULA\t"),
+			Instruction::TSTA => write!(f, "\tTSTA\t"),
+			Instruction::COMA => write!(f, "\tCOMA\t"),
+			Instruction::AddToStack => write!(f, "\tLEASP\t{:X}", Addressing::SP(-1)),
+			Instruction::RemoveFromStack => write!(f, "\tLEASP\t{:X}", Addressing::SP(-1)),
 			Instruction::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -102,11 +129,25 @@ pub(crate) enum Addressing {
 impl fmt::Display for Addressing {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Addressing::Data(d) => write!(f, "%#{:02X}", *d as u8),
+			// mod 256 to allow -255 to 255 instead of -127 to 127
+			Addressing::Data(d) => write!(f, "#{:03}", *d % 256),
+			Addressing::Adr(d) => write!(f, "{:03}", *d % 256),
+			Addressing::SP(d) => write!(f, "{:03}, SP", *d % 256),
+			Addressing::Xn(d) => write!(f, "{:03}, X", *d % 256),
+			Addressing::Yn(d) => write!(f, "{:03}, X", *d % 256),
+			Addressing::Label(l) => write!(f, "{}", l),
+		}
+	}
+}
+
+impl fmt::UpperHex for Addressing {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Addressing::Data(d) => write!(f, "#%{:02X}", *d as u8),
 			Addressing::Adr(d) => write!(f, "%{:02X}", *d as u8),
-			Addressing::SP(d) => write!(f, "SP, %{:02X}", *d as u8),
-			Addressing::Xn(d) => write!(f, "X, %{:02X}", *d as u8),
-			Addressing::Yn(d) => write!(f, "Y, %{:02X}", *d as u8),
+			Addressing::SP(d) => write!(f, "%{:02X}, SP", *d as u8),
+			Addressing::Xn(d) => write!(f, "%{:02X}, X", *d as u8),
+			Addressing::Yn(d) => write!(f, "%{:02X}, Y", *d as u8),
 			Addressing::Label(l) => write!(f, "{}", l),
 		}
 	}

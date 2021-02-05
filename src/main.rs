@@ -48,7 +48,7 @@ fn main() {
 	}
 	dbg!(&parsed);
 	let compiled = compile_flisp::compile(&parsed /*&flags*/).expect("Compiler error");
-	fs::write("./a.sflisp", &compiled).expect("IO Error: Could not save file");
+	fs::write("./out.sflisp", &compiled).expect("IO Error: Could not save file");
 }
 
 //struct Flags;
