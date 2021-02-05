@@ -22,13 +22,17 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		return Err(CompileError(line!(), "Program is to large for digiflisp!"));
 	}
 	let mut output = String::new();
-	for ic in instructions {
-		match ic {
-			(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}\n", inst, comm)),
-			(inst, None) => output.push_str(&format!("{:X}\n", inst)),
+	for (i, c) in instructions.iter().skip(1) {
+		match (i, c) {
+			(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}", inst, comm)),
+			(inst, None) => output.push_str(&format!("{:X}", inst)),
+		}
+		if !matches!(i, Instruction::Label(n) if n.len() < 8) {
+			output.push('\n');
+		} else {
+			output.push(' ');
 		}
 	}
-	println!("Instructions: [\n{}]", output);
 	Ok(output)
 }
 

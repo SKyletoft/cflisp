@@ -43,11 +43,10 @@ fn main() {
 	if !ok {
 		eprintln!("Error: type check error");
 		return;
-	} else {
-		println!("type check passed");
 	}
-	dbg!(&parsed);
+	//dbg!(&parsed);
 	let compiled = compile_flisp::compile(&parsed /*&flags*/).expect("Compiler error");
+	//eprintln!("{}", &compiled);
 	fs::write("./out.sflisp", &compiled).expect("IO Error: Could not save file");
 }
 
