@@ -22,16 +22,20 @@ into this:
 ```flisp
 ; tests/expected1.sflisp
 main    ORG     $20
-ptr     PSHA
-x       PSHA
         LDA     #0
-        STA     SP, -1
+        PSHA    SP, -1  ; ptr
         LDA     #5
-        STA     SP, 0
+        PSHA    SP, 0   ; x
         CMPA    #5
         BNE     main_1
         LDA     #3
         STA     SP, 0
 main_1  LDA     SP, 0
         STA     SP, -1
+        JMP     end
+
+end     JMP     end
+
+        ORG     $FF
+        FCB     main
 ```

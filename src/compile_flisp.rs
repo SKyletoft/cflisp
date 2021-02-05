@@ -5,6 +5,8 @@ use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use statement_element::StatementElement;
 use types::{Type, Variable};
 
+const ABOVE_STACK_OFFSET: isize = -1;
+
 pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileError> {
 	let instructions = compile_elements(
 		program,
@@ -19,7 +21,7 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 		.filter(|(instruction, _)| !matches!(instruction, Instruction::Label(_)))
 		.count() > 255
 	{
-		return Err(CompileError(line!(), "Program is to large for digiflisp!"));
+		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
 	let mut output = String::new();
 	for (i, c) in instructions.iter().skip(1) {
@@ -84,8 +86,8 @@ fn compile_element<'a>(
 			let get_adr = compile_statement(ptr, variables, global_variables, stack_size)?;
 			let mut value = compile_statement(value, variables, global_variables, stack_size)?;
 			let mut statement = get_adr;
-			statement.push((Instruction::STA(Addressing::SP(-1)), None));
-			statement.push((Instruction::LDX(Addressing::SP(-1)), None));
+			statement.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			statement.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
 			statement.append(&mut value);
 			statement.push((Instruction::STA(Addressing::Xn(0)), None));
 			statement
@@ -304,7 +306,15 @@ fn compile_statement_inner<'a>(
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
 		StatementElement::Array(_) => unimplemented!(),
-		StatementElement::Deref(_) => unimplemented!(),
+		StatementElement::Deref(adr) => {
+			//Is this sound if it occurs on the left hand side?
+			let mut instructions =
+				compile_statement_inner(adr.as_ref(), variables, global_variables, stack_size)?;
+			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
+			instructions.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			instructions.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			instructions
+		}
 		StatementElement::AdrOf(_) => unimplemented!(),
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
