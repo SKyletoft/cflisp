@@ -36,6 +36,7 @@ fn construct_structure_from_tokens<'a>(
 					block: code_parsed,
 				}
 			}
+
 			//Function declaration?
 			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
@@ -47,6 +48,7 @@ fn construct_structure_from_tokens<'a>(
 					block: code_parsed,
 				}
 			}
+
 			//Pointer variabler declaration
 			[Decl(t), Deref(d), Assign, ..] => {
 				let mut typ = t.clone();
@@ -77,6 +79,7 @@ fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+
 			//Variable declaration
 			[Decl(t), Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[3..];
@@ -88,6 +91,7 @@ fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+
 			//Variable assignment
 			[Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[2..];
@@ -98,6 +102,7 @@ fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+
 			//Pointer assignment
 			[Deref(d), Assign, ..] => {
 				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(d.as_ref())?)?;
@@ -109,11 +114,13 @@ fn construct_structure_from_tokens<'a>(
 					value: rhs_parsed,
 				}
 			}
+
 			//Variable declaration (without init)
 			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
 				typ: t.clone(),
 				name: *n,
 			},
+
 			//If else if
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
@@ -127,6 +134,7 @@ fn construct_structure_from_tokens<'a>(
 					else_then: Some(vec![else_if_parsed]),
 				}
 			}
+
 			//If else
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
@@ -139,6 +147,7 @@ fn construct_structure_from_tokens<'a>(
 					else_then: Some(else_parsed),
 				}
 			}
+
 			//If
 			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
@@ -150,6 +159,7 @@ fn construct_structure_from_tokens<'a>(
 					else_then: None,
 				}
 			}
+
 			//For
 			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
 				let split = helper::remove_parentheses(init_cond_post)
@@ -179,6 +189,7 @@ fn construct_structure_from_tokens<'a>(
 					body: body_parsed,
 				}
 			}
+
 			//While
 			[While, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
@@ -189,6 +200,7 @@ fn construct_structure_from_tokens<'a>(
 					body: body_parsed,
 				}
 			}
+
 			_ => {
 				dbg!(tokens);
 				return Err(ParseError(
@@ -215,11 +227,13 @@ pub(crate) fn type_check(
 				typ: typ.clone(),
 				name: *name,
 			}),
+
 			LanguageElement::VariableAssignment { name: _, value } => {
 				if !value.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
 				variables.push(Variable {
 					typ: typ.clone(),
@@ -229,6 +243,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::PointerAssignment { ptr, value } => {
 				if !ptr.type_check(&variables, &functions)?
 					|| !value.type_check(&variables, &functions)?
@@ -236,6 +251,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::FunctionDeclaration {
 				typ,
 				name,
@@ -251,6 +267,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::IfStatement {
 				condition,
 				then,
@@ -266,6 +283,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::For {
 				init,
 				condition,
@@ -281,6 +299,7 @@ pub(crate) fn type_check(
 					return Ok(false);
 				}
 			}
+
 			LanguageElement::While { condition, body } => {
 				if !condition.type_check(&variables, &functions)?
 					|| !type_check(body, &variables, &functions)?

@@ -1,11 +1,5 @@
 use crate::*;
 
-pub(crate) enum Register {
-	A,
-	X,
-	Y,
-}
-
 pub(crate) type CommentedInstruction<'a> = (Instruction, Option<&'a str>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,14 +16,12 @@ pub(crate) enum Instruction {
 	EORA(Addressing),
 	STA(Addressing),
 	JMP(Addressing),
-	BEQ(Addressing),
+	BNE(Addressing),
 	LEASP(Addressing),
 	PSHA,
 	PULA,
 	TSTA,
 	COMA,
-	AddToStack,      //LEA SP,-1
-	RemoveFromStack, //LEA SP,1
 	Label(String),
 }
 
@@ -48,14 +40,12 @@ impl fmt::Display for Instruction {
 			Instruction::EORA(a) => write!(f, "\tEORA\t{}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{}", *a),
 			Instruction::JMP(a) => write!(f, "\tJMP\t{}", *a),
-			Instruction::BEQ(a) => write!(f, "\tBEQ\t{}", *a),
+			Instruction::BNE(a) => write!(f, "\tBNE\t{}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{}", *a),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
-			Instruction::AddToStack => write!(f, "\tLEASP\t{}", Addressing::SP(-1)),
-			Instruction::RemoveFromStack => write!(f, "\tLEASP\t{}", Addressing::SP(-1)),
 			Instruction::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -75,14 +65,12 @@ impl fmt::UpperHex for Instruction {
 			Instruction::EORA(a) => write!(f, "\tEORA\t{:X}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{:X}", *a),
 			Instruction::JMP(a) => write!(f, "\tJMP\t{:X}", *a),
-			Instruction::BEQ(a) => write!(f, "\tBEQ\t{:X}", *a),
+			Instruction::BNE(a) => write!(f, "\tBNE\t{:X}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{:X}", *a),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
-			Instruction::AddToStack => write!(f, "\tLEASP\t{:X}", Addressing::SP(-1)),
-			Instruction::RemoveFromStack => write!(f, "\tLEASP\t{:X}", Addressing::SP(-1)),
 			Instruction::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -101,13 +89,11 @@ impl Instruction {
 			| Instruction::EORA(a)
 			| Instruction::SUBA(a)
 			| Instruction::JMP(a)
-			| Instruction::BEQ(a)
+			| Instruction::BNE(a)
 			| Instruction::LEASP(a)
 			| Instruction::ORA(a)
 			| Instruction::STA(a) => Some(a.clone()),
-			Instruction::AddToStack
-			| Instruction::RemoveFromStack
-			| Instruction::Label(_)
+			Instruction::Label(_)
 			| Instruction::COMA
 			| Instruction::PSHA
 			| Instruction::PULA
@@ -129,14 +115,9 @@ impl Instruction {
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
 			| Instruction::JMP(a)
-			| Instruction::BEQ(a)
+			| Instruction::BNE(a)
 			| Instruction::LEASP(a) => a.size(),
-			Instruction::PSHA
-			| Instruction::PULA
-			| Instruction::TSTA
-			| Instruction::COMA
-			| Instruction::AddToStack
-			| Instruction::RemoveFromStack => 1,
+			Instruction::PSHA | Instruction::PULA | Instruction::TSTA | Instruction::COMA => 1,
 			Instruction::Label(_) => 0,
 		}
 	}

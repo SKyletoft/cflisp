@@ -98,10 +98,6 @@ impl<'a> StatementElement<'a> {
 			StatementElement::GT { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::LT { lhs: _, rhs: _ } => unimplemented!(),
 			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::FunctionCall {
-				name: _,
-				parametres: _,
-			} => unimplemented!(),
 			StatementElement::Var(_) => unimplemented!(),
 			StatementElement::Num(_) => unimplemented!(),
 			StatementElement::Char(_) => unimplemented!(),
@@ -109,6 +105,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Array(_) => unimplemented!(),
 			StatementElement::Deref(_) => unimplemented!(),
 			StatementElement::AdrOf(_) => unimplemented!(),
+			StatementElement::FunctionCall {
+				name: _,
+				parametres: _,
+			} => unimplemented!(),
 		}
 	}
 
@@ -128,10 +128,6 @@ impl<'a> StatementElement<'a> {
 			StatementElement::LT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Not { lhs } => lhs.as_ref().depth(),
-			StatementElement::FunctionCall {
-				name: _,
-				parametres,
-			} => parametres.iter().map(StatementElement::depth).sum(),
 			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElement::Deref(n) => n.as_ref().depth(),
 			StatementElement::Var(_) => 0,
@@ -139,6 +135,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Char(_) => 0,
 			StatementElement::Bool(_) => 0,
 			StatementElement::AdrOf(_) => 0,
+			StatementElement::FunctionCall {
+				name: _,
+				parametres,
+			} => parametres.iter().map(StatementElement::depth).sum(),
 		};
 		rest + 1
 	}
@@ -150,6 +150,7 @@ impl<'a> StatementElement<'a> {
 			StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
 			StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
 			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(n)),
+
 			StatementToken::FunctionCall(name, ts) => {
 				let parametres = ts
 					.into_iter()
@@ -157,6 +158,7 @@ impl<'a> StatementElement<'a> {
 					.collect::<Result<Vec<_>, _>>()?;
 				Parsed(StatementElement::FunctionCall { name, parametres })
 			}
+
 			StatementToken::Array(arr) => {
 				let elements = arr
 					.into_iter()
@@ -164,15 +166,18 @@ impl<'a> StatementElement<'a> {
 					.collect::<Result<Vec<_>, _>>()?;
 				Parsed(StatementElement::Array(elements))
 			}
+
 			StatementToken::ArrayAccess { ptr, idx } => {
 				Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
 					lhs: Box::new(StatementElement::Var(ptr)),
 					rhs: Box::new(StatementElement::from_tokens(idx)?),
 				})))
 			}
+
 			StatementToken::Deref(ptr) => Parsed(StatementElement::Deref(Box::new(
 				StatementElement::from_tokens(ptr)?,
 			))),
+
 			t => Unparsed(t),
 		};
 		Ok(res)
@@ -327,6 +332,7 @@ impl<'a> StatementElement<'a> {
 			StatementElement::GT { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::LT { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::Cmp { lhs: _, rhs: _ } => Type::Bool,
+
 			StatementElement::FunctionCall {
 				name,
 				parametres: _,
@@ -335,17 +341,21 @@ impl<'a> StatementElement<'a> {
 				.find(|f| &f.name == name)
 				.map(|f| f.return_type.clone())
 				.ok_or(ParseError(line!(), "Cannot resolve function!"))?,
+
 			StatementElement::Var(name) => variables
 				.iter()
 				.find(|f| &f.name == name)
 				.map(|v| v.typ.clone())
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
+
 			StatementElement::Array(arr) => Type::Ptr(Box::new(
 				arr.get(0)
 					.map(|s| s.type_of(functions, variables))
 					.unwrap_or(Ok(Type::Void))?,
 			)),
+
 			StatementElement::Deref(t) => t.as_ref().type_of(functions, variables)?,
+
 			StatementElement::AdrOf(name) => Type::Ptr(Box::new(
 				variables
 					.iter()
@@ -384,59 +394,74 @@ impl<'a> StatementElement<'a> {
 					false
 				}
 			}
+
 			StatementElement::Add { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Sub { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Mul { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Div { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Mod { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::LShift { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::RShift { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::And { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Or { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Xor { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::GT { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::LT { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Cmp { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
+
 			StatementElement::Not { lhs } => lhs.as_ref().type_check(variables, functions)?,
+
 			_ => true,
 		};
 		Ok(res)
@@ -476,11 +501,13 @@ pub(crate) fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,
+
 			LanguageElement::VariableDeclarationAssignment {
 				typ: _,
 				name: _,
 				value: _,
 			} => 0,
+
 			LanguageElement::FunctionDeclaration {
 				typ: _,
 				name: _,

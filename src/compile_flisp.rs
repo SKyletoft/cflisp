@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::*;
-use env::var;
 use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use statement_element::StatementElement;
 use types::{Type, Variable};
@@ -66,8 +65,12 @@ fn compile_element<'a>(
 			}
 			variables.insert(*name, (typ.clone(), *stack_size));
 			*stack_size += 1;
-			vec![(Instruction::AddToStack, Some(*name))]
+			vec![(
+				Instruction::LEASP(Addressing::SP(ABOVE_STACK_OFFSET)),
+				Some(*name),
+			)]
 		}
+
 		LanguageElement::VariableAssignment { name, value } => {
 			let adr = if let Some(&(_, stack_address)) = variables.get(name) {
 				Addressing::SP(stack_address)
@@ -84,6 +87,7 @@ fn compile_element<'a>(
 			statement.push((Instruction::STA(adr), None));
 			statement
 		}
+
 		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
 			if variables.contains_key(name) {
 				dbg!(element);
@@ -95,6 +99,7 @@ fn compile_element<'a>(
 			statement.push((Instruction::PSHA, Some(*name)));
 			statement
 		}
+
 		LanguageElement::PointerAssignment { ptr, value } => {
 			let get_adr = compile_statement(ptr, variables, global_variables, stack_size)?;
 			let mut value = compile_statement(value, variables, global_variables, stack_size)?;
@@ -105,6 +110,7 @@ fn compile_element<'a>(
 			statement.push((Instruction::STA(Addressing::Xn(0)), None));
 			statement
 		}
+
 		LanguageElement::FunctionDeclaration {
 			typ: _,
 			name,
@@ -133,6 +139,7 @@ fn compile_element<'a>(
 			}
 			fun
 		}
+
 		LanguageElement::IfStatement {
 			condition,
 			then,
@@ -169,7 +176,7 @@ fn compile_element<'a>(
 					&else_str,
 					&mut else_stack,
 				)?;
-				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
+				cond.push((Instruction::BNE(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut else_block);
@@ -180,19 +187,24 @@ fn compile_element<'a>(
 					));
 				}
 			} else {
-				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+				cond.push((Instruction::BNE(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut then_block);
 			}
 			cond.push((Instruction::Label(end_str), None));
 			cond
 		}
+
 		LanguageElement::For {
-			init,
-			condition,
-			after,
-			body,
+			init: _,
+			condition: _,
+			after: _,
+			body: _,
 		} => todo!(),
-		LanguageElement::While { condition, body } => todo!(),
+
+		LanguageElement::While {
+			condition: _,
+			body: _,
+		} => todo!(),
 	};
 	Ok(res)
 }
@@ -300,16 +312,12 @@ fn compile_statement_inner<'a>(
 			}
 			instructions
 		}
+
 		StatementElement::FunctionCall {
 			name: _,
 			parametres: _,
-		} => {
-			dbg!(statement);
-			return Err(CompileError(
-				line!(),
-				"Internal: Function call in statement. Should've been moved out?",
-			));
-		}
+		} => todo!(),
+
 		StatementElement::Var(name) => {
 			let adr = if let Some((_, adr)) = variables.get(name) {
 				Addressing::SP(*stack_size - *adr)
@@ -324,15 +332,19 @@ fn compile_statement_inner<'a>(
 			};
 			vec![(Instruction::LDA(adr), Some(*name))]
 		}
+
 		StatementElement::Num(n) => {
 			vec![(Instruction::LDA(Addressing::Data(*n)), None)]
 		}
+
 		StatementElement::Char(c) => {
 			vec![(Instruction::LDA(Addressing::Data(*c as isize)), None)]
 		}
+
 		StatementElement::Bool(b) => {
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
+
 		StatementElement::Array(arr) => {
 			let mut vec = Vec::new();
 			for element in arr.iter() {
@@ -344,6 +356,7 @@ fn compile_statement_inner<'a>(
 			}
 			vec
 		}
+
 		StatementElement::Deref(adr) => {
 			//Is this sound if it occurs on the left hand side?
 			let mut instructions =
@@ -353,6 +366,7 @@ fn compile_statement_inner<'a>(
 			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
 			instructions
 		}
+
 		StatementElement::AdrOf(name) => {
 			if let Some((_, adr)) = variables.get(name) {
 				vec![(
@@ -367,6 +381,7 @@ fn compile_statement_inner<'a>(
 				));
 			}
 		}
+
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
 	Ok(instructions)
