@@ -7,7 +7,7 @@ use types::{Type, Variable};
 
 const ABOVE_STACK_OFFSET: isize = -1;
 
-pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileError> {
+pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<String, CompileError> {
 	let instructions = compile_elements(
 		program,
 		&mut HashMap::new(),
@@ -25,10 +25,19 @@ pub(crate) fn compile(program: &[LanguageElement]) -> Result<String, CompileErro
 	}
 	let mut output = String::new();
 	for (i, c) in instructions.iter().skip(1) {
-		match (i, c) {
-			(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}", inst, comm)),
-			(inst, None) => output.push_str(&format!("{:X}", inst)),
+		match (flags.hex, flags.comments) {
+			(true, true) => match (i, c) {
+				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}", inst, comm)),
+				(inst, None) => output.push_str(&format!("{:X}", inst)),
+			},
+			(false, true) => match (i, c) {
+				(inst, Some(comm)) => output.push_str(&format!("{}\t ;{}", inst, comm)),
+				(inst, None) => output.push_str(&format!("{}", inst)),
+			},
+			(true, false) => output.push_str(&format!("{:X}", i)),
+			(false, false) => output.push_str(&format!("{}", i)),
 		}
+
 		if !matches!(i, Instruction::Label(n) if n.len() < 8) {
 			output.push('\n');
 		} else {
@@ -126,9 +135,9 @@ fn compile_element<'a>(
 			else_then,
 		} => {
 			let line_id_str = line_id.to_string();
-			let then_str = "if-then-".to_string() + scope_name + "-" + &line_id_str;
-			let else_str = "if-else-".to_string() + scope_name + "-" + &line_id_str;
-			let end_str = "if-end-".to_string() + scope_name + "-" + &line_id_str;
+			let then_str = "if_then_".to_string() + scope_name + "_" + &line_id_str;
+			let else_str = "if_else_".to_string() + scope_name + "_" + &line_id_str;
+			let end_str = "if_end_".to_string() + scope_name + "_" + &line_id_str;
 			let mut cond = compile_statement(condition, variables, global_variables, stack_size)?;
 			cond.push((Instruction::TSTA, None));
 			let mut then_block = compile_elements(

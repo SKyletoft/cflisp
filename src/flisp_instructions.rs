@@ -132,9 +132,9 @@ impl fmt::Display for Addressing {
 			// mod 256 to allow -255 to 255 instead of -127 to 127
 			Addressing::Data(d) => write!(f, "#{:03}", *d % 256),
 			Addressing::Adr(d) => write!(f, "{:03}", *d % 256),
-			Addressing::SP(d) => write!(f, "{:03}, SP", *d % 256),
-			Addressing::Xn(d) => write!(f, "{:03}, X", *d % 256),
-			Addressing::Yn(d) => write!(f, "{:03}, X", *d % 256),
+			Addressing::SP(d) => write!(f, "{:03},SP", *d % 256),
+			Addressing::Xn(d) => write!(f, "{:03},X", *d % 256),
+			Addressing::Yn(d) => write!(f, "{:03},Y", *d % 256),
 			Addressing::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -145,9 +145,9 @@ impl fmt::UpperHex for Addressing {
 		match self {
 			Addressing::Data(d) => write!(f, "#%{:02X}", *d as u8),
 			Addressing::Adr(d) => write!(f, "%{:02X}", *d as u8),
-			Addressing::SP(d) => write!(f, "%{:02X}, SP", *d as u8),
-			Addressing::Xn(d) => write!(f, "%{:02X}, X", *d as u8),
-			Addressing::Yn(d) => write!(f, "%{:02X}, Y", *d as u8),
+			Addressing::SP(d) => write!(f, "%{:02X},SP", *d as u8),
+			Addressing::Xn(d) => write!(f, "%{:02X},X", *d as u8),
+			Addressing::Yn(d) => write!(f, "%{:02X},Y", *d as u8),
 			Addressing::Label(l) => write!(f, "{}", l),
 		}
 	}
