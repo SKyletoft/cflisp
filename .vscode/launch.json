@@ -20,7 +20,7 @@
 				}
 			},
 			"args": [
-				"tests/test1.c"
+				"tests/test4.c"
 			],
 			"cwd": "${workspaceFolder}",
 		},

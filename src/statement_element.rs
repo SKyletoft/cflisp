@@ -113,7 +113,7 @@ impl<'a> StatementElement<'a> {
 	}
 
 	pub(crate) fn depth(&self) -> usize {
-		match self {
+		let rest = match self {
 			StatementElement::Add { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Sub { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Mul { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
@@ -132,14 +132,15 @@ impl<'a> StatementElement<'a> {
 				name: _,
 				parametres,
 			} => parametres.iter().map(StatementElement::depth).sum(),
-			StatementElement::Var(_) => 1,
-			StatementElement::Num(_) => 1,
-			StatementElement::Char(_) => 1,
-			StatementElement::Bool(_) => 1,
-			StatementElement::Array(_) => 1,
-			StatementElement::Deref(_) => 1,
-			StatementElement::AdrOf(_) => 1,
-		}
+			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
+			StatementElement::Deref(n) => n.as_ref().depth(),
+			StatementElement::Var(_) => 0,
+			StatementElement::Num(_) => 0,
+			StatementElement::Char(_) => 0,
+			StatementElement::Bool(_) => 0,
+			StatementElement::AdrOf(_) => 0,
+		};
+		rest + 1
 	}
 
 	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {

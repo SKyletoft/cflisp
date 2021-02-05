@@ -3,7 +3,7 @@ int main() {
 	int *x = {1, 2, 3, 4, 5};
 	int y  = x[3];
 	int a  = *435;
-	int z  = *(x + 1 * 1);
+	int z  = *(x + 1);
 	int *c = &a;
 	if (a == b) {
 		int d = 1;

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::*;
+use env::var;
 use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use statement_element::StatementElement;
 use types::{Type, Variable};
@@ -18,8 +19,9 @@ pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<Stri
 	)?;
 	if instructions
 		.iter()
-		.filter(|(instruction, _)| !matches!(instruction, Instruction::Label(_)))
-		.count() > 255
+		.map(|(instruction, _)| instruction.size())
+		.sum::<usize>()
+		> 255
 	{
 		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
@@ -27,11 +29,11 @@ pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<Stri
 	for (i, c) in instructions.iter().skip(1) {
 		match (flags.hex, flags.comments) {
 			(true, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ;{}", inst, comm)),
+				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
 				(inst, None) => output.push_str(&format!("{:X}", inst)),
 			},
 			(false, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{}\t ;{}", inst, comm)),
+				(inst, Some(comm)) => output.push_str(&format!("{}\t ; {}", inst, comm)),
 				(inst, None) => output.push_str(&format!("{}", inst)),
 			},
 			(true, false) => output.push_str(&format!("{:X}", i)),
@@ -59,6 +61,7 @@ fn compile_element<'a>(
 	let res = match element {
 		LanguageElement::VariableDeclaration { typ, name } => {
 			if variables.contains_key(name) {
+				dbg!(element);
 				return Err(CompileError(line!(), "Name already exists in scope!"));
 			}
 			variables.insert(*name, (typ.clone(), *stack_size));
@@ -83,6 +86,7 @@ fn compile_element<'a>(
 		}
 		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
 			if variables.contains_key(name) {
+				dbg!(element);
 				return Err(CompileError(line!(), "Name already exists in scope!"));
 			}
 			variables.insert(*name, (typ.clone(), *stack_size));
@@ -140,27 +144,41 @@ fn compile_element<'a>(
 			let end_str = "if_end_".to_string() + scope_name + "_" + &line_id_str;
 			let mut cond = compile_statement(condition, variables, global_variables, stack_size)?;
 			cond.push((Instruction::TSTA, None));
+			let mut then_stack = *stack_size;
 			let mut then_block = compile_elements(
 				then.as_slice(),
-				variables,
+				&mut variables.clone(),
 				global_variables,
 				functions,
 				&then_str,
-				stack_size,
+				&mut then_stack,
 			)?;
+			if then_stack != *stack_size {
+				cond.push((
+					Instruction::LEASP(Addressing::SP(then_stack - *stack_size)),
+					None,
+				));
+			}
 			if let Some(v) = else_then {
+				let mut else_stack = *stack_size;
 				let mut else_block = compile_elements(
 					v.as_slice(),
-					variables,
+					&mut variables.clone(),
 					global_variables,
 					functions,
 					&else_str,
-					stack_size,
+					&mut else_stack,
 				)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut else_block);
+				if else_stack != *stack_size {
+					cond.push((
+						Instruction::LEASP(Addressing::SP(else_stack - *stack_size)),
+						None,
+					));
+				}
 			} else {
 				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut then_block);
@@ -220,7 +238,7 @@ fn compile_statement<'a>(
 		)];
 		block.append(&mut statement_instructions);
 		block.append(&mut vec![(
-			Instruction::LEASP(Addressing::SP(depth as isize + 1)),
+			Instruction::LEASP(Addressing::SP(-(depth as isize - 1))),
 			Some("Clearing memory for statement"),
 		)]);
 		block
@@ -251,6 +269,7 @@ fn compile_statement_inner<'a>(
 		| StatementElement::GT { lhs, rhs }
 		| StatementElement::LT { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
+			//DOESN'T WORK AT ALL
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right, depth) = if left_depth >= right_depth {
@@ -314,17 +333,40 @@ fn compile_statement_inner<'a>(
 		StatementElement::Bool(b) => {
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
-		StatementElement::Array(_) => unimplemented!(),
+		StatementElement::Array(arr) => {
+			let mut vec = Vec::new();
+			for element in arr.iter() {
+				let mut instructions =
+					compile_statement_inner(element, variables, global_variables, stack_size)?;
+				*stack_size += 1;
+				vec.append(&mut instructions);
+				vec.push((Instruction::PSHA, None));
+			}
+			vec
+		}
 		StatementElement::Deref(adr) => {
 			//Is this sound if it occurs on the left hand side?
 			let mut instructions =
 				compile_statement_inner(adr.as_ref(), variables, global_variables, stack_size)?;
-			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
 			instructions.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
 			instructions.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
 			instructions
 		}
-		StatementElement::AdrOf(_) => unimplemented!(),
+		StatementElement::AdrOf(name) => {
+			if let Some((_, adr)) = variables.get(name) {
+				vec![(
+					Instruction::LDA(Addressing::Data(*stack_size - adr)),
+					Some(*name),
+				)]
+			} else {
+				dbg!(name);
+				return Err(CompileError(
+					line!(),
+					"Name resolution failed? Shouldn't it've been checked by now?",
+				));
+			}
+		}
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
 	Ok(instructions)

@@ -27,7 +27,6 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 				let slice = &s[start..=i];
 				if keep_closure(slice) {
 					vec.push(slice);
-					vec.push(";");
 				}
 				start = i + 1;
 				curlies -= 1;
@@ -141,4 +140,8 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 pub(crate) fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
 	s[1..s.len() - 1].trim()
+}
+
+pub(crate) fn is_block(s: &str) -> bool {
+	s.starts_with('{') && s.ends_with('}')
 }

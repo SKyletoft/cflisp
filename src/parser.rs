@@ -1,4 +1,5 @@
 use crate::*;
+use helper::is_block;
 use language_element::LanguageElement;
 use statement_element::StatementElement;
 use statement_token::StatementToken;
@@ -12,8 +13,7 @@ pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, Par
 
 fn construct_block<'a>(tokens: &[Token<'a>]) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let mut res = Vec::new();
-	//REVISIT LATER. SPLITTING AT NEWLINE CAUSES ERRORS WITH ELSE BLOCKS
-	for token in tokens.split(|t| t == &NewLine).filter(|t| !t.is_empty()) {
+	for token in split_token_lines(tokens) {
 		res.push(construct_structure_from_tokens(token)?);
 	}
 	statement_element::move_declarations_first(&mut res);
@@ -118,8 +118,8 @@ fn construct_structure_from_tokens<'a>(
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(then_code)?;
-				let else_if_tokens = &tokens[5..];
+				let then_parsed = parse(helper::remove_parentheses(then_code))?;
+				let else_if_tokens = &tokens[4..];
 				let else_if_parsed = construct_structure_from_tokens(else_if_tokens)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
@@ -292,4 +292,28 @@ pub(crate) fn type_check(
 	}
 
 	Ok(true)
+}
+
+fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
+	let mut vec = Vec::new();
+	let mut last = 0;
+	for idx in 0..tokens.len() {
+		if matches!(tokens[idx], Token::NewLine) {
+			let slice = &tokens[last..idx];
+			if !slice.is_empty() {
+				vec.push(slice);
+			}
+			last = idx + 1;
+		}
+		if matches!(tokens[idx], Token::UnparsedBlock(raw) if is_block(raw))
+			&& !matches!(tokens.get(idx + 1), Some(Token::Else))
+		{
+			let slice = &tokens[last..=idx];
+			if !slice.is_empty() {
+				vec.push(slice);
+			}
+			last = idx + 1;
+		}
+	}
+	vec
 }

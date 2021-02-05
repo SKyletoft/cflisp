@@ -114,6 +114,32 @@ impl Instruction {
 			| Instruction::TSTA => None,
 		}
 	}
+
+	pub(crate) fn size(&self) -> usize {
+		match self {
+			Instruction::LDA(a)
+			| Instruction::LDX(a)
+			| Instruction::LDY(a)
+			| Instruction::ADDA(a)
+			| Instruction::SUBA(a)
+			| Instruction::ANDA(a)
+			| Instruction::ASL(a)
+			| Instruction::ASR(a)
+			| Instruction::ORA(a)
+			| Instruction::EORA(a)
+			| Instruction::STA(a)
+			| Instruction::JMP(a)
+			| Instruction::BEQ(a)
+			| Instruction::LEASP(a) => a.size(),
+			Instruction::PSHA
+			| Instruction::PULA
+			| Instruction::TSTA
+			| Instruction::COMA
+			| Instruction::AddToStack
+			| Instruction::RemoveFromStack => 1,
+			Instruction::Label(_) => 0,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,6 +150,19 @@ pub(crate) enum Addressing {
 	Xn(isize),
 	Yn(isize),
 	Label(String),
+}
+
+impl Addressing {
+	fn size(&self) -> usize {
+		match self {
+			Addressing::Data(_)
+			| Addressing::Adr(_)
+			| Addressing::SP(_)
+			| Addressing::Xn(_)
+			| Addressing::Yn(_) => 1,
+			Addressing::Label(_) => 0,
+		}
+	}
 }
 
 impl fmt::Display for Addressing {
