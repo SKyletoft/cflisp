@@ -240,17 +240,19 @@ fn compile_statement<'a>(
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let depth = statement.depth();
+	let depth = statement.depth() as isize;
+	*stack_size += depth - 1;
 	let mut statement_instructions =
-		compile_statement_inner(statement, variables, global_variables, stack_size)?;
+		compile_statement_inner(statement, variables, global_variables, stack_size, &mut 0)?;
+	*stack_size -= depth - 1;
 	let block = if depth > 1 {
 		let mut block = vec![(
-			Instruction::LEASP(Addressing::SP(depth as isize - 1)),
+			Instruction::LEASP(Addressing::SP(-(depth - 1))),
 			Some("Reserving memory for statement"),
 		)];
 		block.append(&mut statement_instructions);
 		block.append(&mut vec![(
-			Instruction::LEASP(Addressing::SP(-(depth as isize - 1))),
+			Instruction::LEASP(Addressing::SP(depth)), //why not -1?
 			Some("Clearing memory for statement"),
 		)]);
 		block
@@ -266,6 +268,7 @@ fn compile_statement_inner<'a>(
 	variables: &mut HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: &mut isize,
+	tmps_used: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		StatementElement::Add { lhs, rhs }
@@ -284,32 +287,27 @@ fn compile_statement_inner<'a>(
 			//DOESN'T WORK AT ALL
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
-			let (left, right, depth) = if left_depth >= right_depth {
-				(lhs.as_ref(), rhs.as_ref(), right_depth)
+			let (left, right) = if left_depth >= right_depth {
+				(lhs.as_ref(), rhs.as_ref())
 			} else {
-				(rhs.as_ref(), lhs.as_ref(), left_depth)
+				(rhs.as_ref(), lhs.as_ref())
 			};
 			let mut instructions =
-				compile_statement_inner(left, variables, global_variables, stack_size)?;
-			if depth > 1 {
-				instructions.push((Instruction::STA(Addressing::SP(*stack_size)), None));
-				*stack_size += 1;
-			} else {
-				let right_instructions =
-					compile_statement_inner(right, variables, global_variables, stack_size)?;
-				let addressing = match right_instructions.as_slice() {
-					[(instruction, _)] => instruction.address().ok_or(CompileError(
-						line!(),
-						"Internal: Invalid right hand instruction?",
-					)),
-					_ => {
-						dbg!(statement);
-						return Err(CompileError(line!(), "Internal: Depth caluclation failed?"));
-					}
-				}?;
-				let merge = (statement.as_flisp_instruction(addressing), None);
-				instructions.push(merge);
-			}
+				compile_statement_inner(left, variables, global_variables, stack_size, tmps_used)?;
+			instructions.push((
+				Instruction::STA(Addressing::SP(dbg!(*stack_size - *tmps_used))),
+				None,
+			));
+			*tmps_used += 1;
+			let mut right_instructions =
+				compile_statement_inner(right, variables, global_variables, stack_size, tmps_used)?;
+			*tmps_used -= 1;
+			instructions.append(&mut right_instructions);
+			let merge = (
+				statement.as_flisp_instruction(Addressing::SP(*stack_size - *tmps_used)),
+				None,
+			);
+			instructions.push(merge);
 			instructions
 		}
 
@@ -348,8 +346,13 @@ fn compile_statement_inner<'a>(
 		StatementElement::Array(arr) => {
 			let mut vec = Vec::new();
 			for element in arr.iter() {
-				let mut instructions =
-					compile_statement_inner(element, variables, global_variables, stack_size)?;
+				let mut instructions = compile_statement_inner(
+					element,
+					variables,
+					global_variables,
+					stack_size,
+					tmps_used,
+				)?;
 				*stack_size += 1;
 				vec.append(&mut instructions);
 				vec.push((Instruction::PSHA, None));
@@ -359,8 +362,13 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::Deref(adr) => {
 			//Is this sound if it occurs on the left hand side?
-			let mut instructions =
-				compile_statement_inner(adr.as_ref(), variables, global_variables, stack_size)?;
+			let mut instructions = compile_statement_inner(
+				adr.as_ref(),
+				variables,
+				global_variables,
+				stack_size,
+				tmps_used,
+			)?;
 			instructions.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
 			instructions.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
 			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
