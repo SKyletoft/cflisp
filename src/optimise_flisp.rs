@@ -10,7 +10,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 
 fn load_x(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while idx < instructions.len() - 3 && instructions.len() >= 3 {
+	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(addressing), comment),
 			(Instruction::STA(Addressing::SP(-1)), _),
@@ -30,7 +30,7 @@ fn load_x(instructions: &mut Vec<CommentedInstruction>) {
 
 fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while idx < instructions.len() - 3 && instructions.len() >= 3 {
+	while instructions.len() >= 2 && idx < instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
 			((Instruction::LDA(_), _), (Instruction::LDA(_), _))
@@ -76,6 +76,7 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 			i,
 			Instruction::ADDA(Addressing::Data(0))
 				| Instruction::EORA(Addressing::Data(0))
+				| Instruction::ORA(Addressing::Data(0))
 				| Instruction::ANDA(Addressing::Data(isize::MAX))
 		)
 	});
