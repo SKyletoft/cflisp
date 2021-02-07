@@ -72,7 +72,7 @@ fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
 
 fn nop(instructions: &mut Vec<CommentedInstruction>) {
 	instructions.retain(|(i, _)| {
-		matches!(
+		!matches!(
 			i,
 			Instruction::ADDA(Addressing::Data(0))
 				| Instruction::EORA(Addressing::Data(0))
