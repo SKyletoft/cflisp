@@ -10,24 +10,14 @@ const ABOVE_STACK_OFFSET: isize = -1;
 pub(crate) fn compile<'a>(
 	program: &'a [LanguageElement],
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let instructions = compile_elements(
+	compile_elements(
 		program,
 		&mut HashMap::new(),
 		&mut HashMap::new(),
 		&mut HashMap::new(),
 		"global",
 		&mut 0,
-	)?;
-	if instructions
-		.iter()
-		.map(|(instruction, _)| instruction.size())
-		.sum::<usize>()
-		> 255
-	{
-		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
-	}
-
-	Ok(instructions)
+	)
 }
 
 fn compile_elements<'a>(
@@ -229,9 +219,6 @@ fn compile_statement<'a>(
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let depth = statement.depth() as isize - 1;
-	eprintln!("\n---------------------------------------------------\n");
-	dbg!(depth);
-	dbg!(statement);
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
@@ -319,12 +306,7 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::Var(name) => {
 			let adr = if let Some((_, adr)) = variables.get(name) {
-				dbg!(statement);
-				dbg!((*stack_size, tmps, *adr));
-				let adr = *stack_size + tmps - *adr;
-				dbg!(adr);
-				eprintln!("~~~~~~~~~~");
-				Addressing::SP(adr)
+				Addressing::SP(*stack_size + tmps - *adr)
 			} else if let Some((_, adr)) = global_variables.get(name) {
 				Addressing::Adr(*adr)
 			} else {
@@ -410,7 +392,18 @@ fn compile_statement_inner<'a>(
 	Ok(instructions)
 }
 
-pub(crate) fn instructions_to_text(instructions: &[CommentedInstruction], flags: &Flags) -> String {
+pub(crate) fn instructions_to_text(
+	instructions: &[CommentedInstruction],
+	flags: &Flags,
+) -> Result<String, CompileError> {
+	if instructions
+		.iter()
+		.map(|(instruction, _)| instruction.size())
+		.sum::<usize>()
+		> 255
+	{
+		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
+	}
 	let mut output = String::new();
 	for (i, c) in instructions.iter().skip(1) {
 		match (flags.hex, flags.comments) {
@@ -432,5 +425,5 @@ pub(crate) fn instructions_to_text(instructions: &[CommentedInstruction], flags:
 			output.push(' ');
 		}
 	}
-	output
+	Ok(output)
 }

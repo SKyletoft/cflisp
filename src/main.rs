@@ -53,7 +53,7 @@ fn main() {
 	if flags.optimise {
 		optimise_flisp::all_optimisations(&mut instr);
 	}
-	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags);
+	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags).expect("Too long?");
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
 		compiled.push_str("\tJMP\tend\n\nend\tJMP\tend\n\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJMP\tmain\n\n\tORG\t$FF\n\tFCB\tinit\n");
