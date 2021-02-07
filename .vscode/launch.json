@@ -20,7 +20,8 @@
 				}
 			},
 			"args": [
-				"tests/test4.c"
+				"tests/test9.c",
+				"-SOp"
 			],
 			"cwd": "${workspaceFolder}",
 		},

@@ -50,10 +50,7 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
-	let mut instr = compile_flisp::compile(&parsed).expect("Compiler error");
-	if flags.optimise {
-		optimise_flisp::all_optimisations(&mut instr);
-	}
+	let instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
 	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags).expect("Too long?");
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");

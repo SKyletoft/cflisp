@@ -9,6 +9,7 @@ const ABOVE_STACK_OFFSET: isize = -1;
 
 pub(crate) fn compile<'a>(
 	program: &'a [LanguageElement],
+	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	compile_elements(
 		program,
@@ -17,6 +18,7 @@ pub(crate) fn compile<'a>(
 		&mut HashMap::new(),
 		"global",
 		&mut 0,
+		flags.optimise,
 	)
 }
 
@@ -27,9 +29,10 @@ fn compile_elements<'a>(
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
 	stack_size: &mut isize,
+	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
-	for line in block.iter().enumerate().map(|(i, e)| {
+	for mut line in block.iter().enumerate().map(|(i, e)| {
 		compile_element(
 			e,
 			variables,
@@ -40,7 +43,11 @@ fn compile_elements<'a>(
 			i,
 		)
 	}) {
-		instructions.append(&mut line?);
+		let line = &mut line?;
+		if optimise {
+			optimise_flisp::all_optimisations(line);
+		}
+		instructions.append(line);
 	}
 	Ok(instructions)
 }
@@ -150,6 +157,7 @@ fn compile_element<'a>(
 				functions,
 				name,
 				&mut args_count,
+				false,
 			)?;
 			if args_count != 0 {
 				fun.push((Instruction::LEASP(Addressing::SP(args_count)), None));
@@ -177,6 +185,7 @@ fn compile_element<'a>(
 				functions,
 				&then_str,
 				&mut then_stack,
+				false,
 			)?;
 			if then_stack != *stack_size {
 				cond.push((
@@ -193,6 +202,7 @@ fn compile_element<'a>(
 					functions,
 					&else_str,
 					&mut else_stack,
+					false,
 				)?;
 				cond.push((Instruction::BNE(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
