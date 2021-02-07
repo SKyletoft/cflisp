@@ -7,7 +7,9 @@ use types::{Type, Variable};
 
 const ABOVE_STACK_OFFSET: isize = -1;
 
-pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<String, CompileError> {
+pub(crate) fn compile<'a>(
+	program: &'a [LanguageElement],
+) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = compile_elements(
 		program,
 		&mut HashMap::new(),
@@ -24,29 +26,8 @@ pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<Stri
 	{
 		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
-	let mut output = String::new();
-	for (i, c) in instructions.iter().skip(1) {
-		match (flags.hex, flags.comments) {
-			(true, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
-				(inst, None) => output.push_str(&format!("{:X}", inst)),
-			},
-			(false, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{}\t ; {}", inst, comm)),
-				(inst, None) => output.push_str(&format!("{}", inst)),
-			},
-			(true, false) => output.push_str(&format!("{:X}", i)),
-			(false, false) => output.push_str(&format!("{}", i)),
-		}
 
-		if !matches!(i, Instruction::Label(n) if n.len() < 8) {
-			output.push('\n');
-		} else {
-			output.push(' ');
-		}
-	}
-
-	Ok(output)
+	Ok(instructions)
 }
 
 fn compile_elements<'a>(
@@ -427,4 +408,29 @@ fn compile_statement_inner<'a>(
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
 	Ok(instructions)
+}
+
+pub(crate) fn instructions_to_text(instructions: &[CommentedInstruction], flags: &Flags) -> String {
+	let mut output = String::new();
+	for (i, c) in instructions.iter().skip(1) {
+		match (flags.hex, flags.comments) {
+			(true, true) => match (i, c) {
+				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
+				(inst, None) => output.push_str(&format!("{:X}", inst)),
+			},
+			(false, true) => match (i, c) {
+				(inst, Some(comm)) => output.push_str(&format!("{}\t ; {}", inst, comm)),
+				(inst, None) => output.push_str(&format!("{}", inst)),
+			},
+			(true, false) => output.push_str(&format!("{:X}", i)),
+			(false, false) => output.push_str(&format!("{}", i)),
+		}
+
+		if !matches!(i, Instruction::Label(n) if n.len() < 8) {
+			output.push('\n');
+		} else {
+			output.push(' ');
+		}
+	}
+	output
 }

@@ -163,11 +163,11 @@ impl fmt::Display for Addressing {
 impl fmt::UpperHex for Addressing {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Addressing::Data(d) => write!(f, "#%{:02X}", *d as u8),
-			Addressing::Adr(d) => write!(f, "%{:02X}", *d as u8),
-			Addressing::SP(d) => write!(f, "%{:02X},SP", *d as u8),
-			Addressing::Xn(d) => write!(f, "%{:02X},X", *d as u8),
-			Addressing::Yn(d) => write!(f, "%{:02X},Y", *d as u8),
+			Addressing::Data(d) => write!(f, "#${:02X}", *d as u8),
+			Addressing::Adr(d) => write!(f, "${:02X}", *d as u8),
+			Addressing::SP(d) => write!(f, "${:02X},SP", *d as u8),
+			Addressing::Xn(d) => write!(f, "${:02X},X", *d as u8),
+			Addressing::Yn(d) => write!(f, "${:02X},Y", *d as u8),
 			Addressing::Label(l) => write!(f, "{}", l),
 		}
 	}

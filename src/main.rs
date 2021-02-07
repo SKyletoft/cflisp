@@ -6,6 +6,7 @@ pub mod flags;
 pub mod flisp_instructions;
 pub mod helper;
 pub mod language_element;
+pub mod optimise_flisp;
 pub mod parser;
 pub mod statement_element;
 pub mod statement_token;
@@ -48,7 +49,15 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
-	let compiled = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
+	let mut instr = compile_flisp::compile(&parsed).expect("Compiler error");
+	if flags.optimise {
+		optimise_flisp::all_optimisations(&mut instr);
+	}
+	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags);
+	if flags.debug {
+		compiled.insert_str(0, "\tORG\t$20\n");
+		compiled.push_str("\tJMP\tend\n\nend\tJMP\tend\n\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJMP\tmain\n\n\tORG\t$FF\n\tFCB\tinit\n");
+	}
 	if flags.print_result {
 		eprintln!("{}", &compiled);
 	} else {

@@ -117,6 +117,16 @@ impl<'a> Token<'a> {
 					ParseError(line!(), "Number parse error: Is the number too large?")
 				})?)
 			}
+			n if n.starts_with("0x")
+				&& n.len() > 2 && n.chars().skip(2).all(|r| r.is_ascii_hexdigit()) =>
+			{
+				Num(isize::from_str_radix(&n[2..], 16).map_err(|_| {
+					ParseError(
+						line!(),
+						"Number parse error: Is the number too large? (hex)",
+					)
+				})?)
+			}
 			n => Token::Name(n),
 		};
 		Ok(token)
