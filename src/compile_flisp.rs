@@ -45,7 +45,33 @@ pub(crate) fn compile(program: &[LanguageElement], flags: &Flags) -> Result<Stri
 			output.push(' ');
 		}
 	}
+
 	Ok(output)
+}
+
+fn compile_elements<'a>(
+	block: &'a [LanguageElement],
+	variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &mut HashMap<&'a str, (Type, isize)>,
+	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
+	scope_name: &str,
+	stack_size: &mut isize,
+) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
+	for line in block.iter().enumerate().map(|(i, e)| {
+		compile_element(
+			e,
+			variables,
+			global_variables,
+			functions,
+			scope_name,
+			stack_size,
+			i,
+		)
+	}) {
+		instructions.append(&mut line?);
+	}
+	Ok(instructions)
 }
 
 fn compile_element<'a>(
@@ -93,8 +119,8 @@ fn compile_element<'a>(
 				dbg!(element);
 				return Err(CompileError(line!(), "Name already exists in scope!"));
 			}
-			variables.insert(*name, (typ.clone(), *stack_size));
 			*stack_size += 1;
+			variables.insert(*name, (typ.clone(), *stack_size));
 			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
 			statement.push((Instruction::PSHA, Some(*name)));
 			statement
@@ -104,8 +130,14 @@ fn compile_element<'a>(
 			let get_adr = compile_statement(ptr, variables, global_variables, stack_size)?;
 			let mut value = compile_statement(value, variables, global_variables, stack_size)?;
 			let mut statement = get_adr;
-			statement.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
-			statement.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			statement.push((
+				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
+				Some("A to X part 1"),
+			));
+			statement.push((
+				Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
+				Some("A to X part 2"),
+			));
 			statement.append(&mut value);
 			statement.push((Instruction::STA(Addressing::Xn(0)), None));
 			statement
@@ -135,7 +167,7 @@ fn compile_element<'a>(
 				&mut args_count,
 			)?;
 			if args_count != 0 {
-				fun.push((Instruction::LEASP(Addressing::SP(-args_count)), None));
+				fun.push((Instruction::LEASP(Addressing::SP(args_count)), None));
 			}
 			fun
 		}
@@ -209,45 +241,27 @@ fn compile_element<'a>(
 	Ok(res)
 }
 
-fn compile_elements<'a>(
-	block: &'a [LanguageElement],
-	variables: &mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &mut HashMap<&'a str, (Type, isize)>,
-	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
-	scope_name: &str,
-	stack_size: &mut isize,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
-	for line in block.iter().enumerate().map(|(i, e)| {
-		compile_element(
-			e,
-			variables,
-			global_variables,
-			functions,
-			scope_name,
-			stack_size,
-			i,
-		)
-	}) {
-		instructions.append(&mut line?);
-	}
-	Ok(instructions)
-}
-
 fn compile_statement<'a>(
 	statement: &'a StatementElement,
 	variables: &mut HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let depth = statement.depth() as isize;
-	*stack_size += depth - 1;
-	let mut statement_instructions =
-		compile_statement_inner(statement, variables, global_variables, stack_size, &mut 0)?;
-	*stack_size -= depth - 1;
-	let block = if depth > 1 {
+	let depth = statement.depth() as isize - 1;
+	eprintln!("\n---------------------------------------------------\n");
+	dbg!(depth);
+	dbg!(statement);
+	let mut statement_instructions = compile_statement_inner(
+		statement,
+		variables,
+		global_variables,
+		stack_size,
+		&mut 0,
+		if depth >= 2 { depth } else { 0 },
+	)?;
+	if depth > 1 {
 		let mut block = vec![(
-			Instruction::LEASP(Addressing::SP(-(depth - 1))),
+			Instruction::LEASP(Addressing::SP(-depth)),
 			Some("Reserving memory for statement"),
 		)];
 		block.append(&mut statement_instructions);
@@ -255,12 +269,10 @@ fn compile_statement<'a>(
 			Instruction::LEASP(Addressing::SP(depth)), //why not -1?
 			Some("Clearing memory for statement"),
 		)]);
-		block
-	} else {
-		statement_instructions
+		statement_instructions = block;
 	};
 
-	Ok(block)
+	Ok(statement_instructions)
 }
 
 fn compile_statement_inner<'a>(
@@ -269,6 +281,7 @@ fn compile_statement_inner<'a>(
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: &mut isize,
 	tmps_used: &mut isize,
+	tmps: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		StatementElement::Add { lhs, rhs }
@@ -292,22 +305,29 @@ fn compile_statement_inner<'a>(
 			} else {
 				(rhs.as_ref(), lhs.as_ref())
 			};
-			let mut instructions =
-				compile_statement_inner(left, variables, global_variables, stack_size, tmps_used)?;
+			let mut instructions = compile_statement_inner(
+				left,
+				variables,
+				global_variables,
+				stack_size,
+				tmps_used,
+				tmps,
+			)?;
+			*tmps_used += 1;
+			instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+			instructions.append(&mut compile_statement_inner(
+				right,
+				variables,
+				global_variables,
+				stack_size,
+				tmps_used,
+				tmps,
+			)?);
 			instructions.push((
-				Instruction::STA(Addressing::SP(dbg!(*stack_size - *tmps_used))),
+				statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
 				None,
 			));
-			*tmps_used += 1;
-			let mut right_instructions =
-				compile_statement_inner(right, variables, global_variables, stack_size, tmps_used)?;
 			*tmps_used -= 1;
-			instructions.append(&mut right_instructions);
-			let merge = (
-				statement.as_flisp_instruction(Addressing::SP(*stack_size - *tmps_used)),
-				None,
-			);
-			instructions.push(merge);
 			instructions
 		}
 
@@ -318,7 +338,12 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::Var(name) => {
 			let adr = if let Some((_, adr)) = variables.get(name) {
-				Addressing::SP(*stack_size - *adr)
+				dbg!(statement);
+				dbg!((*stack_size, tmps, *adr));
+				let adr = *stack_size + tmps - *adr;
+				dbg!(adr);
+				eprintln!("~~~~~~~~~~");
+				Addressing::SP(adr)
 			} else if let Some((_, adr)) = global_variables.get(name) {
 				Addressing::Adr(*adr)
 			} else {
@@ -352,6 +377,7 @@ fn compile_statement_inner<'a>(
 					global_variables,
 					stack_size,
 					tmps_used,
+					tmps,
 				)?;
 				*stack_size += 1;
 				vec.append(&mut instructions);
@@ -368,17 +394,25 @@ fn compile_statement_inner<'a>(
 				global_variables,
 				stack_size,
 				tmps_used,
+				tmps,
 			)?;
-			instructions.push((Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), None));
-			instructions.push((Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), None));
+			instructions.push((
+				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
+				Some("A to X transfer"),
+			));
+			instructions.push((
+				Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
+				Some("A to X  continued"),
+			));
 			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
 			instructions
 		}
 
 		StatementElement::AdrOf(name) => {
 			if let Some((_, adr)) = variables.get(name) {
+				dbg!(tmps);
 				vec![(
-					Instruction::LDA(Addressing::Data(*stack_size - adr)),
+					Instruction::LDA(Addressing::Data(*stack_size + tmps - adr)),
 					Some(*name),
 				)]
 			} else {
