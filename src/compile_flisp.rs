@@ -154,6 +154,7 @@ fn compile_element<'a>(
 			if args_count != 0 {
 				fun.push((Instruction::LEASP(Addressing::SP(args_count)), None));
 			}
+			fun.push((Instruction::RTS, None));
 			fun
 		}
 
@@ -369,25 +370,45 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Deref(adr) => {
-			//Is this sound if it occurs on the left hand side?
-			let mut instructions = compile_statement_inner(
-				adr.as_ref(),
-				variables,
-				global_variables,
-				stack_size,
-				tmps_used,
-				tmps,
-			)?;
-			instructions.push((
-				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X transfer"),
-			));
-			instructions.push((
-				Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X  continued"),
-			));
-			instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
-			instructions
+			if let Some((&StatementElement::Var(name), &StatementElement::Num(offset))) =
+				adr.internal_ref()
+			{
+				let adr = if let Some((_, adr)) = variables.get(name) {
+					Addressing::SP(*stack_size + tmps - *adr)
+				} else if let Some((_, adr)) = global_variables.get(name) {
+					Addressing::Adr(*adr)
+				} else {
+					eprintln!("Error: {}", name);
+					return Err(CompileError(
+						line!(),
+						"Name resolution failed? Shouldn't be checked by now?",
+					));
+				};
+				vec![
+					(Instruction::LDY(adr), Some(name)),
+					(Instruction::LDA(Addressing::Yn(offset)), None),
+				]
+			} else {
+				//Is this sound if it occurs on the left hand side?
+				let mut instructions = compile_statement_inner(
+					adr.as_ref(),
+					variables,
+					global_variables,
+					stack_size,
+					tmps_used,
+					tmps,
+				)?;
+				instructions.push((
+					Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
+					Some("A to X transfer"),
+				));
+				instructions.push((
+					Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
+					Some("A to X  continued"),
+				));
+				instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
+				instructions
+			}
 		}
 
 		StatementElement::AdrOf(name) => {

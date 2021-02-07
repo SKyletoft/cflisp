@@ -23,6 +23,8 @@ pub(crate) enum Instruction {
 	PULA,
 	TSTA,
 	COMA,
+	RTS,
+	JSR(Addressing),
 	Label(String),
 }
 
@@ -44,10 +46,12 @@ impl fmt::Display for Instruction {
 			Instruction::JMP(a) => write!(f, "\tJMP\t{}", *a),
 			Instruction::BNE(a) => write!(f, "\tBNE\t{}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{}", *a),
+			Instruction::JSR(a) => write!(f, "\tJSR\t{}", *a),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
+			Instruction::RTS => write!(f, "\tRTS\t"),
 			Instruction::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -70,10 +74,12 @@ impl fmt::UpperHex for Instruction {
 			Instruction::JMP(a) => write!(f, "\tJMP\t{:X}", *a),
 			Instruction::BNE(a) => write!(f, "\tBNE\t{:X}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{:X}", *a),
+			Instruction::JSR(a) => write!(f, "\tJSR\t{:X}", *a),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
+			Instruction::RTS => write!(f, "\tRTS\t"),
 			Instruction::Label(l) => write!(f, "{}", l),
 		}
 	}
@@ -96,11 +102,13 @@ impl Instruction {
 			| Instruction::BNE(a)
 			| Instruction::LEASP(a)
 			| Instruction::ORA(a)
+			| Instruction::JSR(a)
 			| Instruction::STA(a) => Some(a.clone()),
 			Instruction::Label(_)
 			| Instruction::COMA
 			| Instruction::PSHA
 			| Instruction::PULA
+			| Instruction::RTS
 			| Instruction::TSTA => None,
 		}
 	}
@@ -121,8 +129,13 @@ impl Instruction {
 			| Instruction::STA(a)
 			| Instruction::JMP(a)
 			| Instruction::BNE(a)
+			| Instruction::JSR(a)
 			| Instruction::LEASP(a) => a.size(),
-			Instruction::PSHA | Instruction::PULA | Instruction::TSTA | Instruction::COMA => 1,
+			Instruction::PSHA
+			| Instruction::PULA
+			| Instruction::TSTA
+			| Instruction::COMA
+			| Instruction::RTS => 1,
 			Instruction::Label(_) => 0,
 		}
 	}

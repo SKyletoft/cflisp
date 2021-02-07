@@ -56,8 +56,8 @@ fn main() {
 	}
 	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags).expect("Too long?");
 	if flags.debug {
-		//compiled.insert_str(0, "\tORG\t$20\n");
-		compiled.push_str("\tJMP\tend\n\nend\tJMP\tend\n\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJMP\tmain\n\n\tORG\t$FF\n\tFCB\tinit\n");
+		compiled.insert_str(0, "\tORG\t$20\n");
+		compiled.push_str("\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");
 	}
 	if flags.print_result {
 		eprintln!("{}", &compiled);

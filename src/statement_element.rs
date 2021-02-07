@@ -466,6 +466,36 @@ impl<'a> StatementElement<'a> {
 		};
 		Ok(res)
 	}
+
+	pub(crate) fn internal_ref(&self) -> Option<(&StatementElement, &StatementElement)> {
+		match self {
+			StatementElement::Add { lhs, rhs }
+			| StatementElement::Sub { lhs, rhs }
+			| StatementElement::Mul { lhs, rhs }
+			| StatementElement::Div { lhs, rhs }
+			| StatementElement::Mod { lhs, rhs }
+			| StatementElement::LShift { lhs, rhs }
+			| StatementElement::RShift { lhs, rhs }
+			| StatementElement::And { lhs, rhs }
+			| StatementElement::Or { lhs, rhs }
+			| StatementElement::Xor { lhs, rhs }
+			| StatementElement::GT { lhs, rhs }
+			| StatementElement::LT { lhs, rhs }
+			| StatementElement::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
+			StatementElement::Not { lhs: _ }
+			| StatementElement::FunctionCall {
+				name: _,
+				parametres: _,
+			}
+			| StatementElement::Var(_)
+			| StatementElement::Num(_)
+			| StatementElement::Char(_)
+			| StatementElement::Bool(_)
+			| StatementElement::Array(_)
+			| StatementElement::Deref(_)
+			| StatementElement::AdrOf(_) => None,
+		}
+	}
 }
 
 fn do_operation<'a>(

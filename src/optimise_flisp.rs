@@ -45,6 +45,7 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
+	// Needs rewrite since proper array dereffing was implemented
 	let mut last_x = isize::MIN;
 	let mut last_y = isize::MIN;
 	let mut idx = instructions.len() - 1;
