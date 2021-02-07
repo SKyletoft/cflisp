@@ -32,7 +32,7 @@ fn compile_elements<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
-	for mut line in block.iter().enumerate().map(|(i, e)| {
+	for line in block.iter().enumerate().map(|(i, e)| {
 		compile_element(
 			e,
 			variables,
@@ -86,7 +86,7 @@ fn compile_element<'a>(
 
 		LanguageElement::VariableAssignment { name, value } => {
 			let adr = if let Some(&(_, stack_address)) = variables.get(name) {
-				Addressing::SP(stack_address)
+				Addressing::SP(*stack_size - stack_address)
 			} else if let Some(&(_, stack_address)) = global_variables.get(name) {
 				Addressing::Adr(stack_address)
 			} else {
@@ -97,7 +97,7 @@ fn compile_element<'a>(
 				));
 			};
 			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
-			statement.push((Instruction::STA(adr), None));
+			statement.push((Instruction::STA(adr), Some(name)));
 			statement
 		}
 
@@ -423,7 +423,6 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::AdrOf(name) => {
 			if let Some((_, adr)) = variables.get(name) {
-				dbg!(tmps);
 				vec![(
 					Instruction::LDA(Addressing::Data(*stack_size + tmps - adr)),
 					Some(*name),

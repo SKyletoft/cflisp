@@ -23,9 +23,9 @@ into this:
 ; tests/expected1.sflisp
 main    ORG     $20
         LDA     #0
-        PSHA    SP, -1  ; ptr
+        PSHA            ; ptr
         LDA     #5
-        PSHA    SP, 0   ; x
+        PSHA            ; x
         CMPA    #5
         BNE     main_1
         LDA     #3

@@ -57,7 +57,7 @@ fn main() {
 		compiled.push_str("\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");
 	}
 	if flags.print_result {
-		eprintln!("{}", &compiled);
+		println!("{}", &compiled);
 	} else {
 		fs::write(&flags.out, &compiled).expect("IO Error: Could not save file");
 	}
