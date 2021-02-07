@@ -336,3 +336,12 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	}
 	vec
 }
+
+pub(crate) fn remove_comments(s: &str) -> String {
+	let mut out = String::new();
+	for line in s.lines() {
+		let comment_start = line.find("//").unwrap_or_else(|| line.len());
+		out.push_str(&line[..comment_start]);
+	}
+	out
+}

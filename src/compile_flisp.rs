@@ -56,16 +56,25 @@ fn compile_element<'a>(
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
 		LanguageElement::VariableDeclaration { typ, name } => {
-			if variables.contains_key(name) {
-				dbg!(element);
-				return Err(CompileError(line!(), "Name already exists in scope!"));
+			if scope_name == "global" {
+				if global_variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(line!(), "Name already exists in scope!"));
+				}
+				global_variables.insert(*name, (typ.clone(), *stack_size));
+				vec![]
+			} else {
+				if variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(line!(), "Name already exists in scope!"));
+				}
+				variables.insert(*name, (typ.clone(), *stack_size));
+				*stack_size += 1;
+				vec![(
+					Instruction::LEASP(Addressing::SP(ABOVE_STACK_OFFSET)),
+					Some(*name),
+				)]
 			}
-			variables.insert(*name, (typ.clone(), *stack_size));
-			*stack_size += 1;
-			vec![(
-				Instruction::LEASP(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some(*name),
-			)]
 		}
 
 		LanguageElement::VariableAssignment { name, value } => {
@@ -86,15 +95,20 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
-			if variables.contains_key(name) {
-				dbg!(element);
-				return Err(CompileError(line!(), "Name already exists in scope!"));
+			if scope_name == "global" {
+				todo!();
+			} else {
+				if variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(line!(), "Name already exists in scope!"));
+				}
+				*stack_size += 1;
+				variables.insert(*name, (typ.clone(), *stack_size));
+				let mut statement =
+					compile_statement(value, variables, global_variables, stack_size)?;
+				statement.push((Instruction::PSHA, Some(*name)));
+				statement
 			}
-			*stack_size += 1;
-			variables.insert(*name, (typ.clone(), *stack_size));
-			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
-			statement.push((Instruction::PSHA, Some(*name)));
-			statement
 		}
 
 		LanguageElement::PointerAssignment { ptr, value } => {
@@ -265,7 +279,6 @@ fn compile_statement_inner<'a>(
 		| StatementElement::GT { lhs, rhs }
 		| StatementElement::LT { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
-			//DOESN'T WORK AT ALL
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right) = if left_depth >= right_depth {
@@ -282,19 +295,25 @@ fn compile_statement_inner<'a>(
 				tmps,
 			)?;
 			*tmps_used += 1;
-			instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
-			instructions.append(&mut compile_statement_inner(
+			let mut right_instructions = compile_statement_inner(
 				right,
 				variables,
 				global_variables,
 				stack_size,
 				tmps_used,
 				tmps,
-			)?);
-			instructions.push((
-				statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
-				None,
-			));
+			)?;
+			if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
+				instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+			} else {
+				instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+				instructions.append(&mut right_instructions);
+				instructions.push((
+					statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+					None,
+				));
+			}
+
 			*tmps_used -= 1;
 			instructions
 		}

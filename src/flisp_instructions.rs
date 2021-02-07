@@ -7,6 +7,7 @@ pub(crate) enum Instruction {
 	LDA(Addressing),
 	LDX(Addressing),
 	LDY(Addressing),
+	LDSP(Addressing),
 	ADDA(Addressing),
 	SUBA(Addressing),
 	ANDA(Addressing),
@@ -31,6 +32,7 @@ impl fmt::Display for Instruction {
 			Instruction::LDA(a) => write!(f, "\tLDA\t{}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{}", *a),
 			Instruction::LDY(a) => write!(f, "\tLDY\t{}", *a),
+			Instruction::LDSP(a) => write!(f, "\tLDSP\t{}", *a),
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{}", *a),
@@ -56,6 +58,7 @@ impl fmt::UpperHex for Instruction {
 			Instruction::LDA(a) => write!(f, "\tLDA\t{:X}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{:X}", *a),
 			Instruction::LDY(a) => write!(f, "\tLDY\t{:X}", *a),
+			Instruction::LDSP(a) => write!(f, "\tLDSP\t{:X}", *a),
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{:X}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{:X}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{:X}", *a),
@@ -82,6 +85,7 @@ impl Instruction {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
 			| Instruction::LDY(a)
+			| Instruction::LDSP(a)
 			| Instruction::ADDA(a)
 			| Instruction::ANDA(a)
 			| Instruction::ASL(a)
@@ -106,6 +110,7 @@ impl Instruction {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
 			| Instruction::LDY(a)
+			| Instruction::LDSP(a)
 			| Instruction::ADDA(a)
 			| Instruction::SUBA(a)
 			| Instruction::ANDA(a)
