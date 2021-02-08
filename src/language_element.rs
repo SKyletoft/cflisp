@@ -45,4 +45,5 @@ pub(crate) enum LanguageElement<'a> {
 		condition: StatementElement<'a>,
 		body: Block<'a>,
 	},
+	Return(StatementElement<'a>),
 }

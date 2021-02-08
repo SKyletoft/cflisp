@@ -40,7 +40,8 @@ fn construct_structure_from_tokens<'a>(
 			//Function declaration?
 			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
-				let code_parsed = parse(code)?;
+				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
+				let code_parsed = construct_block(&code_tokenised)?;
 				LanguageElement::FunctionDeclaration {
 					typ: t.clone(),
 					name: *n,
@@ -199,6 +200,12 @@ fn construct_structure_from_tokens<'a>(
 					condition: condition_parsed,
 					body: body_parsed,
 				}
+			}
+
+			[Return] => {todo!()}
+
+			[Return, ..] => {
+				let return_value = Token::parse_statement_tokens(t)tt
 			}
 
 			_ => {
