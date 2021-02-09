@@ -327,6 +327,9 @@ fn compile_statement_inner<'a>(
 		| StatementElement::Xor { lhs, rhs }
 		| StatementElement::GT { lhs, rhs }
 		| StatementElement::LT { lhs, rhs }
+		| StatementElement::GTE { lhs, rhs }
+		| StatementElement::LTE { lhs, rhs }
+		| StatementElement::NotCmp { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();

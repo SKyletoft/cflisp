@@ -55,7 +55,19 @@ pub(crate) enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	GTE {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	LTE {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
 	Cmp {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	NotCmp {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
@@ -95,9 +107,12 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
 			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
 			StatementElement::Not { lhs: _ } => Instruction::COMA,
-			StatementElement::GT { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::LT { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::GT { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::LT { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::GTE { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::LTE { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::NotCmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Var(_) => unimplemented!(),
 			StatementElement::Num(_) => unimplemented!(),
 			StatementElement::Char(_) => unimplemented!(),
@@ -126,7 +141,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Xor { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::GT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::LT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::GTE { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::LTE { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Not { lhs } => lhs.as_ref().depth(),
 			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElement::Deref(n) => n.as_ref().depth(),
@@ -331,7 +349,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Not { lhs: _ } => Type::Bool,
 			StatementElement::GT { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::LT { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::GTE { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::LTE { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::Cmp { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::NotCmp { lhs: _, rhs: _ } => Type::Bool,
 
 			StatementElement::FunctionCall {
 				name,
@@ -481,6 +502,9 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::Xor { lhs, rhs }
 			| StatementElement::GT { lhs, rhs }
 			| StatementElement::LT { lhs, rhs }
+			| StatementElement::GTE { lhs, rhs }
+			| StatementElement::LTE { lhs, rhs }
+			| StatementElement::NotCmp { lhs, rhs }
 			| StatementElement::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
 			StatementElement::Not { lhs: _ }
 			| StatementElement::FunctionCall {

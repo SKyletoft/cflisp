@@ -274,16 +274,6 @@ pub(crate) fn type_check(
 				if !type_check(block, &variables, &functions)? {
 					return Ok(false);
 				}
-
-				if let Some(LanguageElement::Return(Some(statement))) =
-					block.get(block.len().wrapping_sub(1))
-				{
-					if &statement.type_of(&functions, &variables)? != typ {
-						return Ok(false);
-					}
-				} else if typ != &Type::Void && name != &"main" {
-					return Ok(false);
-				}
 			}
 
 			LanguageElement::IfStatement {
