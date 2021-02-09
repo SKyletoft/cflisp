@@ -7,8 +7,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	nop(instructions);
 	repeat_load(instructions);
 	load_a(instructions);
-	repeat_a(instructions);
 	function_op_load_reduce(instructions);
+	repeat_a(instructions);
 	reduce_reserves(instructions);
 }
 
@@ -67,13 +67,13 @@ fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 	while idx < instructions.len() {
 		match &instructions[idx] {
 			(Instruction::LDA(_), comment) => {
-				if Some(comment) == instructions.get(last_load).map(|(_, c)| c) {
+				if comment.is_some() && Some(comment) == instructions.get(last_load).map(|(_, c)| c)
+				{
 					instructions.remove(idx);
 					idx -= 1;
 				} else {
 					last_load = idx;
 				}
-				continue;
 			}
 			(Instruction::ADDA(_), _)
 			| (Instruction::SUBA(_), _)
