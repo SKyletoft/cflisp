@@ -213,11 +213,9 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			_ => {
-				dbg!(tokens);
-				return Err(ParseError(
-					line!(),
-					"Couldn't match tokens into LanguageElement pattern",
-				));
+				let tokenised = StatementToken::from_tokens(tokens)?;
+				let element = StatementElement::from_tokens(tokenised)?;
+				LanguageElement::Statement(element)
 			}
 		}
 	};
@@ -332,6 +330,12 @@ pub(crate) fn type_check(
 
 			LanguageElement::Return(_) => {
 				//Is handled by function def instead
+			}
+
+			LanguageElement::Statement(statement) => {
+				if !statement.type_check(&variables, &functions)? {
+					return Ok(false);
+				}
 			}
 		}
 	}

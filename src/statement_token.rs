@@ -58,6 +58,18 @@ impl<'a> StatementToken<'a> {
 				Token::Cmp => StatementToken::Cmp,
 				Token::AdrOf(n) => StatementToken::AdrOf(n),
 				Token::Deref(b) => StatementToken::Deref(StatementToken::from_tokens(b.as_ref())?),
+				Token::Args(b) => {
+					assert!(b.is_empty());
+					if let Some(StatementToken::Var(n)) = res.get(last) {
+						res[last] = StatementToken::FunctionCall(n, vec![]);
+						continue;
+					} else {
+						return Err(ParseError(
+							line!(),
+							"Empty parentheses outside of a function call?",
+						));
+					}
+				}
 				Token::UnparsedBlock(b) => {
 					if b.starts_with('(') && b.ends_with(')') {
 						if let Some(StatementToken::Var(n)) = res.get(last) {

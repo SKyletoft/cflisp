@@ -165,6 +165,7 @@ fn compile_element<'a>(
 				&mut args_count,
 				false,
 			)?;
+			args_count -= args.len() as isize;
 			if args_count != 0 {
 				fun.push((Instruction::LEASP(Addressing::SP(args_count)), None));
 			}
@@ -259,6 +260,14 @@ fn compile_element<'a>(
 				vec![]
 			}
 		}
+
+		LanguageElement::Statement(statement) => compile_statement(
+			statement,
+			variables,
+			global_variables,
+			functions,
+			stack_size,
+		)?,
 	};
 	Ok(res)
 }
@@ -361,8 +370,6 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::FunctionCall { name, parametres } => {
-			//Invariant: Is responsible for pushing args to stack,
-			// BUT NOT CLEARING THEM
 			let mut instructions = Vec::new();
 			let arg_names = functions.get(name).ok_or(CompileError(
 				line!(),
@@ -386,6 +393,10 @@ fn compile_statement_inner<'a>(
 				instructions.push((Instruction::PSHA, Some(v_name)));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
+			instructions.push((
+				Instruction::LEASP(Addressing::SP(parametres.len() as isize)),
+				None,
+			));
 			instructions
 		}
 
