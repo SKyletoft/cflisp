@@ -52,6 +52,15 @@ fn main() {
 	}
 	let instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
 	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags).expect("Too long?");
+	if flags.mul {
+		compiled.push_str(include_str!("mul.sflisp"));
+	}
+	if flags.div {
+		compiled.push_str(include_str!("div.sflisp"));
+	}
+	if flags.modulo {
+		compiled.push_str(include_str!("mod.sflisp"));
+	}
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
 		compiled.push_str("\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");

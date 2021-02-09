@@ -354,15 +354,29 @@ fn compile_statement_inner<'a>(
 				tmps_used,
 				tmps,
 			)?;
-			if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-				instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
-			} else {
-				instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
-				instructions.append(&mut right_instructions);
-				instructions.push((
-					statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
-					None,
-				));
+			match statement {
+				StatementElement::Mul { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("mul rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((Instruction::PSHA, Some("mul lhs")));
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__mul__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
+				}
+				_ => {
+					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
+						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+					} else {
+						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+						instructions.append(&mut right_instructions);
+						instructions.push((
+							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+							None,
+						));
+					}
+				}
 			}
 
 			*tmps_used -= 1;
