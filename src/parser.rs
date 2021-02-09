@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::*;
 use helper::is_block;
 use language_element::LanguageElement;
@@ -202,10 +204,12 @@ fn construct_structure_from_tokens<'a>(
 				}
 			}
 
-			[Return] => {todo!()}
+			[Return] => LanguageElement::Return(None),
 
 			[Return, ..] => {
-				let return_value = Token::parse_statement_tokens(t)tt
+				let return_value = StatementToken::from_tokens(&tokens[1..])?;
+				let return_statement = StatementElement::from_tokens(return_value)?;
+				LanguageElement::Return(Some(return_statement))
 			}
 
 			_ => {
@@ -270,7 +274,18 @@ pub(crate) fn type_check(
 					name: *name,
 					parametres: args.clone(),
 				});
+
 				if !type_check(block, &variables, &functions)? {
+					return Ok(false);
+				}
+
+				if let Some(LanguageElement::Return(Some(statement))) =
+					block.get(block.len().wrapping_sub(1))
+				{
+					if &statement.type_of(&functions, &variables)? != typ {
+						return Ok(false);
+					}
+				} else if typ != &Type::Void && name != &"main" {
 					return Ok(false);
 				}
 			}
@@ -313,6 +328,10 @@ pub(crate) fn type_check(
 				{
 					return Ok(false);
 				}
+			}
+
+			LanguageElement::Return(_) => {
+				//Is handled by function def instead
 			}
 		}
 	}

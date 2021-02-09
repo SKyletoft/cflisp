@@ -137,8 +137,8 @@ impl<'a> StatementElement<'a> {
 			StatementElement::AdrOf(_) => 0,
 			StatementElement::FunctionCall {
 				name: _,
-				parametres,
-			} => parametres.iter().map(StatementElement::depth).sum(),
+				parametres: _,
+			} => 0, //Each parametre is its own memory alloc
 		};
 		rest + 1
 	}
@@ -309,7 +309,7 @@ impl<'a> StatementElement<'a> {
 		}
 	}
 
-	fn type_of(
+	pub(crate) fn type_of(
 		&self,
 		functions: &'a [Function<'a>],
 		variables: &'a [Variable<'a>],

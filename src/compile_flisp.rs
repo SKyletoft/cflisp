@@ -96,7 +96,8 @@ fn compile_element<'a>(
 					"Name resolution failed? Shouldn't be checked by now?",
 				));
 			};
-			let mut statement = compile_statement(value, variables, global_variables, stack_size)?;
+			let mut statement =
+				compile_statement(value, variables, global_variables, functions, stack_size)?;
 			statement.push((Instruction::STA(adr), Some(name)));
 			statement
 		}
@@ -112,15 +113,17 @@ fn compile_element<'a>(
 				*stack_size += 1;
 				variables.insert(*name, (typ.clone(), *stack_size));
 				let mut statement =
-					compile_statement(value, variables, global_variables, stack_size)?;
+					compile_statement(value, variables, global_variables, functions, stack_size)?;
 				statement.push((Instruction::PSHA, Some(*name)));
 				statement
 			}
 		}
 
 		LanguageElement::PointerAssignment { ptr, value } => {
-			let get_adr = compile_statement(ptr, variables, global_variables, stack_size)?;
-			let mut value = compile_statement(value, variables, global_variables, stack_size)?;
+			let get_adr =
+				compile_statement(ptr, variables, global_variables, functions, stack_size)?;
+			let mut value =
+				compile_statement(value, variables, global_variables, functions, stack_size)?;
 			let mut statement = get_adr;
 			statement.push((
 				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
@@ -150,6 +153,9 @@ fn compile_element<'a>(
 			functions.insert(*name, args.as_slice());
 			let mut args_count = args.len() as isize;
 			let mut local_variables = HashMap::new();
+			for (idx, Variable { name, typ }) in args.iter().enumerate() {
+				local_variables.insert(*name, (typ.clone(), idx as isize));
+			}
 			let mut fun = compile_elements(
 				block,
 				&mut local_variables,
@@ -175,7 +181,13 @@ fn compile_element<'a>(
 			let then_str = "if_then_".to_string() + scope_name + "_" + &line_id_str;
 			let else_str = "if_else_".to_string() + scope_name + "_" + &line_id_str;
 			let end_str = "if_end_".to_string() + scope_name + "_" + &line_id_str;
-			let mut cond = compile_statement(condition, variables, global_variables, stack_size)?;
+			let mut cond = compile_statement(
+				condition,
+				variables,
+				global_variables,
+				functions,
+				stack_size,
+			)?;
 			cond.push((Instruction::TSTA, None));
 			let mut then_stack = *stack_size;
 			let mut then_block = compile_elements(
@@ -233,6 +245,20 @@ fn compile_element<'a>(
 			condition: _,
 			body: _,
 		} => todo!(),
+
+		LanguageElement::Return(ret) => {
+			if let Some(statement) = ret {
+				compile_statement(
+					statement,
+					variables,
+					global_variables,
+					functions,
+					stack_size,
+				)?
+			} else {
+				vec![]
+			}
+		}
 	};
 	Ok(res)
 }
@@ -241,6 +267,7 @@ fn compile_statement<'a>(
 	statement: &'a StatementElement,
 	variables: &mut HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
+	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let depth = statement.depth() as isize - 1;
@@ -248,6 +275,7 @@ fn compile_statement<'a>(
 		statement,
 		variables,
 		global_variables,
+		functions,
 		stack_size,
 		&mut 0,
 		if depth >= 2 { depth } else { 0 },
@@ -272,6 +300,7 @@ fn compile_statement_inner<'a>(
 	statement: &'a StatementElement,
 	variables: &mut HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
+	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: &mut isize,
 	tmps_used: &mut isize,
 	tmps: isize,
@@ -301,6 +330,7 @@ fn compile_statement_inner<'a>(
 				left,
 				variables,
 				global_variables,
+				functions,
 				stack_size,
 				tmps_used,
 				tmps,
@@ -310,6 +340,7 @@ fn compile_statement_inner<'a>(
 				right,
 				variables,
 				global_variables,
+				functions,
 				stack_size,
 				tmps_used,
 				tmps,
@@ -329,10 +360,34 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
-		StatementElement::FunctionCall {
-			name: _,
-			parametres: _,
-		} => todo!(),
+		StatementElement::FunctionCall { name, parametres } => {
+			//Invariant: Is responsible for pushing args to stack,
+			// BUT NOT CLEARING THEM
+			let mut instructions = Vec::new();
+			let arg_names = functions.get(name).ok_or(CompileError(
+				line!(),
+				"Name resolution failed? Shouldn't it've been checked by now?",
+			))?;
+			for (
+				statement,
+				Variable {
+					name: v_name,
+					typ: _,
+				},
+			) in parametres.iter().zip(arg_names.iter())
+			{
+				instructions.append(&mut compile_statement(
+					statement,
+					variables,
+					global_variables,
+					functions,
+					stack_size,
+				)?);
+				instructions.push((Instruction::PSHA, Some(v_name)));
+			}
+			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
+			instructions
+		}
 
 		StatementElement::Var(name) => {
 			let adr = if let Some((_, adr)) = variables.get(name) {
@@ -368,6 +423,7 @@ fn compile_statement_inner<'a>(
 					element,
 					variables,
 					global_variables,
+					functions,
 					stack_size,
 					tmps_used,
 					tmps,
@@ -404,6 +460,7 @@ fn compile_statement_inner<'a>(
 					adr.as_ref(),
 					variables,
 					global_variables,
+					functions,
 					stack_size,
 					tmps_used,
 					tmps,
@@ -472,6 +529,9 @@ pub(crate) fn instructions_to_text(
 			output.push('\n');
 		} else {
 			output.push(' ');
+		}
+		if matches!(i, Instruction::RTS) {
+			output.push('\n');
 		}
 	}
 	Ok(output)

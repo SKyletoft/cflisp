@@ -41,6 +41,7 @@ impl<'a> Token<'a> {
 	pub(crate) fn parse_str_to_vec(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		helper::split(source)?
 			.into_iter()
+			.map(|s| s.strip_suffix(',').unwrap_or(s))
 			.map(Token::parse)
 			.collect::<Result<_, _>>()
 			.map(Token::fix_deref)
