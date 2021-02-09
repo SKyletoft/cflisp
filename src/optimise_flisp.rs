@@ -7,6 +7,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	nop(instructions);
 	repeat_load(instructions);
 	load_a(instructions);
+	repeat_a(instructions);
+	function_op_load_reduce(instructions);
 	reduce_reserves(instructions);
 }
 
@@ -54,6 +56,37 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 				| ((Instruction::LDSP(_), _), (Instruction::LDSP(_), _))
 		) {
 			instructions.remove(idx);
+		}
+		idx += 1;
+	}
+}
+
+fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
+	let mut last_load = usize::MAX;
+	let mut idx = 0;
+	while idx < instructions.len() {
+		match &instructions[idx] {
+			(Instruction::LDA(_), comment) => {
+				if Some(comment) == instructions.get(last_load).map(|(_, c)| c) {
+					instructions.remove(idx);
+					idx -= 1;
+				} else {
+					last_load = idx;
+				}
+				continue;
+			}
+			(Instruction::ADDA(_), _)
+			| (Instruction::SUBA(_), _)
+			| (Instruction::ANDA(_), _)
+			| (Instruction::ASL(_), _)
+			| (Instruction::ASR(_), _)
+			| (Instruction::ORA(_), _)
+			| (Instruction::EORA(_), _)
+			| (Instruction::PULA, _)
+			| (Instruction::COMA, None) => {
+				last_load = usize::MAX;
+			}
+			_ => {}
 		}
 		idx += 1;
 	}
@@ -191,6 +224,28 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 				memory_touched = false;
 			}
 			_ => {}
+		}
+		idx += 1;
+	}
+}
+
+fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 4 && idx < instructions.len() - 4 {
+		if let (
+			(Instruction::LEASP(Addressing::SP(2)), _),
+			(Instruction::PSHA, _),
+			(Instruction::LDA(_), _),
+			(Instruction::PSHA, _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+			&instructions[idx + 3],
+		) {
+			instructions.remove(idx);
+			instructions.remove(idx);
+			instructions[idx + 1] = (Instruction::STA(Addressing::SP(1)), None);
 		}
 		idx += 1;
 	}
