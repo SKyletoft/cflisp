@@ -40,12 +40,14 @@ fn main() {
 	}
 	source = parser::remove_comments(&source);
 	let parsed = parser::parse(&source).expect("Parse error");
-	let ok = parser::type_check(&parsed, &[], &[]).expect("Name error");
-	if !ok {
-		eprintln!("Error: type check or name resolution error");
-		exit(-1);
-	} else if flags.type_check {
-		eprintln!("Type check passed");
+	if flags.type_check {
+		let ok = parser::type_check(&parsed, &[], &[]).expect("Name error");
+		if !ok {
+			eprintln!("Error: type check or name resolution error");
+			exit(-1);
+		} else if flags.type_check {
+			eprintln!("Type check passed");
+		}
 	}
 	if flags.tree {
 		dbg!(&parsed);

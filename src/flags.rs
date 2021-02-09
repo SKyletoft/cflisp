@@ -23,7 +23,7 @@ impl<'a> FromIterator<&'a String> for Flags {
 			hex: false,
 			comments: true,
 			tree: false,
-			type_check: false,
+			type_check: true,
 			print_result: false,
 			assemble: false,
 			debug: true,
@@ -55,7 +55,7 @@ impl<'a> FromIterator<&'a String> for Flags {
 					flags.tree = true;
 				}
 				if arg.contains('t') {
-					flags.type_check = true;
+					flags.type_check = false;
 				}
 				if arg.contains('s') {
 					flags.print_result = true;
