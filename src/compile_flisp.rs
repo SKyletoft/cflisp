@@ -447,45 +447,74 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Deref(adr) => {
-			if let Some((&StatementElement::Var(name), &StatementElement::Num(offset))) =
-				adr.internal_ref()
-			{
-				let adr = if let Some((_, adr)) = variables.get(name) {
-					Addressing::SP(*stack_size + tmps - *adr)
-				} else if let Some((_, adr)) = global_variables.get(name) {
-					Addressing::Adr(*adr)
-				} else {
-					eprintln!("Error: {}", name);
-					return Err(CompileError(
-						line!(),
-						"Name resolution failed? Shouldn't be checked by now?",
+			match (adr.as_ref(), adr.internal_ref()) {
+				//Array opt
+				(
+					&StatementElement::Add { lhs: _, rhs: _ },
+					Some((&StatementElement::Var(name), &StatementElement::Num(offset))),
+				) => {
+					let adr = if let Some((_, adr)) = variables.get(name) {
+						Addressing::SP(*stack_size + tmps - *adr)
+					} else if let Some((_, adr)) = global_variables.get(name) {
+						Addressing::Adr(*adr)
+					} else {
+						eprintln!("Error: {}", name);
+						return Err(CompileError(
+							line!(),
+							"Name resolution failed? Shouldn't be checked by now?",
+						));
+					};
+					vec![
+						(Instruction::LDY(adr), Some(name)),
+						(Instruction::LDA(Addressing::Yn(offset)), None),
+					]
+				}
+				//General opt
+				(
+					&StatementElement::Add { lhs: _, rhs: _ },
+					Some((&StatementElement::Var(name), rhs)),
+				) => {
+					let adr = if let Some((_, adr)) = variables.get(name) {
+						Addressing::SP(*stack_size + tmps - *adr)
+					} else if let Some((_, adr)) = global_variables.get(name) {
+						Addressing::Adr(*adr)
+					} else {
+						eprintln!("Error: {}", name);
+						return Err(CompileError(
+							line!(),
+							"Name resolution failed? Shouldn't be checked by now?",
+						));
+					};
+					let mut statement =
+						compile_statement(rhs, variables, global_variables, functions, stack_size)?;
+					statement.append(&mut vec![
+						(Instruction::LDY(adr), Some(name)),
+						(Instruction::LDA(Addressing::AY), None),
+					]);
+					statement
+				}
+				//General case
+				_ => {
+					let mut instructions = compile_statement_inner(
+						adr.as_ref(),
+						variables,
+						global_variables,
+						functions,
+						stack_size,
+						tmps_used,
+						tmps,
+					)?;
+					instructions.push((
+						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
+						Some("A to X transfer"),
 					));
-				};
-				vec![
-					(Instruction::LDY(adr), Some(name)),
-					(Instruction::LDA(Addressing::Yn(offset)), None),
-				]
-			} else {
-				//Is this sound if it occurs on the left hand side?
-				let mut instructions = compile_statement_inner(
-					adr.as_ref(),
-					variables,
-					global_variables,
-					functions,
-					stack_size,
-					tmps_used,
-					tmps,
-				)?;
-				instructions.push((
-					Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-					Some("A to X transfer"),
-				));
-				instructions.push((
-					Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-					Some("A to X  continued"),
-				));
-				instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
-				instructions
+					instructions.push((
+						Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
+						Some("A to X  continued"),
+					));
+					instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
+					instructions
+				}
 			}
 		}
 

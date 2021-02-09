@@ -6,6 +6,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	repeat_xy(instructions);
 	nop(instructions);
 	repeat_load(instructions);
+	load_a(instructions);
+	reduce_reserves(instructions);
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -132,4 +134,64 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 				| Instruction::ANDA(Addressing::Data(isize::MAX))
 		)
 	});
+}
+
+fn load_a(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+		if let (
+			(Instruction::STA(Addressing::SP(-1)), _),
+			(Instruction::LDX(Addressing::SP(-1)), _),
+			(Instruction::LDA(Addressing::Xn(0)), comment),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			instructions[idx + 1] = (Instruction::LDA(Addressing::AX), *comment);
+			instructions[idx] = (Instruction::LDX(Addressing::Data(0)), None);
+			instructions.remove(idx + 2);
+		}
+		idx += 1;
+	}
+}
+
+fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
+	//Loop over instructions and check if there are no write
+	// (to memory, not registers) operations between reserve
+	// and clear and remove them if there are none
+	let mut idx = 0;
+	let mut start = usize::MAX;
+	let mut memory_touched = false;
+
+	let mut edit_at = 0;
+	let mut depth = 0;
+
+	while idx < instructions.len() {
+		match instructions[idx] {
+			(Instruction::LEASP(_), Some("Reserving memory for statement")) => {
+				start = idx;
+				memory_touched = false;
+				depth += 1;
+				edit_at = depth;
+			}
+			(Instruction::LEASP(_), Some("Clearing memory for statement")) => {
+				if !memory_touched && depth == edit_at {
+					instructions.remove(idx);
+					instructions.remove(start);
+					reduce_reserves(instructions);
+					return;
+				}
+				depth -= 1;
+			}
+			(Instruction::STA(_), _)
+			| (Instruction::PSHA, _)
+			| (Instruction::PULA, _)
+			| (Instruction::JSR(_), _) => {
+				memory_touched = false;
+			}
+			_ => {}
+		}
+		idx += 1;
+	}
 }

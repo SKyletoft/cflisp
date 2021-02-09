@@ -45,8 +45,6 @@ fn main() {
 		if !ok {
 			eprintln!("Error: type check or name resolution error");
 			exit(-1);
-		} else if flags.type_check {
-			eprintln!("Type check passed");
 		}
 	}
 	if flags.tree {

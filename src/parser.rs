@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use crate::*;
 use helper::is_block;
 use language_element::LanguageElement;

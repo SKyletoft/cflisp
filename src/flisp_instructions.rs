@@ -86,33 +86,6 @@ impl fmt::UpperHex for Instruction {
 }
 
 impl Instruction {
-	pub(crate) fn address(&self) -> Option<Addressing> {
-		match self {
-			Instruction::LDA(a)
-			| Instruction::LDX(a)
-			| Instruction::LDY(a)
-			| Instruction::LDSP(a)
-			| Instruction::ADDA(a)
-			| Instruction::ANDA(a)
-			| Instruction::ASL(a)
-			| Instruction::ASR(a)
-			| Instruction::EORA(a)
-			| Instruction::SUBA(a)
-			| Instruction::JMP(a)
-			| Instruction::BNE(a)
-			| Instruction::LEASP(a)
-			| Instruction::ORA(a)
-			| Instruction::JSR(a)
-			| Instruction::STA(a) => Some(a.clone()),
-			Instruction::Label(_)
-			| Instruction::COMA
-			| Instruction::PSHA
-			| Instruction::PULA
-			| Instruction::RTS
-			| Instruction::TSTA => None,
-		}
-	}
-
 	pub(crate) fn size(&self) -> usize {
 		match self {
 			Instruction::LDA(a)
@@ -149,6 +122,8 @@ pub(crate) enum Addressing {
 	Xn(isize),
 	Yn(isize),
 	Label(String),
+	AX,
+	AY,
 }
 
 impl Addressing {
@@ -159,7 +134,7 @@ impl Addressing {
 			| Addressing::SP(_)
 			| Addressing::Xn(_)
 			| Addressing::Yn(_) => 1,
-			Addressing::Label(_) => 0,
+			Addressing::Label(_) | Addressing::AX | Addressing::AY => 0,
 		}
 	}
 }
@@ -174,6 +149,8 @@ impl fmt::Display for Addressing {
 			Addressing::Xn(d) => write!(f, "{:03},X", *d % 256),
 			Addressing::Yn(d) => write!(f, "{:03},Y", *d % 256),
 			Addressing::Label(l) => write!(f, "{}", l),
+			Addressing::AX => write!(f, "A,X"),
+			Addressing::AY => write!(f, "A,Y"),
 		}
 	}
 }
@@ -187,6 +164,8 @@ impl fmt::UpperHex for Addressing {
 			Addressing::Xn(d) => write!(f, "${:02X},X", *d as u8),
 			Addressing::Yn(d) => write!(f, "${:02X},Y", *d as u8),
 			Addressing::Label(l) => write!(f, "{}", l),
+			Addressing::AX => write!(f, "A,X"),
+			Addressing::AY => write!(f, "A,Y"),
 		}
 	}
 }
