@@ -1,0 +1,7 @@
+; Greater than. Compared SP,1 to A
+__gt__	CMPA	SP,1
+	BGT	__gt_1
+	LDA	#0
+	RTS
+__gt_1	LDA	#1
+	RTS

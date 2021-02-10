@@ -368,6 +368,32 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
 				}
+				StatementElement::Div { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("div rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((Instruction::PSHA, Some("div lhs")));
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__div__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
+				}
+				StatementElement::Mod { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("mod rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((Instruction::PSHA, Some("mod lhs")));
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__mod__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
+				}
+				StatementElement::GT { rhs: _, lhs: _ } => todo!(),
+				StatementElement::GTE { rhs: _, lhs: _ } => todo!(),
+				StatementElement::LT { rhs: _, lhs: _ } => todo!(),
+				StatementElement::LTE { rhs: _, lhs: _ } => todo!(),
+				StatementElement::Cmp { rhs: _, lhs: _ } => todo!(),
+				StatementElement::NotCmp { rhs: _, lhs: _ } => todo!(),
 				_ => {
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
