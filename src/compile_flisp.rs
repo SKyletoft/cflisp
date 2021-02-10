@@ -326,8 +326,8 @@ fn compile_statement_inner<'a>(
 		| StatementElement::Or { lhs, rhs }
 		| StatementElement::Xor { lhs, rhs }
 		| StatementElement::GT { lhs, rhs }
-		| StatementElement::LT { lhs, rhs }
-		| StatementElement::GTE { lhs, rhs }
+		| StatementElement::LT { lhs: rhs, rhs: lhs }
+		| StatementElement::GTE { lhs: rhs, rhs: lhs }
 		| StatementElement::LTE { lhs, rhs }
 		| StatementElement::NotCmp { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
@@ -388,7 +388,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
 				}
-				StatementElement::GT { rhs: _, lhs: _ } => {
+				StatementElement::GT { rhs: _, lhs: _ }
+				| StatementElement::LT { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs")));
 					instructions.append(&mut right_instructions);
 					instructions.push((
@@ -397,7 +398,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::LTE { rhs: _, lhs: _ } => {
+				StatementElement::LTE { rhs: _, lhs: _ }
+				| StatementElement::GTE { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs")));
 					instructions.append(&mut right_instructions);
 					instructions.push((
@@ -407,8 +409,6 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
-				StatementElement::LT { rhs: _, lhs: _ } => todo!(),
-				StatementElement::GTE { rhs: _, lhs: _ } => todo!(),
 				StatementElement::Cmp { rhs: _, lhs: _ } => {
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
