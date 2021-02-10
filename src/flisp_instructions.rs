@@ -11,8 +11,8 @@ pub(crate) enum Instruction {
 	ADDA(Addressing),
 	SUBA(Addressing),
 	ANDA(Addressing),
-	ASL(Addressing),
-	ASR(Addressing),
+	ROLA(Addressing),
+	RORA(Addressing),
 	ORA(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
@@ -38,8 +38,8 @@ impl fmt::Display for Instruction {
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{}", *a),
-			Instruction::ASL(a) => write!(f, "\tASLA\t{}", *a),
-			Instruction::ASR(a) => write!(f, "\tASRA\t{}", *a),
+			Instruction::ROLA(a) => write!(f, "\tROLA\t{}", *a),
+			Instruction::RORA(a) => write!(f, "\tRORA\t{}", *a),
 			Instruction::ORA(a) => write!(f, "\tORA\t{}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{}", *a),
@@ -66,8 +66,8 @@ impl fmt::UpperHex for Instruction {
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{:X}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{:X}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{:X}", *a),
-			Instruction::ASL(a) => write!(f, "\tASLA\t{:X}", *a),
-			Instruction::ASR(a) => write!(f, "\tASRA\t{:X}", *a),
+			Instruction::ROLA(a) => write!(f, "\tROLA\t{:X}", *a),
+			Instruction::RORA(a) => write!(f, "\tRORA\t{:X}", *a),
 			Instruction::ORA(a) => write!(f, "\tORA\t{:X}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{:X}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{:X}", *a),
@@ -95,8 +95,8 @@ impl Instruction {
 			| Instruction::ADDA(a)
 			| Instruction::SUBA(a)
 			| Instruction::ANDA(a)
-			| Instruction::ASL(a)
-			| Instruction::ASR(a)
+			| Instruction::ROLA(a)
+			| Instruction::RORA(a)
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)

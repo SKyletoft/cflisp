@@ -1,0 +1,7 @@
+__gt__	CMPA	1,SP	; Greater than. Compares SP,1 to A -> A
+	BGT	__gt_1
+	LDA	#0
+	RTS
+__gt_1	LDA	#1
+	RTS
+

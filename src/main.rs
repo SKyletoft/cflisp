@@ -61,9 +61,13 @@ fn main() {
 	if flags.modulo {
 		compiled.push_str(include_str!("mod.sflisp"));
 	}
+	//if !flags.optimise {
+	if true {
+		compiled.push_str(include_str!("gt.sflisp"));
+	}
 	if flags.debug {
-		compiled.insert_str(0, "\tORG\t$20\n");
-		compiled.push_str("\ninit\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");
+		//compiled.insert_str(0, "\tORG\t$20\n");
+		compiled.push_str("init\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");
 	}
 	if flags.print_result {
 		println!("{}", &compiled);

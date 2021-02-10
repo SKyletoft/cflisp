@@ -388,12 +388,40 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
 				}
-				StatementElement::GT { rhs: _, lhs: _ } => todo!(),
-				StatementElement::GTE { rhs: _, lhs: _ } => todo!(),
+				StatementElement::GT { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("gt rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__gt__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+				}
+				StatementElement::LTE { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("lte rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__gt__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+					instructions.push((Instruction::COMA, None));
+				}
 				StatementElement::LT { rhs: _, lhs: _ } => todo!(),
-				StatementElement::LTE { rhs: _, lhs: _ } => todo!(),
-				StatementElement::Cmp { rhs: _, lhs: _ } => todo!(),
-				StatementElement::NotCmp { rhs: _, lhs: _ } => todo!(),
+				StatementElement::GTE { rhs: _, lhs: _ } => todo!(),
+				StatementElement::Cmp { rhs: _, lhs: _ } => {
+					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
+						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+					} else {
+						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+						instructions.append(&mut right_instructions);
+						instructions.push((
+							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+							None,
+						));
+					}
+					instructions.push((Instruction::COMA, None));
+				}
 				_ => {
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));

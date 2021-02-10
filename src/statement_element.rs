@@ -235,7 +235,7 @@ impl<'a> StatementElement<'a> {
 				lhs: Box::new(notted),
 			});
 		}
-		let operations: [(MaybeParsed, OpFnPtr); 13] = [
+		let operations: [(MaybeParsed, OpFnPtr); 16] = [
 			(Unparsed(StatementToken::Mul), |l, r| {
 				StatementElement::Mul {
 					lhs: Box::new(l),
@@ -286,8 +286,26 @@ impl<'a> StatementElement<'a> {
 				lhs: Box::new(l),
 				rhs: Box::new(r),
 			}),
+			(Unparsed(StatementToken::LTE), |l, r| {
+				StatementElement::LTE {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::GTE), |l, r| {
+				StatementElement::GTE {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
 			(Unparsed(StatementToken::Cmp), |l, r| {
 				StatementElement::Cmp {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::NotCmp), |l, r| {
+				StatementElement::NotCmp {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}

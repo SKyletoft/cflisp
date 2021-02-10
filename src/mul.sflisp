@@ -6,3 +6,4 @@ __mul_2 ROL	1,SP
 	TST	2,SP
 	BNE	__mul_1
 	RTS
+
