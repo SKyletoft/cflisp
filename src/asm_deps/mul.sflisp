@@ -1,5 +1,5 @@
 __mul__	LDA	#0	; Computes SP,1 * SP,2 -> A
-__mul_1	ROR	2,SP
+__mul_1	ROR	2,SP	; (SP,0 is the return adr)
 	BCC	__mul_2
 	ADDA	1,SP
 __mul_2 ROL	1,SP

@@ -315,20 +315,12 @@ fn compile_statement_inner<'a>(
 	tmps: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
+		//Commutative operations
 		StatementElement::Add { lhs, rhs }
-		| StatementElement::Sub { lhs, rhs }
 		| StatementElement::Mul { lhs, rhs }
-		| StatementElement::Div { lhs, rhs }
-		| StatementElement::Mod { lhs, rhs }
-		| StatementElement::LShift { lhs, rhs }
-		| StatementElement::RShift { lhs, rhs }
 		| StatementElement::And { lhs, rhs }
 		| StatementElement::Or { lhs, rhs }
 		| StatementElement::Xor { lhs, rhs }
-		| StatementElement::GT { lhs, rhs }
-		| StatementElement::LT { lhs: rhs, rhs: lhs }
-		| StatementElement::GTE { lhs: rhs, rhs: lhs }
-		| StatementElement::LTE { lhs, rhs }
 		| StatementElement::NotCmp { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
@@ -368,6 +360,73 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
 				}
+				StatementElement::Cmp { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("cmp rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__eq__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+				}
+				StatementElement::NotCmp { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("cmp rhs")));
+					instructions.append(&mut right_instructions);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__eq__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+					instructions.push((Instruction::COMA, None));
+				}
+				_ => {
+					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
+						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+					} else {
+						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+						instructions.append(&mut right_instructions);
+						instructions.push((
+							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+							None,
+						));
+					}
+				}
+			}
+
+			*tmps_used -= 1;
+			instructions
+		}
+		//Non-commutative operations
+		StatementElement::Sub { lhs, rhs }
+		| StatementElement::Div { lhs, rhs }
+		| StatementElement::Mod { lhs, rhs }
+		| StatementElement::LShift { lhs, rhs }
+		| StatementElement::RShift { lhs, rhs }
+		| StatementElement::GT { lhs, rhs }
+		| StatementElement::LTE { lhs, rhs }
+		| StatementElement::LT { lhs: rhs, rhs: lhs }
+		| StatementElement::GTE { lhs: rhs, rhs: lhs } => {
+			let (left, right) = (lhs.as_ref(), rhs.as_ref());
+			let mut instructions = compile_statement_inner(
+				left,
+				variables,
+				global_variables,
+				functions,
+				stack_size,
+				tmps_used,
+				tmps,
+			)?;
+			*tmps_used += 1;
+			let mut right_instructions = compile_statement_inner(
+				right,
+				variables,
+				global_variables,
+				functions,
+				stack_size,
+				tmps_used,
+				tmps,
+			)?;
+			match statement {
 				StatementElement::Div { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("div rhs")));
 					instructions.append(&mut right_instructions);
@@ -407,19 +466,6 @@ fn compile_statement_inner<'a>(
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-					instructions.push((Instruction::COMA, None));
-				}
-				StatementElement::Cmp { rhs: _, lhs: _ } => {
-					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
-					} else {
-						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
-						instructions.append(&mut right_instructions);
-						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
-							None,
-						));
-					}
 					instructions.push((Instruction::COMA, None));
 				}
 				_ => {

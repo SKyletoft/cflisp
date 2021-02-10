@@ -1,0 +1,7 @@
+__eq__	CMPA	1,SP	; Equal to. Compares SP,1 to A -> A
+	BEQ	__eq_1	; (SP,0 is the return adr)
+	LDA	#$00
+	RTS
+__eq_1	LDA	#$FF
+	RTS
+

@@ -64,6 +64,7 @@ fn main() {
 	//if !flags.optimise {
 	if true {
 		compiled.push_str(include_str!("asm_deps/gt.sflisp"));
+		compiled.push_str(include_str!("asm_deps/eq.sflisp"));
 	}
 	if flags.debug {
 		//compiled.insert_str(0, "\tORG\t$20\n");
