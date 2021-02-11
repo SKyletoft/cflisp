@@ -325,7 +325,7 @@ fn compile_statement_inner<'a>(
 		| StatementElement::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
-			let (left, right) = if left_depth >= right_depth {
+			let (left, right) = if left_depth > right_depth {
 				(lhs.as_ref(), rhs.as_ref())
 			} else {
 				(rhs.as_ref(), lhs.as_ref())

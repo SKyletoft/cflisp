@@ -10,6 +10,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
 	reduce_reserves(instructions);
+	cmp_eq_jmp(instructions);
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -246,6 +247,42 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx);
 			instructions.remove(idx);
 			instructions[idx + 1] = (Instruction::STA(Addressing::SP(1)), None);
+		}
+		idx += 1;
+	}
+}
+
+fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+		if let (
+			(Instruction::PSHA, Some("cmp rhs")),
+			(Instruction::LDA(lhs), lhs_comment),
+			(Instruction::JSR(Addressing::Label(function_name)), None),
+			(Instruction::LEASP(Addressing::SP(1)), None),
+			(Instruction::TSTA, None),
+			(Instruction::BNE(jump_to), None),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+			&instructions[idx + 3],
+			&instructions[idx + 4],
+			&instructions[idx + 5],
+		) {
+			if function_name != "__eq__" {
+				idx += 1;
+				continue;
+			}
+			let lhs = lhs.clone();
+			let lhs_comment = *lhs_comment;
+			let jump_to = jump_to.clone();
+			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions[idx + 1] = (Instruction::BEQ(jump_to), None);
+			instructions.remove(idx + 2);
+			instructions.remove(idx + 2);
+			instructions.remove(idx + 2);
+			instructions.remove(idx + 2);
 		}
 		idx += 1;
 	}
