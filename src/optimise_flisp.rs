@@ -294,7 +294,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			(Instruction::JSR(Addressing::Label(function_name)), None),
 			(Instruction::LEASP(Addressing::SP(1)), None),
 			(Instruction::TSTA, None),
-			(Instruction::BNE(_), None),
+			(Instruction::BEQ(jump_adr), None),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -309,7 +309,9 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			}
 			let lhs = lhs.clone();
 			let lhs_comment = *lhs_comment;
+			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions[idx + 5] = (Instruction::BNE(jump_adr), None);
 			instructions.remove(idx + 4);
 			instructions.remove(idx + 3);
 			instructions.remove(idx + 2);
@@ -329,7 +331,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			(Instruction::LEASP(Addressing::SP(1)), None),
 			(Instruction::COMA, None),
 			(Instruction::TSTA, None),
-			(Instruction::BNE(jump_to), None),
+			(Instruction::BEQ(_), None),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -345,9 +347,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			}
 			let lhs = lhs.clone();
 			let lhs_comment = *lhs_comment;
-			let jump_to = jump_to.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx] = (Instruction::BEQ(jump_to), lhs_comment);
 			instructions.remove(idx + 6);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);

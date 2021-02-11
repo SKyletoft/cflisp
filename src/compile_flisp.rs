@@ -217,7 +217,7 @@ fn compile_element<'a>(
 					&mut else_stack,
 					false,
 				)?;
-				cond.push((Instruction::BNE(Addressing::Label(else_str)), None));
+				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut else_block);
@@ -228,7 +228,7 @@ fn compile_element<'a>(
 					));
 				}
 			} else {
-				cond.push((Instruction::BNE(Addressing::Label(end_str.clone())), None));
+				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut then_block);
 			}
 			cond.push((Instruction::Label(end_str), None));
