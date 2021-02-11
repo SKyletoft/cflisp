@@ -54,11 +54,9 @@ fn main() {
 		dbg!(&parsed);
 	}
 	let mut instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
-	dbg!(&instr);
 	if !flags.debug {
 		optimise_flisp::remove_unused_labels(&mut instr);
 	}
-	dbg!(&instr);
 	let mut compiled = text::instructions_to_text(&instr, &flags).expect("Too long?");
 	text::automatic_imports(&mut compiled);
 	if flags.debug {

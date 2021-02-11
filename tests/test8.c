@@ -1,5 +1,5 @@
 int factorial(int n) {
-	if (2 > n) {
+	if (n <= 1) {
 		return 1;
 	} else {
 		return n * factorial(n - 1);

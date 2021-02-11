@@ -13,7 +13,7 @@ pub(crate) fn instructions_to_text(
 		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
 	let mut output = String::new();
-	for (i, c) in instructions.iter().skip(1) {
+	for (i, c) in instructions.iter() {
 		match (flags.hex, flags.comments) {
 			(true, true) => match (i, c) {
 				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
@@ -40,11 +40,6 @@ pub(crate) fn instructions_to_text(
 }
 
 pub(crate) fn automatic_imports(instructions: &mut String) {
-	if !instructions.contains("init") {
-		instructions.push_str(
-			"init\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n",
-		);
-	}
 	if instructions.contains("__mul__") {
 		instructions.push_str(include_str!("asm_deps/mul.sflisp"));
 	}
@@ -59,6 +54,9 @@ pub(crate) fn automatic_imports(instructions: &mut String) {
 	}
 	if instructions.contains("__mod__") {
 		instructions.push_str(include_str!("asm_deps/mod.sflisp"));
+	}
+	if !instructions.contains("init") {
+		instructions.push_str(include_str!("asm_deps/init.sflisp"));
 	}
 	instructions.push_str("\n\tORG\t$FF\n\tFCB\tinit\n");
 }

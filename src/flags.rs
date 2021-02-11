@@ -37,7 +37,7 @@ impl<'a> FromIterator<&'a String> for Flags {
 				continue;
 			}
 			if arg.starts_with('-') {
-				if arg.contains('h') {
+				if arg.contains('x') {
 					flags.hex = true;
 				} else if arg.contains('d') {
 					flags.hex = false;
