@@ -12,6 +12,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	reduce_reserves(instructions);
 	cmp_eq_jmp(instructions);
 	cmp_neq_jmp(instructions);
+	cmp_gt_jmp(instructions);
+	cmp_gte_jmp(instructions);
 	inc(instructions);
 	inca(instructions);
 }
@@ -269,7 +271,7 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 		) {
 			if to == from {
 				instructions[idx] = (Instruction::INC(to.clone()), *comment);
-				instructions.remove(idx + 1);
+				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 			}
 		}
@@ -348,6 +350,81 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			let lhs = lhs.clone();
 			let lhs_comment = *lhs_comment;
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions.remove(idx + 6);
+			instructions.remove(idx + 5);
+			instructions.remove(idx + 4);
+			instructions.remove(idx + 3);
+			instructions.remove(idx + 2);
+		}
+		idx += 1;
+	}
+}
+
+fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+		if let (
+			(Instruction::PSHA, Some("gt rhs")),
+			(Instruction::LDA(lhs), lhs_comment),
+			(Instruction::JSR(Addressing::Label(function_name)), None),
+			(Instruction::LEASP(Addressing::SP(1)), None),
+			(Instruction::TSTA, None),
+			(Instruction::BEQ(jump_adr), None),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+			&instructions[idx + 3],
+			&instructions[idx + 4],
+			&instructions[idx + 5],
+		) {
+			if function_name != "__gt__" {
+				idx += 1;
+				continue;
+			}
+			let lhs = lhs.clone();
+			let lhs_comment = *lhs_comment;
+			let jump_adr = jump_adr.clone();
+			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions[idx + 1] = (Instruction::BGT(jump_adr), None);
+			instructions.remove(idx + 5);
+			instructions.remove(idx + 4);
+			instructions.remove(idx + 3);
+			instructions.remove(idx + 2);
+		}
+		idx += 1;
+	}
+}
+
+fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 7 && idx < instructions.len() - 7 {
+		if let (
+			(Instruction::PSHA, Some("lte rhs")),
+			(Instruction::LDA(lhs), lhs_comment),
+			(Instruction::JSR(Addressing::Label(function_name)), None),
+			(Instruction::LEASP(Addressing::SP(1)), None),
+			(Instruction::COMA, None),
+			(Instruction::TSTA, None),
+			(Instruction::BEQ(jump_adr), None),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+			&instructions[idx + 3],
+			&instructions[idx + 4],
+			&instructions[idx + 5],
+			&instructions[idx + 6],
+		) {
+			if function_name != "__gt__" {
+				idx += 1;
+				continue;
+			}
+			let lhs = lhs.clone();
+			let lhs_comment = *lhs_comment;
+			let jump_adr = jump_adr.clone();
+			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions[idx + 1] = (Instruction::BLT(jump_adr), None);
 			instructions.remove(idx + 6);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);

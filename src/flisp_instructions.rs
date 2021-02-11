@@ -20,7 +20,7 @@ pub(crate) enum Instruction {
 	BNE(Addressing),
 	BEQ(Addressing),
 	BGT(Addressing),
-	BLE(Addressing),
+	BLT(Addressing),
 	LEASP(Addressing),
 	CMPA(Addressing),
 	INC(Addressing),
@@ -53,7 +53,7 @@ impl fmt::Display for Instruction {
 			Instruction::BNE(a) => write!(f, "\tBNE\t{}", *a),
 			Instruction::BEQ(a) => write!(f, "\tBEQ\t{}", *a),
 			Instruction::BGT(a) => write!(f, "\tBGT\t{}", *a),
-			Instruction::BLE(a) => write!(f, "\tBLE\t{}", *a),
+			Instruction::BLT(a) => write!(f, "\tBLT\t{}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{}", *a),
 			Instruction::JSR(a) => write!(f, "\tJSR\t{}", *a),
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{}", *a),
@@ -87,7 +87,7 @@ impl fmt::UpperHex for Instruction {
 			Instruction::BNE(a) => write!(f, "\tBNE\t{:X}", *a),
 			Instruction::BEQ(a) => write!(f, "\tBEQ\t{:X}", *a),
 			Instruction::BGT(a) => write!(f, "\tBGT\t{:X}", *a),
-			Instruction::BLE(a) => write!(f, "\tBLE\t{:X}", *a),
+			Instruction::BLT(a) => write!(f, "\tBLT\t{:X}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{:X}", *a),
 			Instruction::JSR(a) => write!(f, "\tJSR\t{:X}", *a),
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{:X}", *a),
@@ -122,7 +122,7 @@ impl Instruction {
 			| Instruction::BNE(a)
 			| Instruction::BEQ(a)
 			| Instruction::BGT(a)
-			| Instruction::BLE(a)
+			| Instruction::BLT(a)
 			| Instruction::JSR(a)
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
