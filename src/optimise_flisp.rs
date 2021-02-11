@@ -277,12 +277,10 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 fn inca(instructions: &mut Vec<CommentedInstruction>) {
-	let mut idx = 0;
-	while instructions.len() >= 1 && idx < instructions.len() - 1 {
-		if let ((Instruction::ADDA(Addressing::Data(1)), comment),) = (&instructions[idx],) {
-			instructions[idx] = (Instruction::INCA, *comment);
+	for (inst, _) in instructions.iter_mut() {
+		if matches!(inst, Instruction::ADDA(Addressing::Data(1))) {
+			*inst = Instruction::INCA;
 		}
-		idx += 1;
 	}
 }
 
