@@ -11,9 +11,6 @@ pub(crate) struct Flags {
 	pub(crate) out: String,
 	pub(crate) debug: bool,
 	pub(crate) optimise: bool,
-	pub(crate) mul: bool,
-	pub(crate) div: bool,
-	pub(crate) modulo: bool,
 	pub(crate) inline: bool,
 }
 
@@ -28,9 +25,6 @@ impl<'a> FromIterator<&'a String> for Flags {
 			assemble: false,
 			debug: false,
 			optimise: false,
-			mul: false,
-			div: false,
-			modulo: false,
 			inline: false,
 			out: "out.sflisp".to_string(),
 		};
@@ -68,12 +62,6 @@ impl<'a> FromIterator<&'a String> for Flags {
 				}
 				if arg.contains('O') {
 					flags.optimise = true;
-				}
-				if arg.contains('m') {
-					flags.mul = true;
-				}
-				if arg.contains('d') {
-					flags.div = true;
 				}
 				if arg.contains('i') {
 					flags.inline = true;
