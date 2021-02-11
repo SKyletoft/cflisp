@@ -1,5 +1,4 @@
 use crate::*;
-use types::Statement;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementToken<'a> {
@@ -18,10 +17,10 @@ pub(crate) enum StatementToken<'a> {
 	Xor,
 	RShift,
 	LShift,
-	GT,
-	GTE,
-	LT,
-	LTE,
+	GreaterThan,
+	GreaterThanEqual,
+	LessThan,
+	LessThanEqual,
 	Cmp,
 	NotCmp,
 	Not,
@@ -56,10 +55,10 @@ impl<'a> StatementToken<'a> {
 				Token::Not => StatementToken::Not,
 				Token::LShift => StatementToken::LShift,
 				Token::RShift => StatementToken::RShift,
-				Token::GT => StatementToken::GT,
-				Token::LT => StatementToken::LT,
-				Token::GTE => StatementToken::GTE,
-				Token::LTE => StatementToken::LTE,
+				Token::GreaterThan => StatementToken::GreaterThan,
+				Token::LessThan => StatementToken::LessThan,
+				Token::GreaterThanEqual => StatementToken::GreaterThanEqual,
+				Token::LessThanEqual => StatementToken::LessThanEqual,
 				Token::Cmp => StatementToken::Cmp,
 				Token::NotCmp => StatementToken::NotCmp,
 				Token::AdrOf(n) => StatementToken::AdrOf(n),

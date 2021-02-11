@@ -1,6 +1,4 @@
 use crate::*;
-use types::{Statement, Type};
-use Token::*;
 
 ///All possible tokens in the source (after comments have been removed)
 #[derive(Debug, Clone, PartialEq)]
@@ -16,10 +14,10 @@ pub(crate) enum Token<'a> {
 	Mod,
 	Cmp,
 	NotCmp,
-	GT,
-	GTE,
-	LT,
-	LTE,
+	GreaterThan,
+	GreaterThanEqual,
+	LessThan,
+	LessThanEqual,
 	RShift,
 	LShift,
 	Char(char),
@@ -91,10 +89,10 @@ impl<'a> Token<'a> {
 			"%" => Mod,
 			"==" => Cmp,
 			"!=" => NotCmp,
-			">" => GT,
-			">=" => GTE,
-			"<" => LT,
-			"<=" => LTE,
+			">" => GreaterThan,
+			">=" => GreaterThanEqual,
+			"<" => LessThan,
+			"<=" => LessThanEqual,
 			"&&" => And,
 			"&" => And,
 			"|" => Or,
@@ -255,7 +253,8 @@ impl<'a> Token<'a> {
 			self,
 			Add | Sub
 				| Mul | Div | Mod
-				| Cmp | GT | LT | RShift
+				| Cmp | GreaterThan
+				| LessThan | RShift
 				| LShift | And | Or
 				| Xor | Not | Assign
 		)

@@ -1,6 +1,4 @@
 use crate::*;
-use flisp_instructions::{Addressing, Instruction};
-use types::{Block, Function, Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementElement<'a> {
@@ -47,19 +45,19 @@ pub(crate) enum StatementElement<'a> {
 	Not {
 		lhs: Box<StatementElement<'a>>,
 	},
-	GT {
+	GreaterThan {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	LT {
+	LessThan {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	GTE {
+	GreaterThanEqual {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	LTE {
+	LessThanEqual {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
@@ -107,10 +105,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
 			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
 			StatementElement::Not { lhs: _ } => Instruction::COMA,
-			StatementElement::GT { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::LT { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::GTE { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::LTE { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::GreaterThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::LessThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
+			StatementElement::LessThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::NotCmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Var(_) => unimplemented!(),
@@ -139,10 +137,18 @@ impl<'a> StatementElement<'a> {
 			StatementElement::And { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Or { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Xor { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::GT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::LT { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::GTE { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::LTE { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::GreaterThan { lhs, rhs } => {
+				lhs.as_ref().depth().max(rhs.as_ref().depth())
+			}
+			StatementElement::LessThan { lhs, rhs } => {
+				lhs.as_ref().depth().max(rhs.as_ref().depth())
+			}
+			StatementElement::GreaterThanEqual { lhs, rhs } => {
+				lhs.as_ref().depth().max(rhs.as_ref().depth())
+			}
+			StatementElement::LessThanEqual { lhs, rhs } => {
+				lhs.as_ref().depth().max(rhs.as_ref().depth())
+			}
 			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Not { lhs } => lhs.as_ref().depth(),
@@ -278,22 +284,26 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(r),
 				}
 			}),
-			(Unparsed(StatementToken::LT), |l, r| StatementElement::LT {
-				lhs: Box::new(l),
-				rhs: Box::new(r),
-			}),
-			(Unparsed(StatementToken::GT), |l, r| StatementElement::GT {
-				lhs: Box::new(l),
-				rhs: Box::new(r),
-			}),
-			(Unparsed(StatementToken::LTE), |l, r| {
-				StatementElement::LTE {
+			(Unparsed(StatementToken::LessThan), |l, r| {
+				StatementElement::LessThan {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}
 			}),
-			(Unparsed(StatementToken::GTE), |l, r| {
-				StatementElement::GTE {
+			(Unparsed(StatementToken::GreaterThan), |l, r| {
+				StatementElement::GreaterThan {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::LessThanEqual), |l, r| {
+				StatementElement::LessThanEqual {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::GreaterThanEqual), |l, r| {
+				StatementElement::GreaterThanEqual {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				}
@@ -365,10 +375,10 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Or { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::Xor { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::Not { lhs: _ } => Type::Bool,
-			StatementElement::GT { lhs: _, rhs: _ } => Type::Bool,
-			StatementElement::LT { lhs: _, rhs: _ } => Type::Bool,
-			StatementElement::GTE { lhs: _, rhs: _ } => Type::Bool,
-			StatementElement::LTE { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::GreaterThan { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::LessThan { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => Type::Bool,
+			StatementElement::LessThanEqual { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::Cmp { lhs: _, rhs: _ } => Type::Bool,
 			StatementElement::NotCmp { lhs: _, rhs: _ } => Type::Bool,
 
@@ -484,12 +494,12 @@ impl<'a> StatementElement<'a> {
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
 
-			StatementElement::GT { lhs, rhs } => {
+			StatementElement::GreaterThan { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
 
-			StatementElement::LT { lhs, rhs } => {
+			StatementElement::LessThan { lhs, rhs } => {
 				lhs.as_ref().type_check(variables, functions)?
 					&& rhs.as_ref().type_check(variables, functions)?
 			}
@@ -518,10 +528,10 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::And { lhs, rhs }
 			| StatementElement::Or { lhs, rhs }
 			| StatementElement::Xor { lhs, rhs }
-			| StatementElement::GT { lhs, rhs }
-			| StatementElement::LT { lhs, rhs }
-			| StatementElement::GTE { lhs, rhs }
-			| StatementElement::LTE { lhs, rhs }
+			| StatementElement::GreaterThan { lhs, rhs }
+			| StatementElement::LessThan { lhs, rhs }
+			| StatementElement::GreaterThanEqual { lhs, rhs }
+			| StatementElement::LessThanEqual { lhs, rhs }
 			| StatementElement::NotCmp { lhs, rhs }
 			| StatementElement::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
 			StatementElement::Not { lhs: _ }

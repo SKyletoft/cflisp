@@ -26,7 +26,7 @@ impl<'a> FromIterator<&'a String> for Flags {
 			type_check: true,
 			print_result: false,
 			assemble: false,
-			debug: true,
+			debug: false,
 			optimise: false,
 			mul: false,
 			div: false,
@@ -64,7 +64,7 @@ impl<'a> FromIterator<&'a String> for Flags {
 					flags.assemble = true;
 				}
 				if arg.contains('g') {
-					flags.debug = false;
+					flags.debug = true;
 				}
 				if arg.contains('O') {
 					flags.optimise = true;

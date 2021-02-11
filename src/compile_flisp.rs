@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
 use crate::*;
-use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
-use statement_element::StatementElement;
-use types::{Type, Variable};
 
 const ABOVE_STACK_OFFSET: isize = -1;
 
@@ -401,10 +398,10 @@ fn compile_statement_inner<'a>(
 		| StatementElement::Mod { lhs, rhs }
 		| StatementElement::LShift { lhs, rhs }
 		| StatementElement::RShift { lhs, rhs }
-		| StatementElement::GT { lhs, rhs }
-		| StatementElement::LTE { lhs, rhs }
-		| StatementElement::LT { lhs: rhs, rhs: lhs }
-		| StatementElement::GTE { lhs: rhs, rhs: lhs } => {
+		| StatementElement::GreaterThan { lhs, rhs }
+		| StatementElement::LessThanEqual { lhs, rhs }
+		| StatementElement::LessThan { lhs: rhs, rhs: lhs }
+		| StatementElement::GreaterThanEqual { lhs: rhs, rhs: lhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(
 				left,
@@ -446,8 +443,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
 				}
-				StatementElement::GT { rhs: _, lhs: _ }
-				| StatementElement::LT { rhs: _, lhs: _ } => {
+				StatementElement::GreaterThan { rhs: _, lhs: _ }
+				| StatementElement::LessThan { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs")));
 					instructions.append(&mut right_instructions);
 					instructions.push((
@@ -456,8 +453,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::LTE { rhs: _, lhs: _ }
-				| StatementElement::GTE { rhs: _, lhs: _ } => {
+				StatementElement::LessThanEqual { rhs: _, lhs: _ }
+				| StatementElement::GreaterThanEqual { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs")));
 					instructions.append(&mut right_instructions);
 					instructions.push((
@@ -652,43 +649,4 @@ fn compile_statement_inner<'a>(
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
 	Ok(instructions)
-}
-
-pub(crate) fn instructions_to_text(
-	instructions: &[CommentedInstruction],
-	flags: &Flags,
-) -> Result<String, CompileError> {
-	if instructions
-		.iter()
-		.map(|(instruction, _)| instruction.size())
-		.sum::<usize>()
-		> 255
-	{
-		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
-	}
-	let mut output = String::new();
-	for (i, c) in instructions.iter().skip(1) {
-		match (flags.hex, flags.comments) {
-			(true, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
-				(inst, None) => output.push_str(&format!("{:X}", inst)),
-			},
-			(false, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{}\t ; {}", inst, comm)),
-				(inst, None) => output.push_str(&format!("{}", inst)),
-			},
-			(true, false) => output.push_str(&format!("{:X}", i)),
-			(false, false) => output.push_str(&format!("{}", i)),
-		}
-
-		if !matches!(i, Instruction::Label(n) if n.len() < 8) {
-			output.push('\n');
-		} else {
-			output.push(' ');
-		}
-		if matches!(i, Instruction::RTS) {
-			output.push('\n');
-		}
-	}
-	Ok(output)
 }

@@ -10,15 +10,18 @@ pub mod optimise_flisp;
 pub mod parser;
 pub mod statement_element;
 pub mod statement_token;
+pub mod text;
 pub mod token;
 pub mod types;
 
 use error::{CompileError, ParseError};
 use flags::Flags;
+use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use language_element::LanguageElement;
+use statement_element::StatementElement;
 use statement_token::StatementToken;
-use token::Token;
-use types::Variable;
+use token::{Token, Token::*};
+use types::{Block, Function, Statement, Type, Variable};
 
 fn main() {
 	let args = env::args().skip(1).collect::<Vec<_>>();
@@ -50,25 +53,16 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
-	let instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
-	let mut compiled = compile_flisp::instructions_to_text(&instr, &flags).expect("Too long?");
-	if flags.mul {
-		compiled.push_str(include_str!("asm_deps/mul.sflisp"));
+	let mut instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
+	dbg!(&instr);
+	if !flags.debug {
+		optimise_flisp::remove_unused_labels(&mut instr);
 	}
-	if flags.div {
-		compiled.push_str(include_str!("asm_deps/div.sflisp"));
-	}
-	if flags.modulo {
-		compiled.push_str(include_str!("asm_deps/mod.sflisp"));
-	}
-	//if !flags.optimise {
-	if true {
-		compiled.push_str(include_str!("asm_deps/gt.sflisp"));
-		compiled.push_str(include_str!("asm_deps/eq.sflisp"));
-	}
+	dbg!(&instr);
+	let mut compiled = text::instructions_to_text(&instr, &flags).expect("Too long?");
+	text::automatic_imports(&mut compiled);
 	if flags.debug {
-		//compiled.insert_str(0, "\tORG\t$20\n");
-		compiled.push_str("init\tLDA\t#0\n\tLDX\t#0\n\tLDY\t#0\n\tLDSP\t#$FB\n\tJSR\tmain\nend\tJMP\tend\n\n\tORG\t$FF\n\tFCB\tinit\n");
+		compiled.insert_str(0, "\tORG\t$20\n");
 	}
 	if flags.print_result {
 		println!("{}", &compiled);

@@ -1,5 +1,5 @@
 use crate::*;
-use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
+use std::collections::HashSet;
 
 pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	load_xy(instructions);
@@ -433,4 +433,43 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 		}
 		idx += 1;
 	}
+}
+
+pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
+	let mut jumps_to = instructions
+		.iter()
+		.filter_map(|(inst, _)| match inst {
+			Instruction::LDA(Addressing::Label(lbl))
+			| Instruction::LDX(Addressing::Label(lbl))
+			| Instruction::LDY(Addressing::Label(lbl))
+			| Instruction::LDSP(Addressing::Label(lbl))
+			| Instruction::ADDA(Addressing::Label(lbl))
+			| Instruction::SUBA(Addressing::Label(lbl))
+			| Instruction::ANDA(Addressing::Label(lbl))
+			| Instruction::ROLA(Addressing::Label(lbl))
+			| Instruction::RORA(Addressing::Label(lbl))
+			| Instruction::ORA(Addressing::Label(lbl))
+			| Instruction::EORA(Addressing::Label(lbl))
+			| Instruction::STA(Addressing::Label(lbl))
+			| Instruction::JMP(Addressing::Label(lbl))
+			| Instruction::BNE(Addressing::Label(lbl))
+			| Instruction::BEQ(Addressing::Label(lbl))
+			| Instruction::BGT(Addressing::Label(lbl))
+			| Instruction::BLT(Addressing::Label(lbl))
+			| Instruction::LEASP(Addressing::Label(lbl))
+			| Instruction::CMPA(Addressing::Label(lbl))
+			| Instruction::INC(Addressing::Label(lbl))
+			| Instruction::JSR(Addressing::Label(lbl)) => Some(lbl.clone()),
+			_ => None,
+		})
+		.collect::<HashSet<String>>();
+	jumps_to.insert("main".to_string());
+	jumps_to.insert("init".to_string());
+	instructions.retain(|(inst, _)| {
+		if let Instruction::Label(lbl) = inst {
+			jumps_to.contains(lbl)
+		} else {
+			true
+		}
+	});
 }

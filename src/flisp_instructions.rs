@@ -2,6 +2,7 @@ use crate::*;
 
 pub(crate) type CommentedInstruction<'a> = (Instruction, Option<&'a str>);
 
+#[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Instruction {
 	LDA(Addressing),
@@ -138,6 +139,7 @@ impl Instruction {
 	}
 }
 
+#[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Addressing {
 	Data(isize),

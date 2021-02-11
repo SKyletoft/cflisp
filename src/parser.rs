@@ -1,10 +1,4 @@
 use crate::*;
-use helper::is_block;
-use language_element::LanguageElement;
-use statement_element::StatementElement;
-use statement_token::StatementToken;
-use token::{Token, Token::*};
-use types::{Function, Type};
 
 pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
@@ -342,7 +336,7 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 			}
 			last = idx + 1;
 		}
-		if matches!(tokens[idx], Token::UnparsedBlock(raw) if is_block(raw))
+		if matches!(tokens[idx], Token::UnparsedBlock(raw) if helper::is_block(raw))
 			&& !matches!(tokens.get(idx + 1), Some(Token::Else))
 		{
 			let slice = &tokens[last..=idx];
