@@ -321,7 +321,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 
 fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+	while instructions.len() >= 7 && idx < instructions.len() - 7 {
 		if let (
 			(Instruction::PSHA, Some("cmp rhs")),
 			(Instruction::LDA(lhs), lhs_comment),
