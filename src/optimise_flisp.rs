@@ -12,6 +12,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	reduce_reserves(instructions);
 	cmp_eq_jmp(instructions);
 	inc(instructions);
+	inca(instructions);
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -270,6 +271,16 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 1);
 				instructions.remove(idx + 1);
 			}
+		}
+		idx += 1;
+	}
+}
+
+fn inca(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 1 && idx < instructions.len() - 1 {
+		if let ((Instruction::ADDA(Addressing::Data(1)), comment),) = (&instructions[idx],) {
+			instructions[idx] = (Instruction::INCA, *comment);
 		}
 		idx += 1;
 	}
