@@ -11,6 +11,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	repeat_a(instructions);
 	reduce_reserves(instructions);
 	cmp_eq_jmp(instructions);
+	inc(instructions);
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -247,6 +248,28 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx);
 			instructions.remove(idx);
 			instructions[idx + 1] = (Instruction::STA(Addressing::SP(1)), None);
+		}
+		idx += 1;
+	}
+}
+
+fn inc(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+		if let (
+			(Instruction::LDA(from), comment),
+			(Instruction::ADDA(Addressing::Data(1)), _),
+			(Instruction::STA(to), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if to == from {
+				instructions[idx] = (Instruction::INC(to.clone()), *comment);
+				instructions.remove(idx + 1);
+				instructions.remove(idx + 1);
+			}
 		}
 		idx += 1;
 	}
