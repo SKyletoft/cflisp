@@ -1,9 +1,11 @@
-__mul__	LDA	#0	; Computes SP,1 * SP,2 -> A
-__mul_1	ROR	2,SP	; (SP,0 is the return adr)
+__mul__	PSHA		; Computes SP,1 * A -> A
+	LDA	#0	; (SP,0 is the return adr)
+__mul_1	ROR	2,SP
 	BCC	__mul_2
-	ADDA	1,SP
-__mul_2 ROL	1,SP
+	ADDA	0,SP
+__mul_2 ROL	0,SP
 	TST	2,SP
 	BNE	__mul_1
+	LEASP	1,SP
 	RTS
 

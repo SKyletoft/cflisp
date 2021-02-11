@@ -353,12 +353,11 @@ fn compile_statement_inner<'a>(
 				StatementElement::Mul { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("mul rhs")));
 					instructions.append(&mut right_instructions);
-					instructions.push((Instruction::PSHA, Some("mul lhs")));
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__mul__".to_string())),
 						None,
 					));
-					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElement::Cmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs")));
