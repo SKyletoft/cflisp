@@ -13,7 +13,12 @@ pub(crate) fn instructions_to_text(
 		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
 	let mut output = String::new();
-	for (i, c) in instructions.iter() {
+	for ((i, c), (next, _)) in instructions.iter().zip(
+		instructions
+			.iter()
+			.skip(1)
+			.chain([(Instruction::RTS, None)].iter()),
+	) {
 		match (flags.hex, flags.comments) {
 			(true, true) => match (i, c) {
 				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
@@ -32,10 +37,12 @@ pub(crate) fn instructions_to_text(
 		} else {
 			output.push(' ');
 		}
-		if matches!(i, Instruction::RTS) {
+		if matches!((i, next), (Instruction::RTS, Instruction::Label(lbl)) if !(lbl.starts_with("if") || lbl.starts_with("for") || lbl.starts_with("while")))
+		{
 			output.push('\n');
 		}
 	}
+	output.push('\n');
 	Ok(output)
 }
 

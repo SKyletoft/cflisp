@@ -246,15 +246,17 @@ fn compile_element<'a>(
 
 		LanguageElement::Return(ret) => {
 			if let Some(statement) = ret {
-				compile_statement(
+				let mut statement = compile_statement(
 					statement,
 					variables,
 					global_variables,
 					functions,
 					stack_size,
-				)?
+				)?;
+				statement.push((Instruction::RTS, None));
+				statement
 			} else {
-				vec![]
+				vec![(Instruction::RTS, None)]
 			}
 		}
 
