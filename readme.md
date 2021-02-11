@@ -21,21 +21,29 @@ into this:
 
 ```flisp
 ; tests/expected1.sflisp
-main    ORG     $20
-        LDA     #0
-        PSHA            ; ptr
-        LDA     #5
-        PSHA            ; x
-        CMPA    #5
-        BNE     main_1
-        LDA     #3
-        STA     SP, 0
-main_1  LDA     SP, 0
-        STA     SP, -1
-        JMP     end
+main    LDA     #000
+        PSHA             ; ptr
+        LDA     #005
+        PSHA             ; x
+        LDA     000,SP   ; x
+        CMPA    #005
+        BNE     if_end_main_2
+if_then_main_2
+        LDA     #003
+        STA     000,SP   ; x
+if_end_main_2
+        LDX     001,SP   ; ptr
+        LDA     000,SP   ; x
+        STA     000,X
+        LEASP   002,SP
+        RTS
 
+init    LDA     #0
+        LDX     #0
+        LDY     #0
+        LDSP    #$FB
+        JSR     main
 end     JMP     end
 
         ORG     $FF
-        FCB     main
-```
+        FCB     init```
