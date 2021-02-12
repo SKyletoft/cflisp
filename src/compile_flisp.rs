@@ -395,7 +395,7 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 		//Non-commutative operations
-		StatementElement::Sub { lhs, rhs }
+		StatementElement::Sub { lhs: rhs, rhs: lhs }
 		| StatementElement::Div { lhs, rhs }
 		| StatementElement::Mod { lhs, rhs }
 		| StatementElement::LShift { lhs, rhs }

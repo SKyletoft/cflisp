@@ -25,7 +25,9 @@ pub(crate) enum Instruction {
 	LEASP(Addressing),
 	CMPA(Addressing),
 	INC(Addressing),
+	DEC(Addressing),
 	INCA,
+	DECA,
 	PSHA,
 	PULA,
 	TSTA,
@@ -59,7 +61,9 @@ impl fmt::Display for Instruction {
 			Instruction::JSR(a) => write!(f, "\tJSR\t{}", *a),
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{}", *a),
+			Instruction::DEC(a) => write!(f, "\tDEC\t{}", *a),
 			Instruction::INCA => write!(f, "\tINCA\t"),
+			Instruction::DECA => write!(f, "\tDECA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
@@ -93,7 +97,9 @@ impl fmt::UpperHex for Instruction {
 			Instruction::JSR(a) => write!(f, "\tJSR\t{:X}", *a),
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{:X}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{:X}", *a),
+			Instruction::DEC(a) => write!(f, "\tDEC\t{:X}", *a),
 			Instruction::INCA => write!(f, "\tINCA\t"),
+			Instruction::DECA => write!(f, "\tDECA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
@@ -127,11 +133,13 @@ impl Instruction {
 			| Instruction::JSR(a)
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
+			| Instruction::DEC(a)
 			| Instruction::LEASP(a) => a.size(),
 			Instruction::PSHA
 			| Instruction::PULA
 			| Instruction::TSTA
 			| Instruction::INCA
+			| Instruction::DECA
 			| Instruction::COMA
 			| Instruction::RTS => 1,
 			Instruction::Label(_) => 0,

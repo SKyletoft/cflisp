@@ -16,6 +16,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	cmp_gte_jmp(instructions);
 	inc(instructions);
 	inca(instructions);
+	dec(instructions);
+	deca(instructions);
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -257,6 +259,28 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+fn dec(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+		if let (
+			(Instruction::LDA(Addressing::Data(1)), _),
+			(Instruction::SUBA(from), comment),
+			(Instruction::STA(to), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if to == from {
+				instructions[idx] = (Instruction::DEC(to.clone()), *comment);
+				instructions.remove(idx + 2);
+				instructions.remove(idx + 1);
+			}
+		}
+		idx += 1;
+	}
+}
+
 fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
@@ -283,6 +307,14 @@ fn inca(instructions: &mut Vec<CommentedInstruction>) {
 	for (inst, _) in instructions.iter_mut() {
 		if matches!(inst, Instruction::ADDA(Addressing::Data(1))) {
 			*inst = Instruction::INCA;
+		}
+	}
+}
+
+fn deca(instructions: &mut Vec<CommentedInstruction>) {
+	for (inst, _) in instructions.iter_mut() {
+		if matches!(inst, Instruction::SUBA(Addressing::Data(1))) {
+			*inst = Instruction::DECA;
 		}
 	}
 }
