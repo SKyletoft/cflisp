@@ -19,13 +19,16 @@ pub(crate) fn instructions_to_text(
 			.skip(1)
 			.chain([(Instruction::RTS, None)].iter()),
 	) {
+		if matches!(i, Instruction::Label(lbl) if lbl == "global") {
+			continue;
+		}
 		match (flags.hex, flags.comments) {
 			(true, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{:X}\t ; {}", inst, comm)),
+				(inst, Some(comm)) => output.push_str(&format!("{:X}\t; {}", inst, comm)),
 				(inst, None) => output.push_str(&format!("{:X}", inst)),
 			},
 			(false, true) => match (i, c) {
-				(inst, Some(comm)) => output.push_str(&format!("{}\t ; {}", inst, comm)),
+				(inst, Some(comm)) => output.push_str(&format!("{}\t; {}", inst, comm)),
 				(inst, None) => output.push_str(&format!("{}", inst)),
 			},
 			(true, false) => output.push_str(&format!("{:X}", i)),

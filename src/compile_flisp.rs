@@ -29,8 +29,8 @@ fn compile_elements<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
-	for line in block.iter().enumerate().map(|(i, e)| {
-		compile_element(
+	for (i, e) in block.iter().enumerate() {
+		let line = &mut compile_element(
 			e,
 			variables,
 			global_variables,
@@ -38,9 +38,7 @@ fn compile_elements<'a>(
 			scope_name,
 			stack_size,
 			i,
-		)
-	}) {
-		let line = &mut line?;
+		)?;
 		if optimise {
 			optimise_flisp::all_optimisations(line);
 		}
@@ -107,11 +105,13 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				*stack_size += 1;
-				variables.insert(*name, (typ.clone(), *stack_size));
+				let stack_copy = *stack_size;
 				let mut statement =
 					compile_statement(value, variables, global_variables, functions, stack_size)?;
+				assert_eq!(*stack_size, stack_copy);
 				statement.push((Instruction::PSHA, Some(*name)));
+				variables.insert(*name, (typ.clone(), *stack_size));
+				*stack_size += 1;
 				statement
 			}
 		}
@@ -148,12 +148,12 @@ fn compile_element<'a>(
 				));
 			}
 			functions.insert(*name, args.as_slice());
-			let mut args_count = args.len() as isize;
+			let mut args_count = args.len() as isize + 1; //plus one for the return address
 			let mut local_variables = HashMap::new();
 			for (idx, Variable { name, typ }) in args.iter().enumerate() {
 				local_variables.insert(*name, (typ.clone(), idx as isize));
 			}
-			let mut fun = compile_elements(
+			let mut function_body = compile_elements(
 				block,
 				&mut local_variables,
 				global_variables,
@@ -162,12 +162,12 @@ fn compile_element<'a>(
 				&mut args_count,
 				false,
 			)?;
-			args_count -= args.len() as isize;
+			args_count -= args.len() as isize + 1; //plus one again for ret adr
 			if args_count != 0 {
-				fun.push((Instruction::LEASP(Addressing::SP(args_count)), None));
+				function_body.push((Instruction::LEASP(Addressing::SP(args_count)), None));
 			}
-			fun.push((Instruction::RTS, None));
-			fun
+			function_body.push((Instruction::RTS, None));
+			function_body
 		}
 
 		LanguageElement::IfStatement {
@@ -278,7 +278,7 @@ fn compile_statement<'a>(
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let depth = statement.depth() as isize - 1;
+	let depth = statement.depth() as isize;
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
@@ -286,7 +286,7 @@ fn compile_statement<'a>(
 		functions,
 		stack_size,
 		&mut 0,
-		if depth >= 2 { depth } else { 0 },
+		depth - 1, //if depth >= 2 { depth } else { 0 },
 	)?;
 	if depth > 1 {
 		let mut block = vec![(
@@ -348,6 +348,7 @@ fn compile_statement_inner<'a>(
 				tmps_used,
 				tmps,
 			)?;
+			*tmps_used -= 1;
 			match statement {
 				StatementElement::Mul { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("mul rhs")));
@@ -381,17 +382,16 @@ fn compile_statement_inner<'a>(
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
-						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+							statement.as_flisp_instruction(Addressing::SP(*tmps_used)),
 							None,
 						));
 					}
 				}
 			}
 
-			*tmps_used -= 1;
 			instructions
 		}
 		//Non-commutative operations
@@ -470,10 +470,10 @@ fn compile_statement_inner<'a>(
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
-						instructions.push((Instruction::STA(Addressing::SP(-*tmps_used)), None));
+						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(-*tmps_used)),
+							statement.as_flisp_instruction(Addressing::SP(*tmps_used)),
 							None,
 						));
 					}
@@ -543,6 +543,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Array(arr) => {
+			//TODO: Make sure it only occurs in variable declaration
 			let mut vec = Vec::new();
 			for element in arr.iter() {
 				let mut instructions = compile_statement_inner(
@@ -554,7 +555,7 @@ fn compile_statement_inner<'a>(
 					tmps_used,
 					tmps,
 				)?;
-				*stack_size += 1;
+				*stack_size += 1; //THINK THIS OVER. NOT SOUND
 				vec.append(&mut instructions);
 				vec.push((Instruction::PSHA, None));
 			}
@@ -562,6 +563,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Deref(adr) => {
+			todo!("Check addressing offset");
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
@@ -634,6 +636,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::AdrOf(name) => {
+			todo!("Check addressing offset");
 			if let Some((_, adr)) = variables.get(name) {
 				vec![(
 					Instruction::LDA(Addressing::Data(*stack_size + tmps - adr)),

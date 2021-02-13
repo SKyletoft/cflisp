@@ -62,6 +62,7 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 				| ((Instruction::LDX(_), _), (Instruction::LDX(_), _))
 				| ((Instruction::LDY(_), _), (Instruction::LDY(_), _))
 				| ((Instruction::LDSP(_), _), (Instruction::LDSP(_), _))
+				| ((Instruction::RTS, _), (Instruction::RTS, _))
 		) {
 			instructions.remove(idx);
 		}
@@ -173,6 +174,7 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 				| Instruction::EORA(Addressing::Data(0))
 				| Instruction::ORA(Addressing::Data(0))
 				| Instruction::ANDA(Addressing::Data(isize::MAX))
+				| Instruction::LEASP(Addressing::SP(0))
 		)
 	});
 }
@@ -468,7 +470,8 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
-	let mut jumps_to = instructions
+	return;
+	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst {
 			Instruction::LDA(Addressing::Label(lbl))
@@ -495,11 +498,9 @@ pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>)
 			_ => None,
 		})
 		.collect::<HashSet<String>>();
-	jumps_to.insert("main".to_string());
-	jumps_to.insert("init".to_string());
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
-			jumps_to.contains(lbl)
+			!(jumps_to.contains(lbl) || lbl.starts_with("if"))
 		} else {
 			true
 		}
