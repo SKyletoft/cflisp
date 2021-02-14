@@ -15,6 +15,7 @@ pub(crate) fn compile<'a>(
 		&mut HashMap::new(),
 		"global",
 		&mut 0,
+		0,
 		flags.optimise,
 	)
 }
@@ -26,6 +27,7 @@ fn compile_elements<'a>(
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
 	stack_size: &mut isize,
+	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
@@ -37,8 +39,10 @@ fn compile_elements<'a>(
 			functions,
 			scope_name,
 			stack_size,
+			stack_base,
 			i,
 		)?;
+		eprintln!("{}: {}", scope_name, &stack_size);
 		if optimise {
 			optimise_flisp::all_optimisations(line);
 		}
@@ -54,6 +58,7 @@ fn compile_element<'a>(
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
 	stack_size: &mut isize,
+	stack_base: isize,
 	line_id: usize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
@@ -80,19 +85,9 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::VariableAssignment { name, value } => {
-			let adr = if let Some(&(_, stack_address)) = variables.get(name) {
-				Addressing::SP(*stack_size - stack_address)
-			} else if let Some(&(_, stack_address)) = global_variables.get(name) {
-				Addressing::Adr(stack_address)
-			} else {
-				dbg!(element);
-				return Err(CompileError(
-					line!(),
-					"Name resolution failed? Shouldn't be checked by now?",
-				));
-			};
+			let adr = adr_for_name(name, variables, global_variables, *stack_size)?;
 			let mut statement =
-				compile_statement(value, variables, global_variables, functions, stack_size)?;
+				compile_statement(value, variables, global_variables, functions, *stack_size)?;
 			statement.push((Instruction::STA(adr), Some(name)));
 			statement
 		}
@@ -107,20 +102,20 @@ fn compile_element<'a>(
 				}
 				let stack_copy = *stack_size;
 				let mut statement =
-					compile_statement(value, variables, global_variables, functions, stack_size)?;
+					compile_statement(value, variables, global_variables, functions, *stack_size)?;
 				assert_eq!(*stack_size, stack_copy);
-				statement.push((Instruction::PSHA, Some(*name)));
 				variables.insert(*name, (typ.clone(), *stack_size));
 				*stack_size += 1;
+				statement.push((Instruction::PSHA, Some(*name)));
 				statement
 			}
 		}
 
 		LanguageElement::PointerAssignment { ptr, value } => {
 			let get_adr =
-				compile_statement(ptr, variables, global_variables, functions, stack_size)?;
+				compile_statement(ptr, variables, global_variables, functions, *stack_size)?;
 			let mut value =
-				compile_statement(value, variables, global_variables, functions, stack_size)?;
+				compile_statement(value, variables, global_variables, functions, *stack_size)?;
 			let mut statement = get_adr;
 			statement.push((
 				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
@@ -148,7 +143,11 @@ fn compile_element<'a>(
 				));
 			}
 			functions.insert(*name, args.as_slice());
-			let mut args_count = args.len() as isize + 1; //plus one for the return address
+			//Stack: Start -> Arguments -> Return adr -> Variables -> Whatever the stack grows to
+			// If this +1 is removed we can no longer have arguments
+			// This might waste a byte if there are no arguments?
+			let mut args_count = args.len() as isize + 1;
+			let args_base = args_count;
 			let mut local_variables = HashMap::new();
 			for (idx, Variable { name, typ }) in args.iter().enumerate() {
 				local_variables.insert(*name, (typ.clone(), idx as isize));
@@ -160,11 +159,15 @@ fn compile_element<'a>(
 				functions,
 				name,
 				&mut args_count,
+				args_base,
 				false,
 			)?;
-			args_count -= args.len() as isize + 1; //plus one again for ret adr
+			args_count -= args.len() as isize + 1;
 			if args_count != 0 {
-				function_body.push((Instruction::LEASP(Addressing::SP(args_count)), None));
+				function_body.push((
+					Instruction::LEASP(Addressing::SP(args_count)),
+					Some("Clearing variables"),
+				));
 			}
 			function_body.push((Instruction::RTS, None));
 			function_body
@@ -175,6 +178,11 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
+			eprintln!(
+				"IF STATEMENT: Stack: {}, vars: {}",
+				stack_size,
+				variables.len()
+			);
 			let line_id_str = line_id.to_string();
 			let then_str = "if_then_".to_string() + scope_name + "_" + &line_id_str;
 			let else_str = "if_else_".to_string() + scope_name + "_" + &line_id_str;
@@ -184,17 +192,19 @@ fn compile_element<'a>(
 				variables,
 				global_variables,
 				functions,
-				stack_size,
+				*stack_size,
 			)?;
 			cond.push((Instruction::TSTA, None));
 			let mut then_stack = *stack_size;
+			//dbg!(&cond);
 			let mut then_block = compile_elements(
-				then.as_slice(),
+				then,
 				&mut variables.clone(),
 				global_variables,
 				functions,
 				&then_str,
 				&mut then_stack,
+				*stack_size,
 				false,
 			)?;
 			if then_stack != *stack_size {
@@ -206,12 +216,13 @@ fn compile_element<'a>(
 			if let Some(v) = else_then {
 				let mut else_stack = *stack_size;
 				let mut else_block = compile_elements(
-					v.as_slice(),
+					v,
 					&mut variables.clone(),
 					global_variables,
 					functions,
 					&else_str,
 					&mut else_stack,
+					*stack_size,
 					false,
 				)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
@@ -221,7 +232,7 @@ fn compile_element<'a>(
 				if else_stack != *stack_size {
 					cond.push((
 						Instruction::LEASP(Addressing::SP(else_stack - *stack_size)),
-						None,
+						Some("This happened"),
 					));
 				}
 			} else {
@@ -251,12 +262,22 @@ fn compile_element<'a>(
 					variables,
 					global_variables,
 					functions,
-					stack_size,
+					*stack_size,
 				)?;
+				statement.push((
+					Instruction::LEASP(Addressing::SP(*stack_size - stack_base)),
+					None,
+				));
 				statement.push((Instruction::RTS, None));
 				statement
 			} else {
-				vec![(Instruction::RTS, None)]
+				vec![
+					(
+						Instruction::LEASP(Addressing::SP(*stack_size - stack_base)),
+						None,
+					),
+					(Instruction::RTS, None),
+				]
 			}
 		}
 
@@ -265,7 +286,7 @@ fn compile_element<'a>(
 			variables,
 			global_variables,
 			functions,
-			stack_size,
+			*stack_size,
 		)?,
 	};
 	Ok(res)
@@ -273,22 +294,22 @@ fn compile_element<'a>(
 
 fn compile_statement<'a>(
 	statement: &'a StatementElement,
-	variables: &mut HashMap<&'a str, (Type, isize)>,
+	variables: &HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
-	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
-	stack_size: &mut isize,
+	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
+	stack_size: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let depth = statement.depth() as isize;
+	let depth = statement.depth() as isize - 1;
+	eprintln!("compile_statement: {} {}", stack_size, depth);
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
 		global_variables,
 		functions,
-		stack_size,
+		stack_size + depth,
 		&mut 0,
-		depth - 1, //if depth >= 2 { depth } else { 0 },
 	)?;
-	if depth > 1 {
+	if depth != 0 {
 		let mut block = vec![(
 			Instruction::LEASP(Addressing::SP(-depth)),
 			Some("Reserving memory for statement"),
@@ -306,12 +327,11 @@ fn compile_statement<'a>(
 
 fn compile_statement_inner<'a>(
 	statement: &'a StatementElement,
-	variables: &mut HashMap<&'a str, (Type, isize)>,
+	variables: &HashMap<&'a str, (Type, isize)>,
 	global_variables: &HashMap<&'a str, (Type, isize)>,
-	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
-	stack_size: &mut isize,
+	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
+	stack_size: isize,
 	tmps_used: &mut isize,
-	tmps: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		//Commutative operations
@@ -336,23 +356,21 @@ fn compile_statement_inner<'a>(
 				functions,
 				stack_size,
 				tmps_used,
-				tmps,
 			)?;
-			*tmps_used += 1;
-			let mut right_instructions = compile_statement_inner(
-				right,
-				variables,
-				global_variables,
-				functions,
-				stack_size,
-				tmps_used,
-				tmps,
-			)?;
-			*tmps_used -= 1;
+			//let mut right_instructions = ;
 			match statement {
 				StatementElement::Mul { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("mul rhs")));
-					instructions.append(&mut right_instructions);
+					*tmps_used += 1;
+					instructions.append(&mut compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size + 1, //Plus one to take the PSHA above into account
+						tmps_used,
+					)?);
+					*tmps_used -= 1;
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__mul__".to_string())),
 						None,
@@ -361,7 +379,16 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::Cmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs")));
-					instructions.append(&mut right_instructions);
+					*tmps_used += 1;
+					instructions.append(&mut compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size + 1,
+						tmps_used,
+					)?);
+					*tmps_used -= 1;
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
 						None,
@@ -370,7 +397,16 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::NotCmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs")));
-					instructions.append(&mut right_instructions);
+					*tmps_used += 1;
+					instructions.append(&mut compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size + 1,
+						tmps_used,
+					)?);
+					*tmps_used -= 1;
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
 						None,
@@ -378,10 +414,20 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
+				//default:
 				_ => {
+					let mut right_instructions = compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size,
+						tmps_used,
+					)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
+						assert!(instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
@@ -412,43 +458,26 @@ fn compile_statement_inner<'a>(
 				functions,
 				stack_size,
 				tmps_used,
-				tmps,
 			)?;
-			*tmps_used += 1;
-			let mut right_instructions = compile_statement_inner(
-				right,
-				variables,
-				global_variables,
-				functions,
-				stack_size,
-				tmps_used,
-				tmps,
-			)?;
+			//FUNCTION CALL OPS DO NOT WORK ANY MORE AND ANYTHING REQUIRING THEM
+			// IS BROKEN. THIS IS THE FIRST THING THAT NEEDS FIXING BEFORE ANYTHING
+			// ELSE CAN BE DONE.
 			match statement {
-				StatementElement::Div { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("div rhs")));
-					instructions.append(&mut right_instructions);
-					instructions.push((Instruction::PSHA, Some("div lhs")));
-					instructions.push((
-						Instruction::JSR(Addressing::Label("__div__".to_string())),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
-				}
-				StatementElement::Mod { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("mod rhs")));
-					instructions.append(&mut right_instructions);
-					instructions.push((Instruction::PSHA, Some("mod lhs")));
-					instructions.push((
-						Instruction::JSR(Addressing::Label("__mod__".to_string())),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(2)), None));
-				}
+				StatementElement::Div { rhs: _, lhs: _ } => todo!(),
+				StatementElement::Mod { rhs: _, lhs: _ } => todo!(),
 				StatementElement::GreaterThan { rhs: _, lhs: _ }
 				| StatementElement::LessThan { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs")));
-					instructions.append(&mut right_instructions);
+					*tmps_used += 1;
+					instructions.append(&mut compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size + 1, //Plus one to take the PSHA above into account
+						tmps_used,
+					)?);
+					*tmps_used -= 1;
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
 						None,
@@ -458,7 +487,16 @@ fn compile_statement_inner<'a>(
 				StatementElement::LessThanEqual { rhs: _, lhs: _ }
 				| StatementElement::GreaterThanEqual { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs")));
-					instructions.append(&mut right_instructions);
+					*tmps_used += 1;
+					instructions.append(&mut compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size + 1,
+						tmps_used,
+					)?);
+					*tmps_used -= 1;
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
 						None,
@@ -467,9 +505,18 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::COMA, None));
 				}
 				_ => {
+					let mut right_instructions = compile_statement_inner(
+						right,
+						variables,
+						global_variables,
+						functions,
+						stack_size,
+						tmps_used,
+					)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
+						assert!(instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
@@ -479,8 +526,6 @@ fn compile_statement_inner<'a>(
 					}
 				}
 			}
-
-			*tmps_used -= 1;
 			instructions
 		}
 
@@ -516,17 +561,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Var(name) => {
-			let adr = if let Some((_, adr)) = variables.get(name) {
-				Addressing::SP(*stack_size + tmps - *adr)
-			} else if let Some((_, adr)) = global_variables.get(name) {
-				Addressing::Adr(*adr)
-			} else {
-				eprintln!("Error: {}", name);
-				return Err(CompileError(
-					line!(),
-					"Name resolution failed? Shouldn't be checked by now?",
-				));
-			};
+			let adr = adr_for_name(name, variables, global_variables, stack_size)?;
 			vec![(Instruction::LDA(adr), Some(*name))]
 		}
 
@@ -544,7 +579,8 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::Array(arr) => {
 			//TODO: Make sure it only occurs in variable declaration
-			let mut vec = Vec::new();
+			todo!()
+			/*let mut vec = Vec::new();
 			for element in arr.iter() {
 				let mut instructions = compile_statement_inner(
 					element,
@@ -559,28 +595,17 @@ fn compile_statement_inner<'a>(
 				vec.append(&mut instructions);
 				vec.push((Instruction::PSHA, None));
 			}
-			vec
+			vec*/
 		}
 
 		StatementElement::Deref(adr) => {
-			todo!("Check addressing offset");
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
 					&StatementElement::Add { lhs: _, rhs: _ },
 					Some((&StatementElement::Var(name), &StatementElement::Num(offset))),
 				) => {
-					let adr = if let Some((_, adr)) = variables.get(name) {
-						Addressing::SP(*stack_size + tmps - *adr)
-					} else if let Some((_, adr)) = global_variables.get(name) {
-						Addressing::Adr(*adr)
-					} else {
-						eprintln!("Error: {}", name);
-						return Err(CompileError(
-							line!(),
-							"Name resolution failed? Shouldn't be checked by now?",
-						));
-					};
+					let adr = adr_for_name(name, variables, global_variables, stack_size)?;
 					vec![
 						(Instruction::LDY(adr), Some(name)),
 						(Instruction::LDA(Addressing::Yn(offset)), None),
@@ -591,17 +616,7 @@ fn compile_statement_inner<'a>(
 					&StatementElement::Add { lhs: _, rhs: _ },
 					Some((&StatementElement::Var(name), rhs)),
 				) => {
-					let adr = if let Some((_, adr)) = variables.get(name) {
-						Addressing::SP(*stack_size + tmps - *adr)
-					} else if let Some((_, adr)) = global_variables.get(name) {
-						Addressing::Adr(*adr)
-					} else {
-						eprintln!("Error: {}", name);
-						return Err(CompileError(
-							line!(),
-							"Name resolution failed? Shouldn't be checked by now?",
-						));
-					};
+					let adr = adr_for_name(name, variables, global_variables, stack_size)?;
 					let mut statement =
 						compile_statement(rhs, variables, global_variables, functions, stack_size)?;
 					statement.append(&mut vec![
@@ -619,7 +634,6 @@ fn compile_statement_inner<'a>(
 						functions,
 						stack_size,
 						tmps_used,
-						tmps,
 					)?;
 					instructions.push((
 						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
@@ -637,21 +651,37 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::AdrOf(name) => {
 			todo!("Check addressing offset");
-			if let Some((_, adr)) = variables.get(name) {
-				vec![(
-					Instruction::LDA(Addressing::Data(*stack_size + tmps - adr)),
-					Some(*name),
-				)]
-			} else {
-				dbg!(name);
-				return Err(CompileError(
-					line!(),
-					"Name resolution failed? Shouldn't it've been checked by now?",
-				));
-			}
+			//use adr_for_name and calculate the address -> A
 		}
 
 		StatementElement::Not { lhs: _ } => unimplemented!(),
 	};
 	Ok(instructions)
+}
+
+fn adr_for_name<'a>(
+	name: &'a str,
+	variables: &HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, (Type, isize)>,
+	stack_size: isize,
+) -> Result<Addressing, CompileError> {
+	//dbg!(variables);
+	if let Some((_, adr)) = variables.get(name) {
+		eprintln!(
+			"{}: adr_for_name (stack:) {} - (from_bottom:) {} = {}",
+			name,
+			stack_size,
+			adr,
+			(stack_size - *adr - 1)
+		);
+		Ok(Addressing::SP(stack_size - *adr - 1))
+	} else if let Some((_, adr)) = global_variables.get(name) {
+		Ok(Addressing::Adr(*adr))
+	} else {
+		eprintln!("Error: {}", name);
+		Err(CompileError(
+			line!(),
+			"Name resolution failed? Shouldn't be checked by now?",
+		))
+	}
 }
