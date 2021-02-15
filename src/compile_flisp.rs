@@ -292,23 +292,23 @@ fn compile_statement<'a>(
 	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let depth = statement.depth() as isize - 1;
+	let tmps = statement.depth() as isize - 2; //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
 		global_variables,
 		functions,
-		stack_size + depth,
+		stack_size + tmps,
 		&mut 0,
 	)?;
-	if depth != 0 {
+	if tmps > 0 {
 		let mut block = vec![(
-			Instruction::LEASP(Addressing::SP(-depth)),
+			Instruction::LEASP(Addressing::SP(-tmps)),
 			Some("Reserving memory for statement"),
 		)];
 		block.append(&mut statement_instructions);
 		block.append(&mut vec![(
-			Instruction::LEASP(Addressing::SP(depth)), //why not -1?
+			Instruction::LEASP(Addressing::SP(tmps)), //why not -1?
 			Some("Clearing memory for statement"),
 		)]);
 		statement_instructions = block;
@@ -393,6 +393,7 @@ fn compile_statement_inner<'a>(
 				}
 				//default:
 				_ => {
+					*tmps_used += 1;
 					let mut right_instructions = compile_statement_inner(
 						right,
 						variables,
@@ -401,6 +402,7 @@ fn compile_statement_inner<'a>(
 						stack_size,
 						tmps_used,
 					)?;
+					*tmps_used -= 1;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
@@ -474,6 +476,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::COMA, None));
 				}
 				_ => {
+					*tmps_used += 1;
 					let mut right_instructions = compile_statement_inner(
 						right,
 						variables,
@@ -482,6 +485,7 @@ fn compile_statement_inner<'a>(
 						stack_size,
 						tmps_used,
 					)?;
+					*tmps_used -= 1;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {

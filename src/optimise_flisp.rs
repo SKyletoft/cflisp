@@ -199,6 +199,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+//Needs complete rewrite
 fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 	//Loop over instructions and check if there are no write
 	// (to memory, not registers) operations between reserve
