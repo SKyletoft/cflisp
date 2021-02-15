@@ -566,6 +566,7 @@ fn do_operation<'a>(
 		let right = tokens.remove(idx + 1);
 		let left = tokens.remove(idx - 1);
 		if let (Parsed(lhs), Parsed(rhs)) = (right, left) {
+			//SOURCE OF THE FLIPPED LEFT RIGHT BUG. FIX?
 			//The removal of the left item offset the index by one
 			tokens[idx - 1] = Parsed(op_to(lhs, rhs));
 		} else {
@@ -580,7 +581,6 @@ fn do_operation<'a>(
 }
 
 pub(crate) fn move_declarations_first(block: &mut Block) {
-	return;
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,

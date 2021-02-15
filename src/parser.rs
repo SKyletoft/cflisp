@@ -10,7 +10,8 @@ fn construct_block<'a>(tokens: &[Token<'a>]) -> Result<Vec<LanguageElement<'a>>,
 	for token in split_token_lines(tokens) {
 		res.push(construct_structure_from_tokens(token)?);
 	}
-	statement_element::move_declarations_first(&mut res);
+	//Only use when not Flag::debug?
+	//statement_element::move_declarations_first(&mut res);
 	Ok(res)
 }
 
@@ -31,7 +32,7 @@ fn construct_structure_from_tokens<'a>(
 				}
 			}
 
-			//Function declaration?
+			//Function declaration
 			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
 				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
@@ -44,7 +45,7 @@ fn construct_structure_from_tokens<'a>(
 				}
 			}
 
-			//Pointer variabler declaration
+			//Pointer variable declaration
 			[Decl(t), Deref(d), Assign, ..] => {
 				let mut typ = t.clone();
 				let mut r = d;
