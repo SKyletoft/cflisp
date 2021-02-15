@@ -42,7 +42,6 @@ fn compile_elements<'a>(
 			stack_base,
 			i,
 		)?;
-		eprintln!("{}: {}", scope_name, &stack_size);
 		if optimise {
 			optimise_flisp::all_optimisations(line);
 		}
@@ -178,11 +177,6 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
-			eprintln!(
-				"IF STATEMENT: Stack: {}, vars: {}",
-				stack_size,
-				variables.len()
-			);
 			let line_id_str = line_id.to_string();
 			let then_str = "if_then_".to_string() + scope_name + "_" + &line_id_str;
 			let else_str = "if_else_".to_string() + scope_name + "_" + &line_id_str;
@@ -196,7 +190,6 @@ fn compile_element<'a>(
 			)?;
 			cond.push((Instruction::TSTA, None));
 			let mut then_stack = *stack_size;
-			//dbg!(&cond);
 			let mut then_block = compile_elements(
 				then,
 				&mut variables.clone(),
@@ -300,7 +293,6 @@ fn compile_statement<'a>(
 	stack_size: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let depth = statement.depth() as isize - 1;
-	eprintln!("compile_statement: {} {}", stack_size, depth);
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
@@ -357,20 +349,23 @@ fn compile_statement_inner<'a>(
 				stack_size,
 				tmps_used,
 			)?;
-			//let mut right_instructions = ;
+			let mut right_instructions_plus_one = || {
+				*tmps_used += 1;
+				let res = compile_statement_inner(
+					right,
+					variables,
+					global_variables,
+					functions,
+					stack_size + 1, //Plus one to take the PSHAs into account
+					tmps_used,
+				);
+				*tmps_used -= 1;
+				res
+			};
 			match statement {
 				StatementElement::Mul { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("mul rhs")));
-					*tmps_used += 1;
-					instructions.append(&mut compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size + 1, //Plus one to take the PSHA above into account
-						tmps_used,
-					)?);
-					*tmps_used -= 1;
+					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__mul__".to_string())),
 						None,
@@ -379,16 +374,7 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::Cmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs")));
-					*tmps_used += 1;
-					instructions.append(&mut compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size + 1,
-						tmps_used,
-					)?);
-					*tmps_used -= 1;
+					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
 						None,
@@ -397,16 +383,7 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::NotCmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs")));
-					*tmps_used += 1;
-					instructions.append(&mut compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size + 1,
-						tmps_used,
-					)?);
-					*tmps_used -= 1;
+					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
 						None,
@@ -459,25 +436,26 @@ fn compile_statement_inner<'a>(
 				stack_size,
 				tmps_used,
 			)?;
-			//FUNCTION CALL OPS DO NOT WORK ANY MORE AND ANYTHING REQUIRING THEM
-			// IS BROKEN. THIS IS THE FIRST THING THAT NEEDS FIXING BEFORE ANYTHING
-			// ELSE CAN BE DONE.
+			let mut right_instructions_plus_one = || {
+				*tmps_used += 1;
+				let res = compile_statement_inner(
+					right,
+					variables,
+					global_variables,
+					functions,
+					stack_size + 1, //Plus one to take the PSHAs into account
+					tmps_used,
+				);
+				*tmps_used -= 1;
+				res
+			};
 			match statement {
 				StatementElement::Div { rhs: _, lhs: _ } => todo!(),
 				StatementElement::Mod { rhs: _, lhs: _ } => todo!(),
 				StatementElement::GreaterThan { rhs: _, lhs: _ }
 				| StatementElement::LessThan { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs")));
-					*tmps_used += 1;
-					instructions.append(&mut compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size + 1, //Plus one to take the PSHA above into account
-						tmps_used,
-					)?);
-					*tmps_used -= 1;
+					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
 						None,
@@ -487,16 +465,7 @@ fn compile_statement_inner<'a>(
 				StatementElement::LessThanEqual { rhs: _, lhs: _ }
 				| StatementElement::GreaterThanEqual { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs")));
-					*tmps_used += 1;
-					instructions.append(&mut compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size + 1,
-						tmps_used,
-					)?);
-					*tmps_used -= 1;
+					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
 						None,
@@ -667,13 +636,6 @@ fn adr_for_name<'a>(
 ) -> Result<Addressing, CompileError> {
 	//dbg!(variables);
 	if let Some((_, adr)) = variables.get(name) {
-		eprintln!(
-			"{}: adr_for_name (stack:) {} - (from_bottom:) {} = {}",
-			name,
-			stack_size,
-			adr,
-			(stack_size - *adr - 1)
-		);
 		Ok(Addressing::SP(stack_size - *adr - 1))
 	} else if let Some((_, adr)) = global_variables.get(name) {
 		Ok(Addressing::Adr(*adr))

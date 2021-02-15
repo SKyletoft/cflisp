@@ -580,7 +580,6 @@ fn do_operation<'a>(
 }
 
 pub(crate) fn move_declarations_first(block: &mut Block) {
-	return;
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,

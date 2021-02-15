@@ -9,7 +9,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	load_a(instructions);
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
-	//reduce_reserves(instructions);
+	reduce_reserves(instructions);
 	cmp_eq_jmp(instructions);
 	cmp_neq_jmp(instructions);
 	cmp_gt_jmp(instructions);
@@ -231,7 +231,7 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 			| (Instruction::PSHA, _)
 			| (Instruction::PULA, _)
 			| (Instruction::JSR(_), _) => {
-				memory_touched = false;
+				memory_touched = true;
 			}
 			_ => {}
 		}
