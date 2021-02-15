@@ -292,14 +292,15 @@ fn compile_statement<'a>(
 	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let tmps = statement.depth() as isize - 2; //Minus 2 because bottom is value and ops keep one value in memory
+	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
 		statement,
 		variables,
 		global_variables,
 		functions,
 		stack_size + tmps,
-		&mut 0,
+		&mut tmps.clone(), //Will start by -1.
+		                   // Counts down so that positions closest to the stack are used first which helps optimisation to save memory
 	)?;
 	if tmps > 0 {
 		let mut block = vec![(
@@ -350,7 +351,7 @@ fn compile_statement_inner<'a>(
 				tmps_used,
 			)?;
 			let mut right_instructions_plus_one = || {
-				*tmps_used += 1;
+				*tmps_used -= 1;
 				let res = compile_statement_inner(
 					right,
 					variables,
@@ -359,7 +360,7 @@ fn compile_statement_inner<'a>(
 					stack_size + 1, //Plus one to take the PSHAs into account
 					tmps_used,
 				);
-				*tmps_used -= 1;
+				*tmps_used += 1;
 				res
 			};
 			match statement {
@@ -393,7 +394,7 @@ fn compile_statement_inner<'a>(
 				}
 				//default:
 				_ => {
-					*tmps_used += 1;
+					*tmps_used -= 1;
 					let mut right_instructions = compile_statement_inner(
 						right,
 						variables,
@@ -402,7 +403,6 @@ fn compile_statement_inner<'a>(
 						stack_size,
 						tmps_used,
 					)?;
-					*tmps_used -= 1;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
@@ -414,6 +414,7 @@ fn compile_statement_inner<'a>(
 							None,
 						));
 					}
+					*tmps_used += 1;
 				}
 			}
 
@@ -439,7 +440,7 @@ fn compile_statement_inner<'a>(
 				tmps_used,
 			)?;
 			let mut right_instructions_plus_one = || {
-				*tmps_used += 1;
+				*tmps_used -= 1;
 				let res = compile_statement_inner(
 					right,
 					variables,
@@ -448,7 +449,7 @@ fn compile_statement_inner<'a>(
 					stack_size + 1, //Plus one to take the PSHAs into account
 					tmps_used,
 				);
-				*tmps_used -= 1;
+				*tmps_used += 1;
 				res
 			};
 			match statement {
@@ -476,7 +477,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::COMA, None));
 				}
 				_ => {
-					*tmps_used += 1;
+					*tmps_used -= 1;
 					let mut right_instructions = compile_statement_inner(
 						right,
 						variables,
@@ -485,7 +486,6 @@ fn compile_statement_inner<'a>(
 						stack_size,
 						tmps_used,
 					)?;
-					*tmps_used -= 1;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
@@ -497,6 +497,7 @@ fn compile_statement_inner<'a>(
 							None,
 						));
 					}
+					*tmps_used += 1;
 				}
 			}
 			instructions
@@ -638,7 +639,6 @@ fn adr_for_name<'a>(
 	global_variables: &HashMap<&'a str, (Type, isize)>,
 	stack_size: isize,
 ) -> Result<Addressing, CompileError> {
-	//dbg!(variables);
 	if let Some((_, adr)) = variables.get(name) {
 		Ok(Addressing::SP(stack_size - *adr - 1))
 	} else if let Some((_, adr)) = global_variables.get(name) {

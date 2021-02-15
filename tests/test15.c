@@ -17,7 +17,13 @@ int main() {
 	int g = f + 6;
 	int h = g + 7;
 
+	h;
+	a;
+
 	int foo = ((a + b) + (c + d)) + ((e + f) + (g + h));
-	*0xfc   = foo;
+	*0xFC   = foo;
+
+	int bar = a + b + c + d + e + f + g + h;
+	*0xFB   = bar;
 	// printf("0x%X\n", foo);
 }
