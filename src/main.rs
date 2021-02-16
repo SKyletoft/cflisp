@@ -42,7 +42,7 @@ fn main() {
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
-	let parsed = parser::parse(&source).expect("Parse error");
+	let parsed = parser::parse(&source, !flags.debug).expect("Parse error");
 	if flags.type_check {
 		let ok = parser::type_check(&parsed, &[], &[]).expect("Name error");
 		if !ok {

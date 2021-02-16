@@ -1,29 +1,37 @@
 use crate::*;
 
-pub(crate) fn parse<'a>(source: &'a str) -> Result<Vec<LanguageElement<'a>>, ParseError> {
+pub(crate) fn parse<'a>(
+	source: &'a str,
+	move_first: bool,
+) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
-	construct_block(&tokens)
+	construct_block(&tokens, move_first)
 }
 
-fn construct_block<'a>(tokens: &[Token<'a>]) -> Result<Vec<LanguageElement<'a>>, ParseError> {
+fn construct_block<'a>(
+	tokens: &[Token<'a>],
+	move_first: bool,
+) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let mut res = Vec::new();
 	for token in split_token_lines(tokens) {
-		res.push(construct_structure_from_tokens(token)?);
+		res.push(construct_structure_from_tokens(token, move_first)?);
 	}
-	//Only use when not Flag::debug?
-	//statement_element::move_declarations_first(&mut res);
+	if move_first {
+		statement_element::move_declarations_first(&mut res);
+	}
 	Ok(res)
 }
 
 fn construct_structure_from_tokens<'a>(
 	tokens: &[Token<'a>],
+	move_first: bool,
 ) -> Result<LanguageElement<'a>, ParseError> {
 	let element = {
 		match tokens {
 			//Function declaration
 			[Decl(t), Token::Name(n), Args(args), UnparsedBlock(code)] => {
 				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
-				let code_parsed = construct_block(&code_tokenised)?;
+				let code_parsed = construct_block(&code_tokenised, move_first)?;
 				LanguageElement::FunctionDeclaration {
 					typ: t.clone(),
 					name: *n,
@@ -36,7 +44,7 @@ fn construct_structure_from_tokens<'a>(
 			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
 				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
 				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
-				let code_parsed = construct_block(&code_tokenised)?;
+				let code_parsed = construct_block(&code_tokenised, move_first)?;
 				LanguageElement::FunctionDeclaration {
 					typ: t.clone(),
 					name: *n,
@@ -121,9 +129,9 @@ fn construct_structure_from_tokens<'a>(
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(then_code))?;
+				let then_parsed = parse(helper::remove_parentheses(then_code), move_first)?;
 				let else_if_tokens = &tokens[4..];
-				let else_if_parsed = construct_structure_from_tokens(else_if_tokens)?;
+				let else_if_parsed = construct_structure_from_tokens(else_if_tokens, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -135,8 +143,8 @@ fn construct_structure_from_tokens<'a>(
 			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(then_code))?;
-				let else_parsed = parse(helper::remove_parentheses(else_code))?;
+				let then_parsed = parse(helper::remove_parentheses(then_code), move_first)?;
+				let else_parsed = parse(helper::remove_parentheses(else_code), move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -148,7 +156,7 @@ fn construct_structure_from_tokens<'a>(
 			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(code))?;
+				let then_parsed = parse(helper::remove_parentheses(code), move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -167,16 +175,16 @@ fn construct_structure_from_tokens<'a>(
 						"For loop didn't contain three sections!",
 					));
 				}
-				let mut init_vec = parse(split[0])?;
+				let mut init_vec = parse(split[0], move_first)?;
 				if init_vec.len() != 1 {
 					dbg!(init_vec);
 					return Err(ParseError(line!(), "For loop init failed"));
 				}
 				let init_parsed = init_vec.pop().expect("Above check failed?");
-				let post_vec = parse(split[2])?;
+				let post_vec = parse(split[2], move_first)?;
 				let condition = Token::parse_statement_tokens(UnparsedBlock(split[1]))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let body_parsed = parse(helper::remove_parentheses(code))?;
+				let body_parsed = parse(helper::remove_parentheses(code), move_first)?;
 
 				LanguageElement::For {
 					init: Box::new(init_parsed),
@@ -190,7 +198,7 @@ fn construct_structure_from_tokens<'a>(
 			[While, UnparsedBlock(cond), UnparsedBlock(code)] => {
 				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let body_parsed = parse(helper::remove_parentheses(code))?;
+				let body_parsed = parse(helper::remove_parentheses(code), move_first)?;
 				LanguageElement::While {
 					condition: condition_parsed,
 					body: body_parsed,
