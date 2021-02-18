@@ -406,7 +406,7 @@ fn compile_statement_inner<'a>(
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
 					} else {
-						assert!(instructions.len() >= 2);
+						assert!(right_instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((

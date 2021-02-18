@@ -8,4 +8,5 @@ int sum_to(int n) {
 
 int main() {
 	*0xFC = sum_to(10);
+	// printf("0x%X\n", sum_to(10));
 }

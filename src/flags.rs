@@ -14,9 +14,9 @@ pub(crate) struct Flags {
 	pub(crate) inline: bool,
 }
 
-impl<'a> FromIterator<&'a String> for Flags {
-	fn from_iter<T: IntoIterator<Item = &'a String>>(iter: T) -> Self {
-		let mut flags = Flags {
+impl Default for Flags {
+	fn default() -> Self {
+		Flags {
 			hex: false,
 			comments: true,
 			tree: false,
@@ -27,7 +27,13 @@ impl<'a> FromIterator<&'a String> for Flags {
 			optimise: false,
 			inline: false,
 			out: "out.sflisp".to_string(),
-		};
+		}
+	}
+}
+
+impl<'a> FromIterator<&'a String> for Flags {
+	fn from_iter<T: IntoIterator<Item = &'a String>>(iter: T) -> Self {
+		let mut flags = Flags::default();
 		let mut is_name = false;
 		for arg in iter {
 			if is_name {

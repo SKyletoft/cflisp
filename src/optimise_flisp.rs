@@ -1,15 +1,19 @@
 use crate::*;
-use std::collections::HashSet;
+use std::{cmp::Ordering, collections::HashSet};
 
+//Doesn't actually call all optimisations. It only calls those optimisations that
+// can be called on an independent code block. This excludes `remove_unused_labels`
+// and `repeat_rts`
 pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
+	remove_post_early_return_code(instructions);
 	load_xy(instructions);
 	repeat_xy(instructions);
-	nop(instructions);
 	repeat_load(instructions);
 	load_a(instructions);
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
 	reduce_reserves(instructions);
+	nop(instructions); //Should go AFTER reduce reserves
 	cmp_eq_jmp(instructions);
 	cmp_neq_jmp(instructions);
 	cmp_gt_jmp(instructions);
@@ -49,6 +53,21 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx + 2); //Order matters!
 			instructions.remove(idx + 1);
 		}
+		if let (
+			&(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
+			(Instruction::LDA(a_adr), a_comment),
+			(Instruction::STA(Addressing::Xn(0)), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			let a_comment = *a_comment;
+			let a_adr = a_adr.clone();
+			instructions[idx] = (Instruction::LDA(a_adr), a_comment);
+			instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
+			instructions.remove(idx + 2);
+		}
 		idx += 1;
 	}
 }
@@ -63,6 +82,19 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 				| ((Instruction::LDY(_), _), (Instruction::LDY(_), _))
 				| ((Instruction::LDSP(_), _), (Instruction::LDSP(_), _))
 				| ((Instruction::RTS, _), (Instruction::RTS, _))
+		) {
+			instructions.remove(idx);
+		}
+		idx += 1;
+	}
+}
+
+pub(crate) fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+		if matches!(
+			(&instructions[idx], &instructions[idx + 1]),
+			((Instruction::RTS, _), (Instruction::RTS, _))
 		) {
 			instructions.remove(idx);
 		}
@@ -195,48 +227,121 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 			instructions[idx] = (Instruction::LDX(Addressing::Data(0)), None);
 			instructions.remove(idx + 2);
 		}
+		if let ((Instruction::PSHA, _), (Instruction::LDA(Addressing::SP(0)), _)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			instructions.remove(idx + 1);
+		}
+		if let ((Instruction::LDA(_), _), (Instruction::LDA(adr), _)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			if !matches!(adr, Addressing::AX | Addressing::AY) {
+				instructions.remove(idx);
+			}
+		}
 		idx += 1;
 	}
 }
 
-//Needs complete rewrite
+//For each allocation, find how many unused bytes there are and reduce the allocation by that much.
+// Won't remove 0 size allocations, just run nop afterwards.
 fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
-	//Loop over instructions and check if there are no write
-	// (to memory, not registers) operations between reserve
-	// and clear and remove them if there are none
-	let mut idx = 0;
-	let mut start = usize::MAX;
-	let mut memory_touched = false;
+	//return;
+	let mut sp_stack: Vec<(usize, isize)> = Vec::new();
 
-	let mut edit_at = 0;
-	let mut depth = 0;
-
-	while idx < instructions.len() {
-		match instructions[idx] {
-			(Instruction::LEASP(_), Some("Reserving memory for statement")) => {
-				start = idx;
-				memory_touched = false;
-				depth += 1;
-				edit_at = depth;
+	for idx in 0..instructions.len() {
+		match instructions[idx].0 {
+			Instruction::LDSP(Addressing::SP(n)) => {
+				sp_stack.push((idx, n));
 			}
-			(Instruction::LEASP(_), Some("Clearing memory for statement")) => {
-				if !memory_touched && depth == edit_at {
-					instructions.remove(idx);
-					instructions.remove(start);
-					reduce_reserves(instructions);
-					return;
+			Instruction::Label(_)
+			| Instruction::JMP(_)
+			| Instruction::BNE(_)
+			| Instruction::BEQ(_)
+			| Instruction::BGT(_)
+			| Instruction::BLT(_) => {
+				sp_stack.clear();
+			}
+			Instruction::LEASP(Addressing::SP(n)) => {
+				match n.cmp(&&mut 0) {
+					Ordering::Equal => {}
+					Ordering::Less => {
+						sp_stack.push((idx, n));
+					}
+					Ordering::Greater => {
+						if let Some((sp_index, value)) = sp_stack.pop() {
+							if -value != n {
+								sp_stack.clear(); //Should hopefully skip to next reset by not hitting the pop?
+							}
+							let minimum_access = instructions
+								.iter_mut()
+								.skip(sp_index + 1)
+								.take(idx - sp_index)
+								.map(|(inst, _)| {
+									if let Some(Addressing::SP(n)) = inst.get_adr() {
+										*n
+									} else if matches!(inst, Instruction::JSR(_)) {
+										0
+									} else {
+										isize::MAX
+									}
+								})
+								.min()
+								.unwrap_or(isize::MAX);
+							if minimum_access > 0 {
+								if let Some(Addressing::SP(n)) =
+									instructions[sp_index].0.get_adr_mut()
+								{
+									*n += minimum_access
+								}
+								if let Some(Addressing::SP(n)) = instructions[idx].0.get_adr_mut() {
+									*n -= minimum_access
+								}
+								for (inst, _) in instructions
+									.iter_mut()
+									.skip(sp_index + 1)
+									.take(idx - sp_index - 1)
+								{
+									if let Some(Addressing::SP(adr)) = inst.get_adr_mut() {
+										*adr -= minimum_access + 1;
+									}
+								}
+							}
+						}
+					}
 				}
-				depth -= 1;
 			}
-			(Instruction::STA(_), _)
-			| (Instruction::PSHA, _)
-			| (Instruction::PULA, _)
-			| (Instruction::JSR(_), _) => {
-				memory_touched = true;
+			Instruction::PSHA => {
+				sp_stack.push((idx, -1));
+			}
+			Instruction::PULA => {}
+			Instruction::RTS => {}
+			Instruction::JSR(_) => {}
+			_ => {}
+		}
+	}
+}
+
+fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
+	let mut remove = false;
+	let mut idx = 0;
+	while idx < instructions.len() {
+		match instructions[idx].0 {
+			Instruction::RTS => {
+				remove = true;
+				idx += 1;
+				continue;
+			}
+			Instruction::Label(_) => {
+				remove = false;
 			}
 			_ => {}
 		}
-		idx += 1;
+		if remove {
+			instructions.remove(idx);
+		} else {
+			idx += 1;
+		}
 	}
 }
 
@@ -471,8 +576,8 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
-	return;
-	let jumps_to = instructions
+	//return;
+	let mut jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst {
 			Instruction::LDA(Addressing::Label(lbl))
@@ -499,9 +604,10 @@ pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>)
 			_ => None,
 		})
 		.collect::<HashSet<String>>();
+	jumps_to.insert("main".to_string());
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
-			!(jumps_to.contains(lbl) || lbl.starts_with("if"))
+			jumps_to.contains(lbl)
 		} else {
 			true
 		}

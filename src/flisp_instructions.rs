@@ -145,6 +145,76 @@ impl Instruction {
 			Instruction::Label(_) => 0,
 		}
 	}
+
+	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
+		match self {
+			Instruction::LDA(a)
+			| Instruction::LDX(a)
+			| Instruction::LDY(a)
+			| Instruction::LDSP(a)
+			| Instruction::ADDA(a)
+			| Instruction::SUBA(a)
+			| Instruction::ANDA(a)
+			| Instruction::ROLA(a)
+			| Instruction::RORA(a)
+			| Instruction::ORA(a)
+			| Instruction::EORA(a)
+			| Instruction::STA(a)
+			| Instruction::JMP(a)
+			| Instruction::BNE(a)
+			| Instruction::BEQ(a)
+			| Instruction::BGT(a)
+			| Instruction::BLT(a)
+			| Instruction::JSR(a)
+			| Instruction::CMPA(a)
+			| Instruction::INC(a)
+			| Instruction::DEC(a)
+			| Instruction::LEASP(a) => Some(a),
+			Instruction::PSHA
+			| Instruction::PULA
+			| Instruction::TSTA
+			| Instruction::INCA
+			| Instruction::DECA
+			| Instruction::COMA
+			| Instruction::RTS
+			| Instruction::Label(_) => None,
+		}
+	}
+
+	pub(crate) fn get_adr(&self) -> Option<&Addressing> {
+		match self {
+			Instruction::LDA(a)
+			| Instruction::LDX(a)
+			| Instruction::LDY(a)
+			| Instruction::LDSP(a)
+			| Instruction::ADDA(a)
+			| Instruction::SUBA(a)
+			| Instruction::ANDA(a)
+			| Instruction::ROLA(a)
+			| Instruction::RORA(a)
+			| Instruction::ORA(a)
+			| Instruction::EORA(a)
+			| Instruction::STA(a)
+			| Instruction::JMP(a)
+			| Instruction::BNE(a)
+			| Instruction::BEQ(a)
+			| Instruction::BGT(a)
+			| Instruction::BLT(a)
+			| Instruction::JSR(a)
+			| Instruction::CMPA(a)
+			| Instruction::INC(a)
+			| Instruction::DEC(a)
+			| Instruction::LEASP(a) => Some(a),
+			Instruction::PSHA
+			| Instruction::PULA
+			| Instruction::TSTA
+			| Instruction::INCA
+			| Instruction::DECA
+			| Instruction::COMA
+			| Instruction::RTS
+			| Instruction::Label(_) => None,
+		}
+	}
 }
 
 #[allow(clippy::upper_case_acronyms, dead_code)]
