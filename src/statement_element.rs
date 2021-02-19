@@ -127,30 +127,22 @@ impl<'a> StatementElement<'a> {
 
 	pub(crate) fn depth(&self) -> usize {
 		let rest = match self {
-			StatementElement::Add { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Sub { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Mul { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Div { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Mod { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::LShift { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::RShift { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::And { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Or { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Xor { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::GreaterThan { lhs, rhs } => {
-				lhs.as_ref().depth().max(rhs.as_ref().depth())
-			}
-			StatementElement::LessThan { lhs, rhs } => {
-				lhs.as_ref().depth().max(rhs.as_ref().depth())
-			}
-			StatementElement::GreaterThanEqual { lhs, rhs } => {
-				lhs.as_ref().depth().max(rhs.as_ref().depth())
-			}
-			StatementElement::LessThanEqual { lhs, rhs } => {
-				lhs.as_ref().depth().max(rhs.as_ref().depth())
-			}
-			StatementElement::Cmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StatementElement::Add { lhs, rhs }
+			| StatementElement::Sub { lhs, rhs }
+			| StatementElement::Mul { lhs, rhs }
+			| StatementElement::Div { lhs, rhs }
+			| StatementElement::Mod { lhs, rhs }
+			| StatementElement::LShift { lhs, rhs }
+			| StatementElement::RShift { lhs, rhs }
+			| StatementElement::And { lhs, rhs }
+			| StatementElement::Or { lhs, rhs }
+			| StatementElement::Xor { lhs, rhs }
+			| StatementElement::GreaterThan { lhs, rhs }
+			| StatementElement::LessThan { lhs, rhs }
+			| StatementElement::GreaterThanEqual { lhs, rhs }
+			| StatementElement::LessThanEqual { lhs, rhs }
+			| StatementElement::Cmp { lhs, rhs }
+			| StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
 			StatementElement::Not { lhs } => lhs.as_ref().depth(),
 			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElement::Deref(n) => n.as_ref().depth(),
@@ -162,7 +154,7 @@ impl<'a> StatementElement<'a> {
 			StatementElement::FunctionCall {
 				name: _,
 				parametres: _,
-			} => 0, //Each parametre is its own memory alloc
+			} => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
 		};
 		rest + 1
 	}

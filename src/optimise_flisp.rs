@@ -274,13 +274,14 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 								sp_stack.clear(); //Should hopefully skip to next reset by not hitting the pop?
 							}
 							let minimum_access = instructions
-								.iter_mut()
+								.iter()
 								.skip(sp_index + 1)
 								.take(idx - sp_index)
 								.map(|(inst, _)| {
 									if let Some(Addressing::SP(n)) = inst.get_adr() {
 										*n
 									} else if matches!(inst, Instruction::JSR(_)) {
+										//TEST WITHOUT ^
 										0
 									} else {
 										isize::MAX
@@ -449,7 +450,11 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 				idx += 1;
 				continue;
 			}
-			let lhs = lhs.clone();
+			let lhs = if let Addressing::SP(n) = lhs {
+				Addressing::SP(n - 1) //We're removing a PSHA
+			} else {
+				lhs.clone()
+			};
 			let lhs_comment = *lhs_comment;
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
@@ -487,7 +492,11 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 				idx += 1;
 				continue;
 			}
-			let lhs = lhs.clone();
+			let lhs = if let Addressing::SP(n) = lhs {
+				Addressing::SP(n - 1) //We're removing a PSHA
+			} else {
+				lhs.clone()
+			};
 			let lhs_comment = *lhs_comment;
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
 			instructions.remove(idx + 6);
@@ -522,7 +531,11 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 				idx += 1;
 				continue;
 			}
-			let lhs = lhs.clone();
+			let lhs = if let Addressing::SP(n) = lhs {
+				Addressing::SP(n - 1) //We're removing a PSHA
+			} else {
+				lhs.clone()
+			};
 			let lhs_comment = *lhs_comment;
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
@@ -560,7 +573,11 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 				idx += 1;
 				continue;
 			}
-			let lhs = lhs.clone();
+			let lhs = if let Addressing::SP(n) = lhs {
+				Addressing::SP(n - 1) //We're removing a PSHA
+			} else {
+				lhs.clone()
+			};
 			let lhs_comment = *lhs_comment;
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
