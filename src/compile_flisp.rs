@@ -678,9 +678,11 @@ fn compile_statement_inner<'a>(
 					]
 				}
 				Addressing::Adr(n) => vec![(Instruction::LDA(Addressing::Data(n)), Some(*name))],
+				Addressing::Label(lbl) => {
+					vec![(Instruction::LDA(Addressing::DataLabel(lbl)), None)]
+				}
 				_ => return Err(CompileError(line!(), "Illegal access type")),
-			};
-			todo!("Check addressing offset");
+			}
 		}
 
 		StatementElement::Not { lhs: _ } => unimplemented!(),

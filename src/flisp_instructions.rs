@@ -76,7 +76,7 @@ impl fmt::Display for Instruction {
 			Instruction::FCB(bytes) => {
 				write!(f, "\tFCB\t")?;
 				for &val in bytes.iter().take(bytes.len() - 1) {
-					write!(f, "{:03}, ", val % 256)?;
+					write!(f, "{:03},", val % 256)?;
 				}
 				write!(f, "{:03}", bytes[bytes.len() - 1] % 256)
 			}
@@ -120,7 +120,7 @@ impl fmt::UpperHex for Instruction {
 			Instruction::FCB(bytes) => {
 				write!(f, "\tFCB\t")?;
 				for &val in bytes.iter().take(bytes.len() - 1) {
-					write!(f, "${:02X}, ", val % 256)?;
+					write!(f, "${:02X},", val % 256)?;
 				}
 				write!(f, "${:02X}", bytes[bytes.len() - 1])
 			}
@@ -249,6 +249,7 @@ pub(crate) enum Addressing {
 	Xn(isize),
 	Yn(isize),
 	Label(String),
+	DataLabel(String),
 	AX,
 	AY,
 }
@@ -260,7 +261,8 @@ impl Addressing {
 			| Addressing::Adr(_)
 			| Addressing::SP(_)
 			| Addressing::Xn(_)
-			| Addressing::Yn(_) => 1,
+			| Addressing::Yn(_)
+			| Addressing::DataLabel(_) => 1,
 			Addressing::Label(_) | Addressing::AX | Addressing::AY => 0,
 		}
 	}
@@ -276,6 +278,7 @@ impl fmt::Display for Addressing {
 			Addressing::Xn(d) => write!(f, "{:03},X", *d % 256),
 			Addressing::Yn(d) => write!(f, "{:03},Y", *d % 256),
 			Addressing::Label(l) => write!(f, "{}", l),
+			Addressing::DataLabel(l) => write!(f, "#{}", l),
 			Addressing::AX => write!(f, "A,X"),
 			Addressing::AY => write!(f, "A,Y"),
 		}
@@ -291,6 +294,7 @@ impl fmt::UpperHex for Addressing {
 			Addressing::Xn(d) => write!(f, "${:02X},X", *d as u8),
 			Addressing::Yn(d) => write!(f, "${:02X},Y", *d as u8),
 			Addressing::Label(l) => write!(f, "{}", l),
+			Addressing::DataLabel(l) => write!(f, "#{}", l),
 			Addressing::AX => write!(f, "A,X"),
 			Addressing::AY => write!(f, "A,Y"),
 		}
