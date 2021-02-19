@@ -17,6 +17,7 @@ pub(crate) enum Instruction {
 	ORA(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
+	STSP(Addressing),
 	JMP(Addressing),
 	BNE(Addressing),
 	BEQ(Addressing),
@@ -35,6 +36,7 @@ pub(crate) enum Instruction {
 	RTS,
 	JSR(Addressing),
 	Label(String),
+	FCB(Vec<isize>),
 }
 
 impl fmt::Display for Instruction {
@@ -52,6 +54,7 @@ impl fmt::Display for Instruction {
 			Instruction::ORA(a) => write!(f, "\tORA\t{}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{}", *a),
+			Instruction::STSP(a) => write!(f, "\tSTSP\t{}", *a),
 			Instruction::JMP(a) => write!(f, "\tJMP\t{}", *a),
 			Instruction::BNE(a) => write!(f, "\tBNE\t{}", *a),
 			Instruction::BEQ(a) => write!(f, "\tBEQ\t{}", *a),
@@ -70,6 +73,13 @@ impl fmt::Display for Instruction {
 			Instruction::COMA => write!(f, "\tCOMA\t"),
 			Instruction::RTS => write!(f, "\tRTS\t"),
 			Instruction::Label(l) => write!(f, "{}", l),
+			Instruction::FCB(bytes) => {
+				write!(f, "\tFCB\t")?;
+				for &val in bytes.iter().take(bytes.len() - 1) {
+					write!(f, "{:03}, ", val % 256)?;
+				}
+				write!(f, "{:03}", bytes[bytes.len() - 1] % 256)
+			}
 		}
 	}
 }
@@ -88,6 +98,7 @@ impl fmt::UpperHex for Instruction {
 			Instruction::ORA(a) => write!(f, "\tORA\t{:X}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{:X}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{:X}", *a),
+			Instruction::STSP(a) => write!(f, "\tSTSP\t{:X}", *a),
 			Instruction::JMP(a) => write!(f, "\tJMP\t{:X}", *a),
 			Instruction::BNE(a) => write!(f, "\tBNE\t{:X}", *a),
 			Instruction::BEQ(a) => write!(f, "\tBEQ\t{:X}", *a),
@@ -106,6 +117,13 @@ impl fmt::UpperHex for Instruction {
 			Instruction::COMA => write!(f, "\tCOMA\t"),
 			Instruction::RTS => write!(f, "\tRTS\t"),
 			Instruction::Label(l) => write!(f, "{}", l),
+			Instruction::FCB(bytes) => {
+				write!(f, "\tFCB\t")?;
+				for &val in bytes.iter().take(bytes.len() - 1) {
+					write!(f, "${:02X}, ", val % 256)?;
+				}
+				write!(f, "${:02X}", bytes[bytes.len() - 1])
+			}
 		}
 	}
 }
@@ -125,6 +143,7 @@ impl Instruction {
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
+			| Instruction::STSP(a)
 			| Instruction::JMP(a)
 			| Instruction::BNE(a)
 			| Instruction::BEQ(a)
@@ -142,7 +161,7 @@ impl Instruction {
 			| Instruction::DECA
 			| Instruction::COMA
 			| Instruction::RTS => 1,
-			Instruction::Label(_) => 0,
+			Instruction::FCB(_) | Instruction::Label(_) => 0,
 		}
 	}
 
@@ -160,6 +179,7 @@ impl Instruction {
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
+			| Instruction::STSP(a)
 			| Instruction::JMP(a)
 			| Instruction::BNE(a)
 			| Instruction::BEQ(a)
@@ -177,6 +197,7 @@ impl Instruction {
 			| Instruction::DECA
 			| Instruction::COMA
 			| Instruction::RTS
+			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,
 		}
 	}
@@ -195,6 +216,7 @@ impl Instruction {
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
+			| Instruction::STSP(a)
 			| Instruction::JMP(a)
 			| Instruction::BNE(a)
 			| Instruction::BEQ(a)
@@ -212,6 +234,7 @@ impl Instruction {
 			| Instruction::DECA
 			| Instruction::COMA
 			| Instruction::RTS
+			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,
 		}
 	}

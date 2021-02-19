@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::*;
 
+///Technically illegal address for use in register -> register transfers
 const ABOVE_STACK_OFFSET: isize = -1;
 
 pub(crate) fn compile<'a>(
@@ -23,7 +24,7 @@ pub(crate) fn compile<'a>(
 fn compile_elements<'a>(
 	block: &'a [LanguageElement],
 	variables: &mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &mut HashMap<&'a str, Type>,
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
 	stack_size: &mut isize,
@@ -53,7 +54,7 @@ fn compile_elements<'a>(
 fn compile_element<'a>(
 	element: &'a LanguageElement,
 	variables: &mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &mut HashMap<&'a str, Type>,
 	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
 	scope_name: &str,
 	stack_size: &mut isize,
@@ -67,12 +68,15 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				global_variables.insert(*name, (typ.clone(), *stack_size));
+				global_variables.insert(*name, typ.clone());
 				vec![]
 			} else {
 				if variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(line!(), "Name already exists in scope!"));
+					return Err(CompileError(
+						line!(),
+						"Name already exists in scope! (No shadowing)",
+					));
 				}
 				variables.insert(*name, (typ.clone(), *stack_size));
 				*stack_size += 1;
@@ -92,21 +96,77 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
+			let global_def = |val: &StatementElement| match val {
+				StatementElement::Num(n) => Ok(*n),
+				StatementElement::Char(c) => Ok(*c as isize),
+				StatementElement::Bool(b) => Ok(*b as isize),
+				_ => Err(CompileError(
+					line!(),
+					"Non constant in array initialisation",
+				)),
+			};
 			if scope_name == "global" {
-				todo!();
-			} else {
-				if variables.contains_key(name) {
+				if global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				let stack_copy = *stack_size;
-				let mut statement =
-					compile_statement(value, variables, global_variables, functions, *stack_size)?;
-				assert_eq!(*stack_size, stack_copy);
-				variables.insert(*name, (typ.clone(), *stack_size));
-				*stack_size += 1;
-				statement.push((Instruction::PSHA, Some(*name)));
-				statement
+				if let StatementElement::Array(elements) = value {
+					global_variables.insert(*name, typ.clone());
+					let values = elements
+						.iter()
+						.map(global_def)
+						.collect::<Result<Vec<isize>, CompileError>>()?;
+					vec![
+						(Instruction::Label(name.to_string()), None),
+						(Instruction::FCB(values), None),
+					]
+				} else {
+					global_variables.insert(*name, typ.clone());
+					vec![
+						(Instruction::Label(name.to_string()), None),
+						(Instruction::FCB(vec![global_def(value)?]), None),
+					]
+				}
+			} else {
+				if variables.contains_key(name) || global_variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(
+						line!(),
+						"Name already exists in scope! (No shadowing)",
+					));
+				}
+				if let StatementElement::Array(elements) = value {
+					let mut statement = Vec::new();
+					for element in elements {
+						let stack_copy = *stack_size;
+						statement.append(&mut compile_statement(
+							element,
+							variables,
+							global_variables,
+							functions,
+							*stack_size,
+						)?);
+						assert_eq!(*stack_size, stack_copy);
+						*stack_size += 1;
+						statement.push((Instruction::PSHA, Some(*name)));
+					}
+					variables.insert(*name, (typ.clone(), *stack_size));
+					statement
+				} else {
+					let stack_copy = *stack_size;
+					let mut statement = compile_statement(
+						value,
+						variables,
+						global_variables,
+						functions,
+						*stack_size,
+					)?;
+					assert_eq!(*stack_size, stack_copy);
+					variables.insert(*name, (typ.clone(), *stack_size));
+					*stack_size += 1;
+					statement.push((Instruction::PSHA, Some(*name)));
+					statement
+				}
 			}
 		}
 
@@ -288,7 +348,7 @@ fn compile_element<'a>(
 fn compile_statement<'a>(
 	statement: &'a StatementElement,
 	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, Type>,
 	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
@@ -321,7 +381,7 @@ fn compile_statement<'a>(
 fn compile_statement_inner<'a>(
 	statement: &'a StatementElement,
 	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, Type>,
 	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
 	stack_size: isize,
 	tmps_used: &mut isize,
@@ -551,26 +611,7 @@ fn compile_statement_inner<'a>(
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
 
-		StatementElement::Array(arr) => {
-			//TODO: Make sure it only occurs in variable declaration
-			todo!()
-			/*let mut vec = Vec::new();
-			for element in arr.iter() {
-				let mut instructions = compile_statement_inner(
-					element,
-					variables,
-					global_variables,
-					functions,
-					stack_size,
-					tmps_used,
-					tmps,
-				)?;
-				*stack_size += 1; //THINK THIS OVER. NOT SOUND
-				vec.append(&mut instructions);
-				vec.push((Instruction::PSHA, None));
-			}
-			vec*/
-		}
+		StatementElement::Array(_) => return Err(CompileError(line!(), "Illegal array")),
 
 		StatementElement::Deref(adr) => {
 			match (adr.as_ref(), adr.internal_ref()) {
@@ -624,8 +665,22 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::AdrOf(name) => {
-			todo!("Check addressing offset");
 			//use adr_for_name and calculate the address -> A
+			let adr = adr_for_name(name, variables, global_variables, stack_size)?;
+			match adr {
+				Addressing::SP(n) => {
+					vec![
+						(
+							Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)),
+							Some("SP -> Stack"),
+						),
+						(Instruction::ADDA(Addressing::SP(n)), Some(*name)),
+					]
+				}
+				Addressing::Adr(n) => vec![(Instruction::LDA(Addressing::Data(n)), Some(*name))],
+				_ => return Err(CompileError(line!(), "Illegal access type")),
+			};
+			todo!("Check addressing offset");
 		}
 
 		StatementElement::Not { lhs: _ } => unimplemented!(),
@@ -636,13 +691,13 @@ fn compile_statement_inner<'a>(
 fn adr_for_name<'a>(
 	name: &'a str,
 	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, (Type, isize)>,
+	global_variables: &HashMap<&'a str, Type>,
 	stack_size: isize,
 ) -> Result<Addressing, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {
 		Ok(Addressing::SP(stack_size - *adr - 1))
-	} else if let Some((_, adr)) = global_variables.get(name) {
-		Ok(Addressing::Adr(*adr))
+	} else if global_variables.contains_key(name) {
+		Ok(Addressing::Label(name.to_string()))
 	} else {
 		eprintln!("Error: {}", name);
 		Err(CompileError(

@@ -41,6 +41,7 @@ pub(crate) fn instructions_to_text(
 			output.push(' ');
 		}
 		if matches!((i, next), (Instruction::RTS, Instruction::Label(lbl)) if !(lbl.starts_with("if") || lbl.starts_with("for") || lbl.starts_with("while")))
+			|| matches!((i, next), (Instruction::FCB(_), Instruction::Label(_)))
 		{
 			output.push('\n');
 		}

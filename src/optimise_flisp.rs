@@ -600,7 +600,6 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
-	//return;
 	let mut jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst {

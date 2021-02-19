@@ -1,3 +1,5 @@
+#![feature(slice_as_chunks)]
+
 use std::{env, fmt, fs, path::PathBuf, process::exit};
 
 pub mod compile_flisp;
