@@ -1,9 +1,9 @@
 use crate::*;
 use std::{cmp::Ordering, collections::HashSet};
 
-//Doesn't actually call all optimisations. It only calls those optimisations that
-// can be called on an independent code block. This excludes `remove_unused_labels`
-// and `repeat_rts`
+///Doesn't actually call all optimisations. It only calls those optimisations that
+/// can be called on an independent code block. This excludes `remove_unused_labels`
+/// and `repeat_rts`
 pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	remove_post_early_return_code(instructions);
 	load_xy(instructions);
@@ -246,7 +246,6 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 //For each allocation, find how many unused bytes there are and reduce the allocation by that much.
 // Won't remove 0 size allocations, just run nop afterwards.
 fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
-	//return;
 	let mut sp_stack: Vec<(usize, isize)> = Vec::new();
 
 	for idx in 0..instructions.len() {
@@ -254,12 +253,15 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 			Instruction::LDSP(Addressing::SP(n)) => {
 				sp_stack.push((idx, n));
 			}
-			Instruction::Label(_)
+			Instruction::RTS
+			| Instruction::Label(_)
 			| Instruction::JMP(_)
 			| Instruction::BNE(_)
 			| Instruction::BEQ(_)
 			| Instruction::BGT(_)
 			| Instruction::BLT(_) => {
+				//Jump or jump target, new context. Some missed
+				// optimisations but massively reduced complexity
 				sp_stack.clear();
 			}
 			Instruction::LEASP(Addressing::SP(n)) => {
@@ -270,6 +272,10 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 					}
 					Ordering::Greater => {
 						if let Some((sp_index, value)) = sp_stack.pop() {
+							if matches!(instructions[sp_index], (Instruction::PSHA, _)) {
+								//We can't reduce allocation size of a PSHA, only LEASPs
+								continue;
+							}
 							if -value != n {
 								sp_stack.clear(); //Should hopefully skip to next reset by not hitting the pop?
 							}
@@ -280,32 +286,29 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 								.map(|(inst, _)| {
 									if let Some(Addressing::SP(n)) = inst.get_adr() {
 										*n
-									} else if matches!(inst, Instruction::JSR(_)) {
-										//TEST WITHOUT ^
-										0
 									} else {
 										isize::MAX
 									}
 								})
 								.min()
 								.unwrap_or(isize::MAX);
-							if minimum_access > 0 {
-								if let Some(Addressing::SP(n)) =
-									instructions[sp_index].0.get_adr_mut()
-								{
-									*n += minimum_access
-								}
-								if let Some(Addressing::SP(n)) = instructions[idx].0.get_adr_mut() {
-									*n -= minimum_access
-								}
-								for (inst, _) in instructions
-									.iter_mut()
-									.skip(sp_index + 1)
-									.take(idx - sp_index - 1)
-								{
-									if let Some(Addressing::SP(adr)) = inst.get_adr_mut() {
-										*adr -= minimum_access + 1;
-									}
+							if minimum_access <= 0 {
+								continue;
+							}
+							if let Some(Addressing::SP(n)) = instructions[sp_index].0.get_adr_mut()
+							{
+								*n += minimum_access
+							}
+							if let Some(Addressing::SP(n)) = instructions[idx].0.get_adr_mut() {
+								*n -= minimum_access
+							}
+							for (inst, _) in instructions
+								.iter_mut()
+								.skip(sp_index + 1)
+								.take(idx - sp_index - 1)
+							{
+								if let Some(Addressing::SP(adr)) = inst.get_adr_mut() {
+									*adr -= minimum_access + 1;
 								}
 							}
 						}
@@ -315,9 +318,13 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 			Instruction::PSHA => {
 				sp_stack.push((idx, -1));
 			}
-			Instruction::PULA => {}
-			Instruction::RTS => {}
-			Instruction::JSR(_) => {}
+			Instruction::PULA => {
+				if matches!(sp_stack.last(), Some((1, _))) {
+					sp_stack.pop();
+				} else {
+					panic!("Internal error: Where did the PULA even come from?");
+				}
+			}
 			_ => {}
 		}
 	}
