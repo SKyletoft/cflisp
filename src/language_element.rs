@@ -31,9 +31,9 @@ pub(crate) enum LanguageElement<'a> {
 		else_then: Option<Block<'a>>,
 	},
 	For {
-		init: Box<LanguageElement<'a>>,
+		init: Block<'a>,
 		condition: StatementElement<'a>,
-		after: Block<'a>,
+		post: Block<'a>,
 		body: Block<'a>,
 	},
 	While {

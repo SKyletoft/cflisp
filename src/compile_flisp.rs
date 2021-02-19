@@ -42,6 +42,7 @@ fn compile_elements<'a>(
 			stack_size,
 			stack_base,
 			i,
+			optimise,
 		)?;
 		if optimise {
 			optimise_flisp::all_optimisations(line);
@@ -60,6 +61,7 @@ fn compile_element<'a>(
 	stack_size: &mut isize,
 	stack_base: isize,
 	line_id: usize,
+	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
 		LanguageElement::VariableDeclaration { typ, name } => {
@@ -237,10 +239,9 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
-			let line_id_str = line_id.to_string();
-			let then_str = "if_then_".to_string() + scope_name + "_" + &line_id_str;
-			let else_str = "if_else_".to_string() + scope_name + "_" + &line_id_str;
-			let end_str = "if_end_".to_string() + scope_name + "_" + &line_id_str;
+			let then_str = format!("if_then_{}_{}", scope_name, line_id);
+			let else_str = format!("if_else_{}_{}", scope_name, line_id);
+			let end_str = format!("if_end_{}_{}", scope_name, line_id);
 			let mut cond = compile_statement(
 				condition,
 				variables,
@@ -297,11 +298,59 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::For {
-			init: _,
-			condition: _,
-			after: _,
-			body: _,
-		} => todo!(),
+			init,
+			condition,
+			post,
+			body,
+		} => {
+			let init_str = format!("for_init_{}_{}", scope_name, line_id);
+			let cond_str = format!("for_cond_{}_{}", scope_name, line_id);
+			let post_str = format!("for_post_{}_{}", scope_name, line_id);
+			let body_str = format!("for_body_{}_{}", scope_name, line_id);
+			let end_str = format!("for_end_{}_{}", scope_name, line_id);
+			let mut instructions = compile_elements(
+				init,
+				variables,
+				global_variables,
+				functions,
+				&init_str,
+				stack_size,
+				stack_base,
+				optimise,
+			)?;
+			instructions.push((Instruction::Label(cond_str), None));
+			instructions.append(&mut compile_statement(
+				condition,
+				variables,
+				global_variables,
+				functions,
+				*stack_size,
+			)?);
+			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+			instructions.append(&mut compile_elements(
+				body,
+				variables,
+				global_variables,
+				functions,
+				&body_str,
+				stack_size,
+				stack_base,
+				optimise,
+			)?);
+			instructions.append(&mut compile_elements(
+				post,
+				variables,
+				global_variables,
+				functions,
+				&post_str,
+				stack_size,
+				stack_base,
+				optimise,
+			)?);
+			instructions.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
+			instructions.push((Instruction::Label(end_str), None));
+			instructions
+		}
 
 		LanguageElement::While {
 			condition: _,

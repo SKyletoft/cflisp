@@ -8,7 +8,7 @@ Can currently parse a subset of C. Full ISO-C compliance is not planned. `float`
 //  tests/test1.c
 
 int main() {
-    int* ptr = 0;
+    int *ptr = 0;
     int x    = 5;
     if (x == 5) {
         x = 3;

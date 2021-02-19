@@ -168,6 +168,7 @@ fn construct_structure_from_tokens<'a>(
 			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
 				let split = helper::remove_parentheses(init_cond_post)
 					.split(';')
+					.map(str::trim)
 					.collect::<Vec<_>>();
 				if split.len() != 3 {
 					return Err(ParseError(
@@ -175,22 +176,20 @@ fn construct_structure_from_tokens<'a>(
 						"For loop didn't contain three sections!",
 					));
 				}
-				let mut init_vec = parse(split[0], move_first)?;
-				if init_vec.len() != 1 {
-					dbg!(init_vec);
-					return Err(ParseError(line!(), "For loop init failed"));
-				}
-				let init_parsed = init_vec.pop().expect("Above check failed?");
-				let post_vec = parse(split[2], move_first)?;
-				let condition = Token::parse_statement_tokens(UnparsedBlock(split[1]))?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let body_parsed = parse(helper::remove_parentheses(code), move_first)?;
+
+				let condition_tokens = Token::parse_str_to_vec(split[1])?;
+				let condition_statement_tokens = StatementToken::from_tokens(&condition_tokens)?;
+				let condition = StatementElement::from_tokens(condition_statement_tokens)?;
+
+				let init = parse(split[0], move_first)?;
+				let post = parse(split[2], move_first)?;
+				let body = parse(helper::remove_parentheses(code), move_first)?;
 
 				LanguageElement::For {
-					init: Box::new(init_parsed),
-					condition: condition_parsed,
-					after: post_vec,
-					body: body_parsed,
+					init,
+					condition,
+					post,
+					body,
 				}
 			}
 
@@ -298,13 +297,12 @@ pub(crate) fn type_check(
 			LanguageElement::For {
 				init,
 				condition,
-				after,
+				post,
 				body,
 			} => {
-				let init_as_slice = std::slice::from_ref(init.as_ref());
 				if !condition.type_check(&variables, &functions)?
-					|| !type_check(init_as_slice, &variables, &functions)?
-					|| !type_check(after, &variables, &functions)?
+					|| !type_check(init, &variables, &functions)?
+					|| !type_check(post, &variables, &functions)?
 					|| !type_check(body, &variables, &functions)?
 				{
 					return Ok(false);
@@ -354,6 +352,11 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 			}
 			last = idx + 1;
 		}
+	}
+	//And add whatever remains
+	let slice = &tokens[last..];
+	if !slice.is_empty() {
+		vec.push(slice);
 	}
 	vec
 }
