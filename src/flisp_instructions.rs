@@ -153,7 +153,7 @@ impl Instruction {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
-			| Instruction::LEASP(a) => a.size(),
+			| Instruction::LEASP(a) => a.size() + 1,
 			Instruction::PSHA
 			| Instruction::PULA
 			| Instruction::TSTA
@@ -161,7 +161,8 @@ impl Instruction {
 			| Instruction::DECA
 			| Instruction::COMA
 			| Instruction::RTS => 1,
-			Instruction::FCB(_) | Instruction::Label(_) => 0,
+			Instruction::FCB(n) => n.len(),
+			Instruction::Label(_) => 0,
 		}
 	}
 

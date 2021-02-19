@@ -1,5 +1,7 @@
 use crate::*;
 
+const DIGIFLISP_PROGRAM_LIMIT: usize = 172;
+
 pub(crate) fn instructions_to_text(
 	instructions: &[CommentedInstruction],
 	flags: &Flags,
@@ -8,7 +10,7 @@ pub(crate) fn instructions_to_text(
 		.iter()
 		.map(|(instruction, _)| instruction.size())
 		.sum::<usize>()
-		> 255
+		> DIGIFLISP_PROGRAM_LIMIT
 	{
 		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
 	}
@@ -66,8 +68,8 @@ pub(crate) fn automatic_imports(instructions: &mut String) {
 	if instructions.contains("__mod__") {
 		instructions.push_str(include_str!("asm_deps/mod.sflisp"));
 	}
-	if !instructions.contains("init") {
+	if !instructions.contains("__init_") {
 		instructions.push_str(include_str!("asm_deps/init.sflisp"));
 	}
-	instructions.push_str("\n\tORG\t$FF\n\tFCB\tinit\n");
+	instructions.push_str("\n\tORG\t$FF\n\tFCB\t__init_\n");
 }

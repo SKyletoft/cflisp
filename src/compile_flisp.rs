@@ -308,17 +308,67 @@ fn compile_element<'a>(
 			let post_str = format!("for_post_{}_{}", scope_name, line_id);
 			let body_str = format!("for_body_{}_{}", scope_name, line_id);
 			let end_str = format!("for_end_{}_{}", scope_name, line_id);
+			let mut inner_variables = variables.clone();
+			let mut inner_stack = *stack_size;
 			let mut instructions = compile_elements(
 				init,
-				variables,
+				&mut inner_variables,
 				global_variables,
 				functions,
 				&init_str,
-				stack_size,
+				&mut inner_stack,
 				stack_base,
 				optimise,
 			)?;
-			instructions.push((Instruction::Label(cond_str), None));
+			instructions.push((Instruction::Label(cond_str.clone()), None));
+			instructions.append(&mut compile_statement(
+				condition,
+				&inner_variables,
+				global_variables,
+				functions,
+				inner_stack,
+			)?);
+			instructions.push((Instruction::TSTA, None));
+			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+			let mut inner_inner_stack = inner_stack;
+			instructions.append(&mut compile_elements(
+				body,
+				&mut inner_variables.clone(),
+				global_variables,
+				functions,
+				&body_str,
+				&mut inner_inner_stack,
+				stack_base,
+				optimise,
+			)?);
+			instructions.push((
+				Instruction::LEASP(Addressing::SP(inner_inner_stack - inner_stack)),
+				None,
+			));
+			instructions.append(&mut compile_elements(
+				post,
+				&mut inner_variables,
+				global_variables,
+				functions,
+				&post_str,
+				&mut inner_stack,
+				stack_base,
+				optimise,
+			)?);
+			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
+			instructions.push((Instruction::Label(end_str), None));
+			instructions.push((
+				Instruction::LEASP(Addressing::SP(inner_stack - *stack_size)),
+				None,
+			));
+			instructions
+		}
+
+		LanguageElement::While { condition, body } => {
+			let cond_str = format!("while_cond_{}_{}", scope_name, line_id);
+			let body_str = format!("while_body_{}_{}", scope_name, line_id);
+			let end_str = format!("while_end_{}_{}", scope_name, line_id);
+			let mut instructions = vec![(Instruction::Label(cond_str.clone()), None)];
 			instructions.append(&mut compile_statement(
 				condition,
 				variables,
@@ -326,36 +376,27 @@ fn compile_element<'a>(
 				functions,
 				*stack_size,
 			)?);
+			instructions.push((Instruction::TSTA, None));
 			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+			let mut inner_stack = *stack_size;
 			instructions.append(&mut compile_elements(
 				body,
-				variables,
+				&mut variables.clone(),
 				global_variables,
 				functions,
 				&body_str,
-				stack_size,
+				&mut inner_stack,
 				stack_base,
 				optimise,
 			)?);
-			instructions.append(&mut compile_elements(
-				post,
-				variables,
-				global_variables,
-				functions,
-				&post_str,
-				stack_size,
-				stack_base,
-				optimise,
-			)?);
-			instructions.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
+			instructions.push((
+				Instruction::LEASP(Addressing::SP(inner_stack - *stack_size)),
+				None,
+			));
+			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
 			instructions.push((Instruction::Label(end_str), None));
 			instructions
 		}
-
-		LanguageElement::While {
-			condition: _,
-			body: _,
-		} => todo!(),
 
 		LanguageElement::Return(ret) => {
 			if let Some(statement) = ret {

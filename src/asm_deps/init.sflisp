@@ -1,4 +1,4 @@
-init	LDA	#0
+__init_	LDA	#0
 	LDX	#0
 	LDY	#0
 	LDSP	#$FB
