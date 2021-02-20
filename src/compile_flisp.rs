@@ -45,7 +45,7 @@ fn compile_elements<'a>(
 			optimise,
 		)?;
 		if optimise {
-			optimise_flisp::all_optimisations(line);
+			optimise_flisp::all_optimisations(line)?;
 		}
 		instructions.append(line);
 	}
@@ -554,13 +554,13 @@ fn compile_statement_inner<'a>(
 						tmps_used,
 					)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
 					} else {
 						assert!(right_instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(*tmps_used)),
+							statement.as_flisp_instruction(Addressing::SP(*tmps_used))?,
 							None,
 						));
 					}
@@ -654,13 +654,13 @@ fn compile_statement_inner<'a>(
 						tmps_used,
 					)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-						instructions.push((statement.as_flisp_instruction(adr.clone()), *comment));
+						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
 					} else {
 						assert!(instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(*tmps_used)),
+							statement.as_flisp_instruction(Addressing::SP(*tmps_used))?,
 							None,
 						));
 					}

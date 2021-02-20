@@ -4,7 +4,9 @@ use std::{cmp::Ordering, collections::HashSet};
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
-pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
+pub(crate) fn all_optimisations(
+	instructions: &mut Vec<CommentedInstruction>,
+) -> Result<(), CompileError> {
 	remove_post_early_return_code(instructions);
 	load_xy(instructions);
 	repeat_xy(instructions);
@@ -12,7 +14,7 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	load_a(instructions);
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
-	reduce_reserves(instructions);
+	reduce_reserves(instructions)?;
 	nop(instructions); //Should go AFTER reduce reserves
 	cmp_eq_jmp(instructions);
 	cmp_neq_jmp(instructions);
@@ -22,6 +24,8 @@ pub(crate) fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) {
 	inca(instructions);
 	dec(instructions);
 	deca(instructions);
+
+	Ok(())
 }
 
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
@@ -245,7 +249,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 
 //For each allocation, find how many unused bytes there are and reduce the allocation by that much.
 // Won't remove 0 size allocations, just run nop afterwards.
-fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
+fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
 	let mut sp_stack: Vec<(usize, isize)> = Vec::new();
 
 	for idx in 0..instructions.len() {
@@ -322,12 +326,17 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 				if matches!(sp_stack.last(), Some((1, _))) {
 					sp_stack.pop();
 				} else {
-					panic!("Internal error: Where did the PULA even come from?");
+					return Err(CompileError(
+						line!(),
+						"Internal error: Where did the PULA even come from?",
+					));
 				}
 			}
 			_ => {}
 		}
 	}
+
+	Ok(())
 }
 
 fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {

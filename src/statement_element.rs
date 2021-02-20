@@ -92,14 +92,20 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
-	pub(crate) fn as_flisp_instruction(&self, adr: Addressing) -> Instruction {
-		match self {
+	pub(crate) fn as_flisp_instruction(
+		&self,
+		adr: Addressing,
+	) -> Result<Instruction, CompileError> {
+		let res = match self {
 			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
 			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Mul { lhs: _, rhs: _ }
 			| StatementElement::Div { lhs: _, rhs: _ }
 			| StatementElement::Mod { lhs: _, rhs: _ } => {
-				panic!("Internal error: function call, not instruction?")
+				return Err(CompileError(
+					line!(),
+					"Internal error: function call, not instruction?",
+				));
 			}
 			StatementElement::LShift { lhs: _, rhs: _ } => Instruction::LSLA,
 			StatementElement::RShift { lhs: _, rhs: _ } => Instruction::LSRA,
@@ -123,8 +129,15 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::FunctionCall {
 				name: _,
 				parametres: _,
-			} => panic!("Internal error: special cases and literals, not instructions?"),
-		}
+			} => {
+				return Err(CompileError(
+					line!(),
+					"Internal error: special cases and literals, not instructions?",
+				))
+			}
+		};
+
+		Ok(res)
 	}
 
 	pub(crate) fn depth(&self) -> usize {
