@@ -258,7 +258,7 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) {
 			| Instruction::JMP(_)
 			| Instruction::BNE(_)
 			| Instruction::BEQ(_)
-			| Instruction::BGT(_)
+			| Instruction::BGE(_)
 			| Instruction::BLT(_) => {
 				//Jump or jump target, new context. Some missed
 				// optimisations but massively reduced complexity
@@ -485,7 +485,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			(Instruction::LEASP(Addressing::SP(1)), None),
 			(Instruction::COMA, None),
 			(Instruction::TSTA, None),
-			(Instruction::BEQ(_), None),
+			(Instruction::BEQ(jump_adr), None),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -505,7 +505,9 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 				lhs.clone()
 			};
 			let lhs_comment = *lhs_comment;
+			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
+			instructions[idx + 1] = (Instruction::BEQ(jump_adr), None);
 			instructions.remove(idx + 6);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);
@@ -546,7 +548,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			let lhs_comment = *lhs_comment;
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx + 1] = (Instruction::BGT(jump_adr), None);
+			instructions[idx + 1] = (Instruction::BGE(jump_adr), None);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);
 			instructions.remove(idx + 3);
@@ -618,7 +620,7 @@ pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>)
 			| Instruction::JMP(Addressing::Label(lbl))
 			| Instruction::BNE(Addressing::Label(lbl))
 			| Instruction::BEQ(Addressing::Label(lbl))
-			| Instruction::BGT(Addressing::Label(lbl))
+			| Instruction::BGE(Addressing::Label(lbl))
 			| Instruction::BLT(Addressing::Label(lbl))
 			| Instruction::LEASP(Addressing::Label(lbl))
 			| Instruction::CMPA(Addressing::Label(lbl))
