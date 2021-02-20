@@ -12,8 +12,6 @@ pub(crate) enum Instruction {
 	ADDA(Addressing),
 	SUBA(Addressing),
 	ANDA(Addressing),
-	ROLA(Addressing),
-	RORA(Addressing),
 	ORA(Addressing),
 	EORA(Addressing),
 	STA(Addressing),
@@ -33,6 +31,8 @@ pub(crate) enum Instruction {
 	PULA,
 	TSTA,
 	COMA,
+	LSLA,
+	LSRA,
 	RTS,
 	JSR(Addressing),
 	Label(String),
@@ -49,8 +49,6 @@ impl fmt::Display for Instruction {
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{}", *a),
-			Instruction::ROLA(a) => write!(f, "\tROLA\t{}", *a),
-			Instruction::RORA(a) => write!(f, "\tRORA\t{}", *a),
 			Instruction::ORA(a) => write!(f, "\tORA\t{}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{}", *a),
@@ -65,6 +63,8 @@ impl fmt::Display for Instruction {
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{}", *a),
 			Instruction::DEC(a) => write!(f, "\tDEC\t{}", *a),
+			Instruction::LSLA => write!(f, "\tLSLA\t"),
+			Instruction::LSRA => write!(f, "\tLSRA\t"),
 			Instruction::INCA => write!(f, "\tINCA\t"),
 			Instruction::DECA => write!(f, "\tDECA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
@@ -93,8 +93,6 @@ impl fmt::UpperHex for Instruction {
 			Instruction::ADDA(a) => write!(f, "\tADDA\t{:X}", *a),
 			Instruction::SUBA(a) => write!(f, "\tSUBA\t{:X}", *a),
 			Instruction::ANDA(a) => write!(f, "\tANDA\t{:X}", *a),
-			Instruction::ROLA(a) => write!(f, "\tROLA\t{:X}", *a),
-			Instruction::RORA(a) => write!(f, "\tRORA\t{:X}", *a),
 			Instruction::ORA(a) => write!(f, "\tORA\t{:X}", *a),
 			Instruction::EORA(a) => write!(f, "\tEORA\t{:X}", *a),
 			Instruction::STA(a) => write!(f, "\tSTA\t{:X}", *a),
@@ -109,6 +107,8 @@ impl fmt::UpperHex for Instruction {
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{:X}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{:X}", *a),
 			Instruction::DEC(a) => write!(f, "\tDEC\t{:X}", *a),
+			Instruction::LSLA => write!(f, "\tLSLA\t"),
+			Instruction::LSRA => write!(f, "\tLSRA\t"),
 			Instruction::INCA => write!(f, "\tINCA\t"),
 			Instruction::DECA => write!(f, "\tDECA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
@@ -138,8 +138,6 @@ impl Instruction {
 			| Instruction::ADDA(a)
 			| Instruction::SUBA(a)
 			| Instruction::ANDA(a)
-			| Instruction::ROLA(a)
-			| Instruction::RORA(a)
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
@@ -160,6 +158,8 @@ impl Instruction {
 			| Instruction::INCA
 			| Instruction::DECA
 			| Instruction::COMA
+			| Instruction::LSLA
+			| Instruction::LSRA
 			| Instruction::RTS => 1,
 			Instruction::FCB(n) => n.len(),
 			Instruction::Label(_) => 0,
@@ -175,8 +175,6 @@ impl Instruction {
 			| Instruction::ADDA(a)
 			| Instruction::SUBA(a)
 			| Instruction::ANDA(a)
-			| Instruction::ROLA(a)
-			| Instruction::RORA(a)
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
@@ -197,6 +195,8 @@ impl Instruction {
 			| Instruction::INCA
 			| Instruction::DECA
 			| Instruction::COMA
+			| Instruction::LSLA
+			| Instruction::LSRA
 			| Instruction::RTS
 			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,
@@ -212,8 +212,6 @@ impl Instruction {
 			| Instruction::ADDA(a)
 			| Instruction::SUBA(a)
 			| Instruction::ANDA(a)
-			| Instruction::ROLA(a)
-			| Instruction::RORA(a)
 			| Instruction::ORA(a)
 			| Instruction::EORA(a)
 			| Instruction::STA(a)
@@ -234,6 +232,8 @@ impl Instruction {
 			| Instruction::INCA
 			| Instruction::DECA
 			| Instruction::COMA
+			| Instruction::LSLA
+			| Instruction::LSRA
 			| Instruction::RTS
 			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,

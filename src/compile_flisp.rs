@@ -567,15 +567,15 @@ fn compile_statement_inner<'a>(
 					*tmps_used += 1;
 				}
 			}
-
 			instructions
 		}
+
 		//Non-commutative operations
 		StatementElement::Sub { lhs: rhs, rhs: lhs }
 		| StatementElement::Div { lhs, rhs }
 		| StatementElement::Mod { lhs, rhs }
-		| StatementElement::LShift { lhs, rhs }
-		| StatementElement::RShift { lhs, rhs }
+		| StatementElement::LShift { lhs: rhs, rhs: lhs }
+		| StatementElement::RShift { lhs: rhs, rhs: lhs }
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThanEqual { lhs, rhs }
 		| StatementElement::LessThan { lhs: rhs, rhs: lhs }
@@ -625,6 +625,23 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
+				}
+				StatementElement::RShift { lhs: _, rhs: _ }
+				| StatementElement::LShift { lhs: _, rhs: _ } => {
+					if let StatementElement::Num(n) = rhs.as_ref() {
+						if *n < 0 {
+							return Err(CompileError(line!(), "Cannot shift by negative amount"));
+						}
+						let inst =
+							if matches!(statement, StatementElement::RShift { lhs: _, rhs: _ }) {
+								Instruction::LSRA
+							} else {
+								Instruction::LSLA
+							};
+						instructions.append(&mut vec![(inst, None); *n as usize]);
+					} else {
+						todo!()
+					}
 				}
 				_ => {
 					*tmps_used -= 1;
@@ -775,7 +792,18 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElement::Not { lhs: _ } => unimplemented!(),
+		StatementElement::Not { lhs } => {
+			let mut instructions = compile_statement_inner(
+				lhs,
+				variables,
+				global_variables,
+				functions,
+				stack_size,
+				tmps_used,
+			)?;
+			instructions.push((Instruction::COMA, None));
+			instructions
+		}
 	};
 	Ok(instructions)
 }

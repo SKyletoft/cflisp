@@ -96,11 +96,13 @@ impl<'a> StatementElement<'a> {
 		match self {
 			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
 			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::Mul { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Div { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::Mod { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::LShift { lhs: _, rhs: _ } => unimplemented!(),
-			StatementElement::RShift { lhs: _, rhs: _ } => unimplemented!(),
+			StatementElement::Mul { lhs: _, rhs: _ }
+			| StatementElement::Div { lhs: _, rhs: _ }
+			| StatementElement::Mod { lhs: _, rhs: _ } => {
+				panic!("Internal error: function call, not instruction?")
+			}
+			StatementElement::LShift { lhs: _, rhs: _ } => Instruction::LSLA,
+			StatementElement::RShift { lhs: _, rhs: _ } => Instruction::LSRA,
 			StatementElement::And { lhs: _, rhs: _ } => Instruction::ANDA(adr),
 			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
 			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
@@ -111,17 +113,17 @@ impl<'a> StatementElement<'a> {
 			StatementElement::LessThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::NotCmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::Var(_) => unimplemented!(),
-			StatementElement::Num(_) => unimplemented!(),
-			StatementElement::Char(_) => unimplemented!(),
-			StatementElement::Bool(_) => unimplemented!(),
-			StatementElement::Array(_) => unimplemented!(),
-			StatementElement::Deref(_) => unimplemented!(),
-			StatementElement::AdrOf(_) => unimplemented!(),
-			StatementElement::FunctionCall {
+			StatementElement::Var(_)
+			| StatementElement::Num(_)
+			| StatementElement::Char(_)
+			| StatementElement::Bool(_)
+			| StatementElement::Array(_)
+			| StatementElement::Deref(_)
+			| StatementElement::AdrOf(_)
+			| StatementElement::FunctionCall {
 				name: _,
 				parametres: _,
-			} => unimplemented!(),
+			} => panic!("Internal error: special cases and literals, not instructions?"),
 		}
 	}
 
