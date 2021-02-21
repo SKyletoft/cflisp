@@ -1,6 +1,8 @@
-#![feature(slice_as_chunks)]
-
 use std::{env, fmt, fs, path::PathBuf, process::exit};
+
+extern "C" {
+	fn system(command_str: *const u8) -> usize;
+}
 
 pub mod compile_flisp;
 pub mod error;
@@ -67,7 +69,8 @@ fn main() {
 	}
 	if flags.print_result {
 		println!("{}", &compiled);
-	} else {
+	}
+	if !flags.print_result || flags.assemble {
 		fs::write(&flags.out, &compiled).expect("IO Error: Could not save file");
 	}
 	if flags.assemble {
@@ -77,18 +80,26 @@ fn main() {
 		if let Some(p) = path
 			.as_ref()
 			.map(|s| {
-				s.split(':').find(|p| {
-					let path: PathBuf = (p.to_string() + "/qaflisp").into();
-					path.exists()
-				})
+				s.split(':')
+					.filter_map(|p| {
+						let path: PathBuf = (p.to_string() + "/qaflisp").into();
+						if path.exists() {
+							Some(path)
+						} else {
+							None
+						}
+					})
+					.next()
 			})
 			.flatten()
 		{
 			let res = std::process::Command::new(p)
 				.arg(flags.out)
 				.output()
-				.expect("Failed to call qaflisp");
-			eprintln!("{:?}", res.stdout);
+				.map(|out| String::from_utf8(out.stdout))
+				.expect("Failed to call qaflisp")
+				.expect("Output isn't utf8?");
+			print!("{}", res);
 		} else {
 			eprintln!("Couldn't find qaflisp");
 			exit(-1);
