@@ -1,4 +1,4 @@
-## CFLISP
+# CFLISP
 
 An experimental C compiler for Digiflisp written in Rust.
 
@@ -49,4 +49,18 @@ __end__ JMP     __end__
 
 
         ORG     $FF
-        FCB     __init_```
+        FCB     __init_
+```
+
+## Compiler flags
+Flag | Name | Description
+--|--|--
+x | hex | Prints numbers as hex instead
+c | comments | Disables comments (variable names mostly)
+p|tree|Prints the parsed tree structure of the program
+t|type_check| Disables type checking
+s|print_result|Prints the compiled code to stdout instead of a file
+a|assemble|Calls qaflisp directly. Requires qaflisp to be on $PATH. Probably doesn't work on Windows
+o|out|Sets the name of the output file (following argument)
+g|debug|Adds debug info. Disables removal of unused names and adds `ORG $20` to the top for easier digiflisp debugging
+O|optimise| Enables optimisations. In practice it mostly just fixes bad code generation rather than actually optimising the code. (Capital o, not zero)
