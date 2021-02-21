@@ -25,6 +25,8 @@ pub(crate) enum Instruction {
 	CMPA(Addressing),
 	INC(Addressing),
 	DEC(Addressing),
+	LSL(Addressing),
+	LSR(Addressing),
 	INCA,
 	DECA,
 	PSHA,
@@ -63,6 +65,8 @@ impl fmt::Display for Instruction {
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{}", *a),
 			Instruction::DEC(a) => write!(f, "\tDEC\t{}", *a),
+			Instruction::LSL(a) => write!(f, "\tLSL\t{}", *a),
+			Instruction::LSR(a) => write!(f, "\tLSR\t{}", *a),
 			Instruction::LSLA => write!(f, "\tLSLA\t"),
 			Instruction::LSRA => write!(f, "\tLSRA\t"),
 			Instruction::INCA => write!(f, "\tINCA\t"),
@@ -107,6 +111,8 @@ impl fmt::UpperHex for Instruction {
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{:X}", *a),
 			Instruction::INC(a) => write!(f, "\tINC\t{:X}", *a),
 			Instruction::DEC(a) => write!(f, "\tDEC\t{:X}", *a),
+			Instruction::LSL(a) => write!(f, "\rLSL\t{:X}", *a),
+			Instruction::LSR(a) => write!(f, "\tLSR\t{:X}", *a),
 			Instruction::LSLA => write!(f, "\tLSLA\t"),
 			Instruction::LSRA => write!(f, "\tLSRA\t"),
 			Instruction::INCA => write!(f, "\tINCA\t"),
@@ -151,6 +157,8 @@ impl Instruction {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::LSL(a)
+			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => a.size() + 1,
 			Instruction::PSHA
 			| Instruction::PULA
@@ -188,6 +196,8 @@ impl Instruction {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::LSL(a)
+			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => Some(a),
 			Instruction::PSHA
 			| Instruction::PULA
@@ -225,6 +235,8 @@ impl Instruction {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::LSL(a)
+			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => Some(a),
 			Instruction::PSHA
 			| Instruction::PULA

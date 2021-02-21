@@ -5,17 +5,30 @@ use crate::*;
 ///Technically illegal address for use in register -> register transfers
 const ABOVE_STACK_OFFSET: isize = -1;
 
+#[derive(Debug, PartialEq)]
+struct State<'a, 'b, 'c, 'd, 'e, 'f> {
+	variables: &'b mut HashMap<&'a str, (Type, isize)>,
+	global_variables: &'c mut HashMap<&'a str, Type>,
+	functions: &'d mut HashMap<&'a str, &'a [Variable<'a>]>,
+	stack_size: &'f mut isize,
+	scope_name: &'e str,
+	line_id: usize,
+}
+
 pub(crate) fn compile<'a>(
 	program: &'a [LanguageElement],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	compile_elements(
 		program,
-		&mut HashMap::new(),
-		&mut HashMap::new(),
-		&mut HashMap::new(),
-		"global",
-		&mut 0,
+		&mut State {
+			variables: &mut HashMap::new(),
+			global_variables: &mut HashMap::new(),
+			functions: &mut HashMap::new(),
+			scope_name: "global",
+			stack_size: &mut 0,
+			line_id: 0,
+		},
 		0,
 		flags.optimise,
 	)
@@ -23,27 +36,21 @@ pub(crate) fn compile<'a>(
 
 fn compile_elements<'a>(
 	block: &'a [LanguageElement],
-	variables: &mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &mut HashMap<&'a str, Type>,
-	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
-	scope_name: &str,
-	stack_size: &mut isize,
+	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let mut instructions = vec![(Instruction::Label(scope_name.to_string()), None)];
+	let mut instructions = vec![(Instruction::Label(state.scope_name.to_string()), None)];
 	for (i, e) in block.iter().enumerate() {
-		let line = &mut compile_element(
-			e,
-			variables,
-			global_variables,
-			functions,
-			scope_name,
-			stack_size,
-			stack_base,
-			i,
-			optimise,
-		)?;
+		let mut new_state = State {
+			variables: state.variables,
+			global_variables: state.global_variables,
+			functions: state.functions,
+			stack_size: state.stack_size,
+			scope_name: state.scope_name,
+			line_id: i,
+		};
+		let line = &mut compile_element(e, &mut new_state, stack_base, optimise)?;
 		if optimise {
 			optimise_flisp::all_optimisations(line)?;
 		}
@@ -54,34 +61,31 @@ fn compile_elements<'a>(
 
 fn compile_element<'a>(
 	element: &'a LanguageElement,
-	variables: &mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &mut HashMap<&'a str, Type>,
-	functions: &mut HashMap<&'a str, &'a [Variable<'a>]>,
-	scope_name: &str,
-	stack_size: &mut isize,
+	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
-	line_id: usize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
 		LanguageElement::VariableDeclaration { typ, name } => {
-			if scope_name == "global" {
-				if global_variables.contains_key(name) {
+			if state.scope_name == "global" {
+				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				global_variables.insert(*name, typ.clone());
+				state.global_variables.insert(*name, typ.clone());
 				vec![]
 			} else {
-				if variables.contains_key(name) {
+				if state.variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(
 						line!(),
 						"Name already exists in scope! (No shadowing)",
 					));
 				}
-				variables.insert(*name, (typ.clone(), *stack_size));
-				*stack_size += 1;
+				state
+					.variables
+					.insert(*name, (typ.clone(), *state.stack_size));
+				*state.stack_size += 1;
 				vec![(
 					Instruction::LEASP(Addressing::SP(ABOVE_STACK_OFFSET)),
 					Some(*name),
@@ -90,9 +94,13 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::VariableAssignment { name, value } => {
-			let adr = adr_for_name(name, variables, global_variables, *stack_size)?;
-			let mut statement =
-				compile_statement(value, variables, global_variables, functions, *stack_size)?;
+			let adr = adr_for_name(
+				name,
+				state.variables,
+				state.global_variables,
+				*state.stack_size,
+			)?;
+			let mut statement = compile_statement(value, state)?;
 			statement.push((Instruction::STA(adr), Some(name)));
 			statement
 		}
@@ -107,13 +115,13 @@ fn compile_element<'a>(
 					"Non constant in array initialisation",
 				)),
 			};
-			if scope_name == "global" {
-				if global_variables.contains_key(name) {
+			if state.scope_name == "global" {
+				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
 				if let StatementElement::Array(elements) = value {
-					global_variables.insert(*name, typ.clone());
+					state.global_variables.insert(*name, typ.clone());
 					let values = elements
 						.iter()
 						.map(global_def)
@@ -123,14 +131,14 @@ fn compile_element<'a>(
 						(Instruction::FCB(values), None),
 					]
 				} else {
-					global_variables.insert(*name, typ.clone());
+					state.global_variables.insert(*name, typ.clone());
 					vec![
 						(Instruction::Label(name.to_string()), None),
 						(Instruction::FCB(vec![global_def(value)?]), None),
 					]
 				}
 			} else {
-				if variables.contains_key(name) || global_variables.contains_key(name) {
+				if state.variables.contains_key(name) || state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(
 						line!(),
@@ -140,32 +148,24 @@ fn compile_element<'a>(
 				if let StatementElement::Array(elements) = value {
 					let mut statement = Vec::new();
 					for element in elements {
-						let stack_copy = *stack_size;
-						statement.append(&mut compile_statement(
-							element,
-							variables,
-							global_variables,
-							functions,
-							*stack_size,
-						)?);
-						assert_eq!(*stack_size, stack_copy);
-						*stack_size += 1;
+						let stack_copy = *state.stack_size;
+						statement.append(&mut compile_statement(element, state)?);
+						assert_eq!(*state.stack_size, stack_copy);
+						*state.stack_size += 1;
 						statement.push((Instruction::PSHA, Some(*name)));
 					}
-					variables.insert(*name, (typ.clone(), *stack_size));
+					state
+						.variables
+						.insert(*name, (typ.clone(), *state.stack_size));
 					statement
 				} else {
-					let stack_copy = *stack_size;
-					let mut statement = compile_statement(
-						value,
-						variables,
-						global_variables,
-						functions,
-						*stack_size,
-					)?;
-					assert_eq!(*stack_size, stack_copy);
-					variables.insert(*name, (typ.clone(), *stack_size));
-					*stack_size += 1;
+					let stack_copy = *state.stack_size;
+					let mut statement = compile_statement(value, state)?;
+					assert_eq!(*state.stack_size, stack_copy);
+					state
+						.variables
+						.insert(*name, (typ.clone(), *state.stack_size));
+					*state.stack_size += 1;
 					statement.push((Instruction::PSHA, Some(*name)));
 					statement
 				}
@@ -173,10 +173,8 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::PointerAssignment { ptr, value } => {
-			let get_adr =
-				compile_statement(ptr, variables, global_variables, functions, *stack_size)?;
-			let mut value =
-				compile_statement(value, variables, global_variables, functions, *stack_size)?;
+			let get_adr = compile_statement(ptr, state)?;
+			let mut value = compile_statement(value, state)?;
 			let mut statement = get_adr;
 			statement.push((
 				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
@@ -197,13 +195,13 @@ fn compile_element<'a>(
 			args,
 			block,
 		} => {
-			if functions.contains_key(name) {
+			if state.functions.contains_key(name) {
 				return Err(CompileError(
 					line!(),
 					"Function name already exists in scope!",
 				));
 			}
-			functions.insert(*name, args.as_slice());
+			state.functions.insert(*name, args.as_slice());
 			//Stack: Start -> Arguments -> Return adr -> Variables -> Whatever the stack grows to
 			// If this +1 is removed we can no longer have arguments
 			// This might waste a byte if there are no arguments?
@@ -215,11 +213,14 @@ fn compile_element<'a>(
 			}
 			let mut function_body = compile_elements(
 				block,
-				&mut local_variables,
-				global_variables,
-				functions,
-				name,
-				&mut args_count,
+				&mut State {
+					variables: &mut local_variables,
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: name,
+					stack_size: &mut args_count,
+					line_id: state.line_id,
+				},
 				args_base,
 				false,
 			)?;
@@ -239,53 +240,53 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
-			let then_str = format!("if_then_{}_{}", scope_name, line_id);
-			let else_str = format!("if_else_{}_{}", scope_name, line_id);
-			let end_str = format!("if_end_{}_{}", scope_name, line_id);
-			let mut cond = compile_statement(
-				condition,
-				variables,
-				global_variables,
-				functions,
-				*stack_size,
-			)?;
+			let then_str = format!("if_then_{}_{}", state.scope_name, state.line_id);
+			let else_str = format!("if_else_{}_{}", state.scope_name, state.line_id);
+			let end_str = format!("if_end_{}_{}", state.scope_name, state.line_id);
+			let mut cond = compile_statement(condition, state)?;
 			cond.push((Instruction::TSTA, None));
-			let mut then_stack = *stack_size;
+			let mut then_stack = *state.stack_size;
 			let mut then_block = compile_elements(
 				then,
-				&mut variables.clone(),
-				global_variables,
-				functions,
-				&then_str,
-				&mut then_stack,
-				*stack_size,
+				&mut State {
+					variables: &mut state.variables.clone(),
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: &then_str,
+					stack_size: &mut then_stack,
+					line_id: state.line_id,
+				},
+				*state.stack_size,
 				false,
 			)?;
-			if then_stack != *stack_size {
+			if then_stack != *state.stack_size {
 				cond.push((
-					Instruction::LEASP(Addressing::SP(then_stack - *stack_size)),
+					Instruction::LEASP(Addressing::SP(then_stack - *state.stack_size)),
 					None,
 				));
 			}
 			if let Some(v) = else_then {
-				let mut else_stack = *stack_size;
+				let mut else_stack = *state.stack_size;
 				let mut else_block = compile_elements(
 					v,
-					&mut variables.clone(),
-					global_variables,
-					functions,
-					&else_str,
-					&mut else_stack,
-					*stack_size,
+					&mut State {
+						variables: &mut state.variables.clone(),
+						global_variables: state.global_variables,
+						functions: state.functions,
+						scope_name: &else_str,
+						stack_size: &mut else_stack,
+						line_id: state.line_id,
+					},
+					*state.stack_size,
 					false,
 				)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut else_block);
-				if else_stack != *stack_size {
+				if else_stack != *state.stack_size {
 					cond.push((
-						Instruction::LEASP(Addressing::SP(else_stack - *stack_size)),
+						Instruction::LEASP(Addressing::SP(else_stack - *state.stack_size)),
 						Some("This happened"),
 					));
 				}
@@ -303,41 +304,41 @@ fn compile_element<'a>(
 			post,
 			body,
 		} => {
-			let init_str = format!("for_init_{}_{}", scope_name, line_id);
-			let cond_str = format!("for_cond_{}_{}", scope_name, line_id);
-			let post_str = format!("for_post_{}_{}", scope_name, line_id);
-			let body_str = format!("for_body_{}_{}", scope_name, line_id);
-			let end_str = format!("for_end_{}_{}", scope_name, line_id);
-			let mut inner_variables = variables.clone();
-			let mut inner_stack = *stack_size;
+			let init_str = format!("for_init_{}_{}", state.scope_name, state.line_id);
+			let cond_str = format!("for_cond_{}_{}", state.scope_name, state.line_id);
+			let post_str = format!("for_post_{}_{}", state.scope_name, state.line_id);
+			let body_str = format!("for_body_{}_{}", state.scope_name, state.line_id);
+			let end_str = format!("for_end_{}_{}", state.scope_name, state.line_id);
+			let mut inner_variables = state.variables.clone();
+			let mut inner_stack = *state.stack_size;
 			let mut instructions = compile_elements(
 				init,
-				&mut inner_variables,
-				global_variables,
-				functions,
-				&init_str,
-				&mut inner_stack,
+				&mut State {
+					variables: &mut inner_variables,
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: &init_str,
+					stack_size: &mut inner_stack,
+					line_id: state.line_id,
+				},
 				stack_base,
 				optimise,
 			)?;
 			instructions.push((Instruction::Label(cond_str.clone()), None));
-			instructions.append(&mut compile_statement(
-				condition,
-				&inner_variables,
-				global_variables,
-				functions,
-				inner_stack,
-			)?);
+			instructions.append(&mut compile_statement(condition, state)?);
 			instructions.push((Instruction::TSTA, None));
 			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
 			let mut inner_inner_stack = inner_stack;
 			instructions.append(&mut compile_elements(
 				body,
-				&mut inner_variables.clone(),
-				global_variables,
-				functions,
-				&body_str,
-				&mut inner_inner_stack,
+				&mut State {
+					variables: &mut inner_variables,
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: &body_str,
+					stack_size: &mut inner_inner_stack,
+					line_id: state.line_id,
+				},
 				stack_base,
 				optimise,
 			)?);
@@ -347,50 +348,50 @@ fn compile_element<'a>(
 			));
 			instructions.append(&mut compile_elements(
 				post,
-				&mut inner_variables,
-				global_variables,
-				functions,
-				&post_str,
-				&mut inner_stack,
+				&mut State {
+					variables: &mut inner_variables,
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: &post_str,
+					stack_size: &mut inner_stack,
+					line_id: state.line_id,
+				},
 				stack_base,
 				optimise,
 			)?);
 			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
 			instructions.push((Instruction::Label(end_str), None));
 			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_stack - *stack_size)),
+				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
 				None,
 			));
 			instructions
 		}
 
 		LanguageElement::While { condition, body } => {
-			let cond_str = format!("while_cond_{}_{}", scope_name, line_id);
-			let body_str = format!("while_body_{}_{}", scope_name, line_id);
-			let end_str = format!("while_end_{}_{}", scope_name, line_id);
+			let cond_str = format!("while_cond_{}_{}", state.scope_name, state.line_id);
+			let body_str = format!("while_body_{}_{}", state.scope_name, state.line_id);
+			let end_str = format!("while_end_{}_{}", state.scope_name, state.line_id);
 			let mut instructions = vec![(Instruction::Label(cond_str.clone()), None)];
-			instructions.append(&mut compile_statement(
-				condition,
-				variables,
-				global_variables,
-				functions,
-				*stack_size,
-			)?);
+			instructions.append(&mut compile_statement(condition, state)?);
 			instructions.push((Instruction::TSTA, None));
 			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
-			let mut inner_stack = *stack_size;
+			let mut inner_stack = *state.stack_size;
 			instructions.append(&mut compile_elements(
 				body,
-				&mut variables.clone(),
-				global_variables,
-				functions,
-				&body_str,
-				&mut inner_stack,
+				&mut State {
+					variables: &mut state.variables.clone(),
+					global_variables: state.global_variables,
+					functions: state.functions,
+					scope_name: &body_str,
+					stack_size: &mut inner_stack,
+					line_id: state.line_id,
+				},
 				stack_base,
 				optimise,
 			)?);
 			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_stack - *stack_size)),
+				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
 				None,
 			));
 			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
@@ -400,15 +401,9 @@ fn compile_element<'a>(
 
 		LanguageElement::Return(ret) => {
 			if let Some(statement) = ret {
-				let mut statement = compile_statement(
-					statement,
-					variables,
-					global_variables,
-					functions,
-					*stack_size,
-				)?;
+				let mut statement = compile_statement(statement, state)?;
 				statement.push((
-					Instruction::LEASP(Addressing::SP(*stack_size - stack_base)),
+					Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
 					None,
 				));
 				statement.push((Instruction::RTS, None));
@@ -416,7 +411,7 @@ fn compile_element<'a>(
 			} else {
 				vec![
 					(
-						Instruction::LEASP(Addressing::SP(*stack_size - stack_base)),
+						Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
 						None,
 					),
 					(Instruction::RTS, None),
@@ -424,31 +419,26 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::Statement(statement) => compile_statement(
-			statement,
-			variables,
-			global_variables,
-			functions,
-			*stack_size,
-		)?,
+		LanguageElement::Statement(statement) => compile_statement(statement, state)?,
 	};
 	Ok(res)
 }
 
 fn compile_statement<'a>(
 	statement: &'a StatementElement,
-	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, Type>,
-	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
-	stack_size: isize,
+	state: &mut State<'a, '_, '_, '_, '_, '_>,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
 		statement,
-		variables,
-		global_variables,
-		functions,
-		stack_size + tmps,
+		&mut State {
+			variables: state.variables,
+			global_variables: state.global_variables,
+			functions: state.functions,
+			stack_size: &mut (tmps + *state.stack_size),
+			scope_name: state.scope_name,
+			line_id: state.line_id,
+		},
 		&mut tmps.clone(), //Will start by -1.
 		                   // Counts down so that positions closest to the stack are used first which helps optimisation to save memory
 	)?;
@@ -470,10 +460,7 @@ fn compile_statement<'a>(
 
 fn compile_statement_inner<'a>(
 	statement: &'a StatementElement,
-	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, Type>,
-	functions: &HashMap<&'a str, &'a [Variable<'a>]>,
-	stack_size: isize,
+	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
@@ -492,22 +479,19 @@ fn compile_statement_inner<'a>(
 			} else {
 				(rhs.as_ref(), lhs.as_ref())
 			};
-			let mut instructions = compile_statement_inner(
-				left,
-				variables,
-				global_variables,
-				functions,
-				stack_size,
-				tmps_used,
-			)?;
+			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
 				*tmps_used -= 1;
 				let res = compile_statement_inner(
 					right,
-					variables,
-					global_variables,
-					functions,
-					stack_size + 1, //Plus one to take the PSHAs into account
+					&mut State {
+						variables: state.variables,
+						global_variables: state.global_variables,
+						functions: state.functions,
+						stack_size: &mut (1 + *state.stack_size),
+						scope_name: state.scope_name,
+						line_id: state.line_id,
+					},
 					tmps_used,
 				);
 				*tmps_used += 1;
@@ -545,14 +529,7 @@ fn compile_statement_inner<'a>(
 				//default:
 				_ => {
 					*tmps_used -= 1;
-					let mut right_instructions = compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size,
-						tmps_used,
-					)?;
+					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
 					} else {
@@ -581,30 +558,43 @@ fn compile_statement_inner<'a>(
 		| StatementElement::LessThan { lhs: rhs, rhs: lhs }
 		| StatementElement::GreaterThanEqual { lhs: rhs, rhs: lhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
-			let mut instructions = compile_statement_inner(
-				left,
-				variables,
-				global_variables,
-				functions,
-				stack_size,
-				tmps_used,
-			)?;
+			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
 				*tmps_used -= 1;
 				let res = compile_statement_inner(
 					right,
-					variables,
-					global_variables,
-					functions,
-					stack_size + 1, //Plus one to take the PSHAs into account
+					&mut State {
+						variables: state.variables,
+						global_variables: state.global_variables,
+						functions: state.functions,
+						stack_size: &mut (1 + *state.stack_size),
+						scope_name: state.scope_name,
+						line_id: state.line_id,
+					},
 					tmps_used,
 				);
 				*tmps_used += 1;
 				res
 			};
 			match statement {
-				StatementElement::Div { rhs: _, lhs: _ } => todo!(),
-				StatementElement::Mod { rhs: _, lhs: _ } => todo!(),
+				StatementElement::Div { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("div rhs")));
+					instructions.append(&mut right_instructions_plus_one()?);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__div__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+				}
+				StatementElement::Mod { rhs: _, lhs: _ } => {
+					instructions.push((Instruction::PSHA, Some("mod rhs")));
+					instructions.append(&mut right_instructions_plus_one()?);
+					instructions.push((
+						Instruction::JSR(Addressing::Label("__mod__".to_string())),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+				}
 				StatementElement::GreaterThan { rhs: _, lhs: _ }
 				| StatementElement::LessThan { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs")));
@@ -628,6 +618,7 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::RShift { lhs: _, rhs: _ }
 				| StatementElement::LShift { lhs: _, rhs: _ } => {
+					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StatementElement::Num(n) = rhs.as_ref() {
 						if *n < 0 {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
@@ -640,19 +631,35 @@ fn compile_statement_inner<'a>(
 							};
 						instructions.append(&mut vec![(inst, None); *n as usize]);
 					} else {
-						todo!()
+						//The byte to be shifted is in SP(tmps_used) as it's the left hand side
+						// and the amount of shifts are in the A register.
+						let start_str =
+							format!("bit_shift_start_{}_{}", state.scope_name, state.line_id);
+						let end_str =
+							format!("bit_shift_end_{}_{}", state.scope_name, state.line_id);
+						let inst =
+							if matches!(statement, StatementElement::RShift { lhs: _, rhs: _ }) {
+								Instruction::LSR(Addressing::SP(*tmps_used))
+							} else {
+								Instruction::LSL(Addressing::SP(*tmps_used))
+							};
+						let mut shift_loop = vec![
+							(Instruction::Label(start_str.clone()), None),
+							(Instruction::TSTA, None),
+							(Instruction::BEQ(Addressing::Label(end_str.clone())), None),
+							(inst, None),
+							(Instruction::DECA, None),
+							(Instruction::JMP(Addressing::Label(start_str)), None),
+							(Instruction::Label(end_str), None),
+						];
+						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
+						instructions.append(&mut right_instructions);
+						instructions.append(&mut shift_loop);
 					}
 				}
 				_ => {
 					*tmps_used -= 1;
-					let mut right_instructions = compile_statement_inner(
-						right,
-						variables,
-						global_variables,
-						functions,
-						stack_size,
-						tmps_used,
-					)?;
+					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
 					} else {
@@ -672,7 +679,7 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
-			let arg_names = functions.get(name).ok_or(CompileError(
+			let arg_names = state.functions.get(name).ok_or(CompileError(
 				line!(),
 				"Name resolution failed? Shouldn't it've been checked by now?",
 			))?;
@@ -684,13 +691,7 @@ fn compile_statement_inner<'a>(
 				},
 			) in parametres.iter().zip(arg_names.iter())
 			{
-				instructions.append(&mut compile_statement(
-					statement,
-					variables,
-					global_variables,
-					functions,
-					stack_size,
-				)?);
+				instructions.append(&mut compile_statement(statement, state)?);
 				instructions.push((Instruction::PSHA, Some(v_name)));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
@@ -702,7 +703,12 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Var(name) => {
-			let adr = adr_for_name(name, variables, global_variables, stack_size)?;
+			let adr = adr_for_name(
+				name,
+				state.variables,
+				state.global_variables,
+				*state.stack_size,
+			)?;
 			vec![(Instruction::LDA(adr), Some(*name))]
 		}
 
@@ -727,7 +733,12 @@ fn compile_statement_inner<'a>(
 					&StatementElement::Add { lhs: _, rhs: _ },
 					Some((&StatementElement::Var(name), &StatementElement::Num(offset))),
 				) => {
-					let adr = adr_for_name(name, variables, global_variables, stack_size)?;
+					let adr = adr_for_name(
+						name,
+						state.variables,
+						state.global_variables,
+						*state.stack_size,
+					)?;
 					vec![
 						(Instruction::LDY(adr), Some(name)),
 						(Instruction::LDA(Addressing::Yn(offset)), None),
@@ -738,9 +749,13 @@ fn compile_statement_inner<'a>(
 					&StatementElement::Add { lhs: _, rhs: _ },
 					Some((&StatementElement::Var(name), rhs)),
 				) => {
-					let adr = adr_for_name(name, variables, global_variables, stack_size)?;
-					let mut statement =
-						compile_statement(rhs, variables, global_variables, functions, stack_size)?;
+					let adr = adr_for_name(
+						name,
+						state.variables,
+						state.global_variables,
+						*state.stack_size,
+					)?;
+					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
 						(Instruction::LDY(adr), Some(name)),
 						(Instruction::LDA(Addressing::AY), None),
@@ -749,14 +764,7 @@ fn compile_statement_inner<'a>(
 				}
 				//General case
 				_ => {
-					let mut instructions = compile_statement_inner(
-						adr.as_ref(),
-						variables,
-						global_variables,
-						functions,
-						stack_size,
-						tmps_used,
-					)?;
+					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
 					instructions.push((
 						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
 						Some("A to X transfer"),
@@ -773,7 +781,12 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::AdrOf(name) => {
 			//use adr_for_name and calculate the address -> A
-			let adr = adr_for_name(name, variables, global_variables, stack_size)?;
+			let adr = adr_for_name(
+				name,
+				state.variables,
+				state.global_variables,
+				*state.stack_size,
+			)?;
 			match adr {
 				Addressing::SP(n) => {
 					vec![
@@ -793,14 +806,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElement::Not { lhs } => {
-			let mut instructions = compile_statement_inner(
-				lhs,
-				variables,
-				global_variables,
-				functions,
-				stack_size,
-				tmps_used,
-			)?;
+			let mut instructions = compile_statement_inner(lhs, state, tmps_used)?;
 			instructions.push((Instruction::COMA, None));
 			instructions
 		}
