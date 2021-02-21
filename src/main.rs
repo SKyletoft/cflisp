@@ -1,9 +1,5 @@
 use std::{env, fmt, fs, path::PathBuf, process::exit};
 
-extern "C" {
-	fn system(command_str: *const u8) -> usize;
-}
-
 pub mod compile_flisp;
 pub mod error;
 pub mod flags;
