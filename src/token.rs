@@ -42,6 +42,9 @@ pub(crate) enum Token<'a> {
 }
 
 impl<'a> Token<'a> {
+	//It was at this point I realised that having clang-format work on all my test cases
+	// sheltered me from realising that I was only splitting at whitespace
+	///Splits a string into a list of tokens, splitting at whitespace and removing trailing commas
 	pub(crate) fn parse_str_to_vec(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		helper::split(source)?
 			.into_iter()
@@ -51,6 +54,7 @@ impl<'a> Token<'a> {
 			.map(Token::fix_deref)
 	}
 
+	///Fixes operator misread as multiplication into deref
 	fn fix_deref(mut vec: Vec<Token<'a>>) -> Vec<Token<'a>> {
 		let mut i = 0;
 		while i < vec.len() {
@@ -66,6 +70,7 @@ impl<'a> Token<'a> {
 		vec
 	}
 
+	///Maps words to tokens and parses literals
 	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
 		let token = match name {
 			";" => NewLine,
@@ -163,6 +168,7 @@ impl<'a> Token<'a> {
 		}
 	}
 
+	///Converts `Token::UnparsedBlock` into `StatementToken`s
 	pub(crate) fn parse_statement_tokens(
 		t: Token<'a>,
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
@@ -188,6 +194,7 @@ impl<'a> Token<'a> {
 		}
 	}
 
+	///Parses `Token::UnparsedBlock` as a list of statements. (Function *call*, not declaration)
 	pub(crate) fn parse_arguments_tokens(t: Token<'a>) -> Result<Vec<Statement<'a>>, ParseError> {
 		if let UnparsedBlock(s) = t {
 			if !(s.starts_with('(') && s.ends_with(')')) {
@@ -211,6 +218,7 @@ impl<'a> Token<'a> {
 		}
 	}
 
+	///Parses `Token::UnparsedBlock` as a list of types and names. (Function *declaration*, not call)
 	pub(crate) fn parse_argument_list_tokens(
 		t: Token<'a>,
 	) -> Result<Vec<Variable<'a>>, ParseError> {
@@ -251,6 +259,8 @@ impl<'a> Token<'a> {
 		}
 	}
 
+	//Should & and * be considered operators?
+	///Is the token an operator? Address of (&) and derefrencing (*) are not considered operators
 	fn is_op(&self) -> bool {
 		matches!(
 			self,

@@ -1,5 +1,6 @@
 use std::iter::FromIterator;
 
+///Container for all the compiler flags passed in from Args
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Flags {
 	pub(crate) hex: bool,

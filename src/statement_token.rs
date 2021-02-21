@@ -1,5 +1,6 @@
 use crate::*;
 
+///A reduced set of tokens for use in statements
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementToken<'a> {
 	Num(isize),

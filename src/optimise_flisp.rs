@@ -28,6 +28,8 @@ pub(crate) fn all_optimisations(
 	Ok(())
 }
 
+///Replaces a load A and move to X/Y with a direct load to X/Y and
+/// address load to X and write to X,0 to a write to address directly.
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
@@ -76,6 +78,8 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Removes loads (not to A) that are immediately overwritten. May be unsound as it doesn't
+/// check if the new load is dependent on the old load
 fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx < instructions.len() - 2 {
@@ -85,7 +89,6 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 				| ((Instruction::LDX(_), _), (Instruction::LDX(_), _))
 				| ((Instruction::LDY(_), _), (Instruction::LDY(_), _))
 				| ((Instruction::LDSP(_), _), (Instruction::LDSP(_), _))
-				| ((Instruction::RTS, _), (Instruction::RTS, _))
 		) {
 			instructions.remove(idx);
 		}
@@ -93,6 +96,7 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Removes repeat RTS that can occur after unused labels have been eliminated
 pub(crate) fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx < instructions.len() - 2 {
@@ -106,6 +110,7 @@ pub(crate) fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+//Removes repeat loads to A if the value in A wasn't used
 fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 	let mut last_load = usize::MAX;
 	let mut idx = 0;
@@ -137,6 +142,7 @@ fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+//Removes repeat loads to X/Y if the value in X/Y wasn't used
 fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut last_x = isize::MIN;
 	let mut last_y = isize::MIN;
@@ -202,6 +208,7 @@ fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+//Removes instructions that are equivalent with a NOP
 fn nop(instructions: &mut Vec<CommentedInstruction>) {
 	instructions.retain(|(i, _)| {
 		!matches!(
@@ -247,7 +254,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-//For each allocation, find how many unused bytes there are and reduce the allocation by that much.
+//For each tmp allocation, find how many unused bytes there are and reduce the allocation by that much.
 // Won't remove 0 size allocations, just run nop afterwards.
 fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
 	let mut sp_stack: Vec<(usize, isize)> = Vec::new();
@@ -339,6 +346,8 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), C
 	Ok(())
 }
 
+///Removes unreachable instructions that exist after an RTS instruction before the next label
+/// (all jumps are to labels, even jumps that are relative according to the instruction set)
 fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 	let mut remove = false;
 	let mut idx = 0;
@@ -362,6 +371,9 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Removes extra pushes and stack reductions that can just be a STA(SP(1))
+/// that can occur when several operations that are implemented with function
+/// calls follow each other
 fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 4 && idx < instructions.len() - 4 {
@@ -384,6 +396,7 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces subtraction by one with a DEC instruction
 fn dec(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
@@ -406,6 +419,7 @@ fn dec(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces addition by one with an INC instruction
 fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
@@ -428,6 +442,7 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces addition by one with an INC instruction
 fn inca(instructions: &mut Vec<CommentedInstruction>) {
 	for (inst, _) in instructions.iter_mut() {
 		if matches!(inst, Instruction::ADDA(Addressing::Data(1))) {
@@ -436,6 +451,7 @@ fn inca(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces subtraction by one with a DEC instruction
 fn deca(instructions: &mut Vec<CommentedInstruction>) {
 	for (inst, _) in instructions.iter_mut() {
 		if matches!(inst, Instruction::SUBA(Addressing::Data(1))) {
@@ -444,6 +460,8 @@ fn deca(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces the generated function call to __eq__ and a jump that is required for
+/// chained boolean operators with a BEQ instruction directly
 fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx < instructions.len() - 6 {
@@ -484,6 +502,8 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces the generated function call to __eq__ and a jump that is required for
+/// chained boolean operators with a BNE instruction directly
 fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx < instructions.len() - 7 {
@@ -527,6 +547,8 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces the generated function call to __gt__ and a jump that is required for
+/// chained boolean operators with a BGE instruction directly
 fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx < instructions.len() - 6 {
@@ -567,6 +589,8 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Replaces the generated function call to __gt__ and a jump that is required for
+/// chained boolean operators with a BLT instruction directly
 fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx < instructions.len() - 7 {
@@ -610,6 +634,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Removes labels that are never used. Includes everything, even function names
 pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let mut jumps_to = instructions
 		.iter()

@@ -1,40 +1,52 @@
 use crate::*;
 
+// Replace &'a str with a Cow<String>?
+///`(Instruction, Option<&'a str>)`
+///
+/// The comment should have the same lifetime as the input source code (or `&'static`)
 pub(crate) type CommentedInstruction<'a> = (Instruction, Option<&'a str>);
 
+///A flisp instruction. Usually appears as the first half of a `CommentedInstruction` tuple.
+/// Can also be a label or FCB assembler directive.
+/// Naming scheme follows flisp rather than Rust naming conventions
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Instruction {
 	LDA(Addressing),
+	STA(Addressing),
 	LDX(Addressing),
 	LDY(Addressing),
 	LDSP(Addressing),
+	STSP(Addressing),
+	LEASP(Addressing),
+
 	ADDA(Addressing),
 	SUBA(Addressing),
 	ANDA(Addressing),
 	ORA(Addressing),
 	EORA(Addressing),
-	STA(Addressing),
-	STSP(Addressing),
+	CMPA(Addressing),
+	INCA,
+	DECA,
+
+	TSTA,
+	COMA,
+	LSLA,
+	LSRA,
+
 	JMP(Addressing),
 	BNE(Addressing),
 	BEQ(Addressing),
 	BGE(Addressing),
 	BLT(Addressing),
-	LEASP(Addressing),
-	CMPA(Addressing),
+
 	INC(Addressing),
 	DEC(Addressing),
 	LSL(Addressing),
 	LSR(Addressing),
-	INCA,
-	DECA,
+
 	PSHA,
 	PULA,
-	TSTA,
-	COMA,
-	LSLA,
-	LSRA,
 	RTS,
 	JSR(Addressing),
 	Label(String),
@@ -78,6 +90,7 @@ impl fmt::Display for Instruction {
 			Instruction::RTS => write!(f, "\tRTS\t"),
 			Instruction::Label(l) => write!(f, "{}", l),
 			Instruction::FCB(bytes) => {
+				//Maybe insert a newline every eight values?
 				write!(f, "\tFCB\t")?;
 				for &val in bytes.iter().take(bytes.len() - 1) {
 					write!(f, "{:03},", val % 256)?;
@@ -135,6 +148,7 @@ impl fmt::UpperHex for Instruction {
 }
 
 impl Instruction {
+	///The size in bytes that it will take up in the final compiled binary
 	pub(crate) fn size(&self) -> usize {
 		match self {
 			Instruction::LDA(a)
@@ -174,6 +188,7 @@ impl Instruction {
 		}
 	}
 
+	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
 	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
 		match self {
 			Instruction::LDA(a)
@@ -213,6 +228,7 @@ impl Instruction {
 		}
 	}
 
+	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
 	pub(crate) fn get_adr(&self) -> Option<&Addressing> {
 		match self {
 			Instruction::LDA(a)
@@ -253,6 +269,9 @@ impl Instruction {
 	}
 }
 
+///The different addressing modes for the instructions. Unfortunately not every addressing mode
+/// works with every instruction, but as we only use one `Addressing` enum type the type system won't
+/// stop you from misusing this.
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Addressing {
@@ -268,6 +287,7 @@ pub(crate) enum Addressing {
 }
 
 impl Addressing {
+	///The size in bytes that it will take up in the final compiled binary
 	fn size(&self) -> usize {
 		match self {
 			Addressing::Data(_)

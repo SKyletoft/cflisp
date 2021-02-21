@@ -1,5 +1,6 @@
 use std::{error, fmt};
 
+///Error type for parsing and type checking
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ParseError(pub u32, pub &'static str);
 
@@ -11,6 +12,7 @@ impl fmt::Display for ParseError {
 
 impl error::Error for ParseError {}
 
+///Error type for compiling and optimisation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CompileError(pub u32, pub &'static str);
 

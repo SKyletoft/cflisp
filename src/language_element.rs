@@ -1,5 +1,9 @@
 use crate::*;
 
+///Internal representation of the program.
+/// Can represent any language pattern considered valid.
+/// (language patterns are complete lines. Right hand side
+/// statements are `StatementElement`s)
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum LanguageElement<'a> {
 	VariableDeclaration {

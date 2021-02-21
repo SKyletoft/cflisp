@@ -8,6 +8,8 @@ pub(crate) fn parse<'a>(
 	construct_block(&tokens, move_first)
 }
 
+///Wrapper around `construct_structure_from_tokens` to construct an entire block.
+/// Does its own line split
 fn construct_block<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
@@ -22,6 +24,9 @@ fn construct_block<'a>(
 	Ok(res)
 }
 
+///Matches a line of `Token`s into a `LanguageElement`, defaulting to a statement if no match can be made.
+/// Does recursively parse all contained parts so a returned LanguageElement can be trusted as valid, apart
+/// from type checking.
 fn construct_structure_from_tokens<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
@@ -222,6 +227,7 @@ fn construct_structure_from_tokens<'a>(
 	Ok(element)
 }
 
+///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub(crate) fn type_check(
 	block: &[LanguageElement],
 	upper_variables: &[Variable],
@@ -332,6 +338,7 @@ pub(crate) fn type_check(
 	Ok(true)
 }
 
+///Splits tokens at NewLines and after `UnparsedBlock`s that are *not* followed by `Else`
 fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	let mut vec = Vec::new();
 	let mut last = 0;
@@ -361,6 +368,8 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	vec
 }
 
+///Takes the entire source code and removes the rest of the line for each line with a `//`.
+/// Does *not* handle multiline comments
 pub(crate) fn remove_comments(s: &str) -> String {
 	let mut out = String::new();
 	for line in s.lines() {

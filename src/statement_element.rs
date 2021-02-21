@@ -1,5 +1,6 @@
 use crate::*;
 
+///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StatementElement<'a> {
 	Add {
@@ -82,8 +83,11 @@ pub(crate) enum StatementElement<'a> {
 	AdrOf(&'a str),
 }
 
+///Takes two `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same
 type OpFnPtr<'a> = fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> StatementElement<'a>;
 
+///Enum type for Work-In-Progress parsing. Either a parsed StatementElement or a unparsed *single* token.
+/// Both types are exported.
 #[derive(Debug, Clone, PartialEq)]
 enum MaybeParsed<'a> {
 	Parsed(StatementElement<'a>),
@@ -92,6 +96,7 @@ enum MaybeParsed<'a> {
 use MaybeParsed::*;
 
 impl<'a> StatementElement<'a> {
+	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
 	pub(crate) fn as_flisp_instruction(
 		&self,
 		adr: Addressing,

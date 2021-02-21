@@ -52,7 +52,9 @@ pub(crate) fn instructions_to_text(
 	Ok(output)
 }
 
-pub(crate) fn automatic_imports(instructions: &mut String) {
+///Imports all functions for non native operations that are used by the program.
+/// Also adds init if no init function is written
+pub(crate) fn automatic_imports(instructions: &mut String, debug: bool) {
 	if instructions.contains("__mul__") {
 		instructions.push_str(include_str!("asm_deps/mul.sflisp"));
 	}
@@ -69,7 +71,11 @@ pub(crate) fn automatic_imports(instructions: &mut String) {
 		instructions.push_str(include_str!("asm_deps/mod.sflisp"));
 	}
 	if !instructions.contains("__init_") {
-		instructions.push_str(include_str!("asm_deps/init.sflisp"));
+		if debug {
+			instructions.push_str(include_str!("asm_deps/debug_init.sflisp"));
+		} else {
+			instructions.push_str(include_str!("asm_deps/init.sflisp"));
+		}
 	}
 	instructions.push_str("\n\tORG\t$FF\n\tFCB\t__init_\n");
 }

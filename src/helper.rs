@@ -1,5 +1,8 @@
 use crate::*;
 
+///Splits a string slice into words. Will keep anything in parentheses as a single
+/// word so you will have to recall this function after removing parentheses.
+/// `(){}[]""` count as parentheses, not just `()`
 pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 	let keep_closure = |slice: &str| slice.chars().any(|c| !c.is_whitespace());
 	let mut vec = Vec::new();
@@ -137,11 +140,13 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 	}
 }
 
+///Removes the first and last characters. Panics if the string is too short
 pub(crate) fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
 	s[1..s.len() - 1].trim()
 }
 
+///A block starts with `{` and ends with `}`
 pub(crate) fn is_block(s: &str) -> bool {
 	s.starts_with('{') && s.ends_with('}')
 }

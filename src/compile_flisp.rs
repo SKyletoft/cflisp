@@ -814,6 +814,7 @@ fn compile_statement_inner<'a>(
 	Ok(instructions)
 }
 
+///Returns addressing for a name. Stack offset for locals and a Label for globals (and not an absolute address)
 fn adr_for_name<'a>(
 	name: &'a str,
 	variables: &HashMap<&'a str, (Type, isize)>,

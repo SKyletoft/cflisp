@@ -1,11 +1,13 @@
 use crate::*;
 
+///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Variable<'a> {
 	pub(crate) typ: Type,
 	pub(crate) name: &'a str,
 }
 
+///Return type, name and argument list
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Function<'a> {
 	pub(crate) return_type: Type,
