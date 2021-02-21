@@ -1,5 +1,5 @@
-__div__	PSHA		; A / SP,1 -> A
-	LDA	#0
+__div__	PSHA		; Computes A / 1,SP -> A
+	LDA	#0	; (0,SP is the return adr)
 	STA	-1,SP
 	PULA
 __div_1	CMPA	1,SP

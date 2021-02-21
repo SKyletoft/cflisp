@@ -1,5 +1,5 @@
-__mul__	PSHA		; Computes SP,1 * A -> A
-	LDA	#0	; (SP,0 is the return adr)
+__mul__	PSHA		; Computes 1,SP * A -> A
+	LDA	#0	; (0,SP is the return adr)
 __mul_1	ROR	2,SP
 	BCC	__mul_2
 	ADDA	0,SP

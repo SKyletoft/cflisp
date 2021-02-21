@@ -1,5 +1,5 @@
-__gt__	CMPA	1,SP	; Greater than. Compares SP,1 to A -> A
-	BGT	__gt_1	; (SP,0 is the return adr)
+__gt__	CMPA	1,SP	; Greater than. Compares 1,SP to A -> A
+	BGT	__gt_1	; (0,SP is the return adr)
 	LDA	#$00
 	RTS
 __gt_1	LDA	#$FF

@@ -1,5 +1,5 @@
-__eq__	CMPA	1,SP	; Equal to. Compares SP,1 to A -> A
-	BEQ	__eq_1	; (SP,0 is the return adr)
+__eq__	CMPA	1,SP	; Equal to. Compares 1,SP to A -> A
+	BEQ	__eq_1	; (0,SP is the return adr)
 	LDA	#$00
 	RTS
 __eq_1	LDA	#$FF
