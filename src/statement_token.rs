@@ -117,7 +117,7 @@ impl<'a> StatementToken<'a> {
 						StatementToken::Array(v)
 					} else {
 						StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(
-							b,
+							helper::remove_parentheses(b),
 						)?])?)
 					}
 				}

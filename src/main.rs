@@ -1,4 +1,8 @@
-use std::{env, fmt, fs, path::PathBuf, process::exit};
+use std::{
+	env, fmt, fs,
+	path::PathBuf,
+	process::{exit, Command},
+};
 
 pub mod compile_flisp;
 pub mod error;
@@ -38,13 +42,22 @@ fn main() {
 	}
 	let mut source = String::new();
 	for file in files {
-		source.push_str(&fs::read_to_string(file).expect("IO Error: Could not read file"));
+		source.push_str(&fs::read_to_string(file).unwrap_or_else(|_| {
+			eprintln!("IO Error: Could not read file");
+			exit(-1);
+		}));
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
-	let parsed = parser::parse(&source, !flags.debug).expect("Parse error");
+	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|_| {
+		eprintln!("Parse Error");
+		exit(-1);
+	});
 	if flags.type_check {
-		let ok = parser::type_check(&parsed, &[], &[]).expect("Name error");
+		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|_| {
+			eprintln!("Name error");
+			exit(-1);
+		});
 		if !ok {
 			eprintln!("Error: type check or name resolution error");
 			exit(-1);
@@ -53,12 +66,18 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
-	let mut instr = compile_flisp::compile(&parsed, &flags).expect("Compiler error");
+	let mut instr = compile_flisp::compile(&parsed, &flags).unwrap_or_else(|_| {
+		eprintln!("Compilation error");
+		exit(-1);
+	});
 	if !flags.debug {
 		optimise_flisp::remove_unused_labels(&mut instr);
 		optimise_flisp::repeat_rts(&mut instr);
 	}
-	let mut compiled = text::instructions_to_text(&instr, &flags).expect("Too long?");
+	let mut compiled = text::instructions_to_text(&instr, &flags).unwrap_or_else(|_| {
+		eprintln!("Program too large?");
+		exit(-1);
+	});
 	text::automatic_imports(&mut compiled);
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
@@ -67,7 +86,10 @@ fn main() {
 		println!("{}", &compiled);
 	}
 	if !flags.print_result || flags.assemble {
-		fs::write(&flags.out, &compiled).expect("IO Error: Could not save file");
+		fs::write(&flags.out, &compiled).unwrap_or_else(|_| {
+			eprintln!("IO Error: Could not save file");
+			exit(-1);
+		});
 	}
 	if flags.assemble {
 		let path = std::env::vars()
@@ -89,12 +111,18 @@ fn main() {
 			})
 			.flatten()
 		{
-			let res = std::process::Command::new(p)
+			let res = Command::new(p)
 				.arg(flags.out)
 				.output()
 				.map(|out| String::from_utf8(out.stdout))
-				.expect("Failed to call qaflisp")
-				.expect("Output isn't utf8?");
+				.unwrap_or_else(|_| {
+					eprintln!("Failed to call qaflisp");
+					exit(-1);
+				})
+				.unwrap_or_else(|_| {
+					eprintln!("Output isn't utf8?");
+					exit(-1);
+				});
 			print!("{}", res);
 		} else {
 			eprintln!("Couldn't find qaflisp");
