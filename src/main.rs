@@ -27,6 +27,7 @@ use statement_token::StatementToken;
 use token::{Token, Token::*};
 use types::{Block, Function, Statement, Type, Variable};
 
+//Yes, this is a horrible mess
 fn main() {
 	let args = env::args().skip(1).collect::<Vec<_>>();
 	let flags = args.iter().collect::<Flags>();
@@ -78,7 +79,7 @@ fn main() {
 		eprintln!("Program too large?");
 		exit(-1);
 	});
-	text::automatic_imports(&mut compiled);
+	text::automatic_imports(&mut compiled, flags.debug);
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
 	}

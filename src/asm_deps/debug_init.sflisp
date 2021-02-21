@@ -1,0 +1,7 @@
+__init_	LDA	#0
+	LDX	#0
+	LDY	#0
+	LDSP	#$FB
+	JSR	main
+__end__	JMP	__end__
+
