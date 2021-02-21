@@ -1,0 +1,12 @@
+__div__	PSHA		; A / SP,1 -> A
+	LDA	#0
+	STA	-1,SP
+	PULA
+__div_1	CMPA	1,SP
+	BGE	__div_2
+	LDA	-2,SP
+	RTS
+__div_2	SUBA	1,SP
+	INC	-2,SP
+	JMP	__div_1
+
