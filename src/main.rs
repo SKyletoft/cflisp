@@ -43,20 +43,20 @@ fn main() {
 	}
 	let mut source = String::new();
 	for file in files {
-		source.push_str(&fs::read_to_string(file).unwrap_or_else(|_| {
-			eprintln!("IO Error: Could not read file");
+		source.push_str(&fs::read_to_string(file).unwrap_or_else(|e| {
+			eprintln!("IO Error: Could not read file ({})", e);
 			exit(-1);
 		}));
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
-	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|_| {
-		eprintln!("Parse Error");
+	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|e| {
+		eprintln!("Parse Error ({})", e);
 		exit(-1);
 	});
 	if flags.type_check {
-		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|_| {
-			eprintln!("Name error");
+		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|e| {
+			eprintln!("Name error ({})", e);
 			exit(-1);
 		});
 		if !ok {
@@ -67,16 +67,16 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
-	let mut instr = compile_flisp::compile(&parsed, &flags).unwrap_or_else(|_| {
-		eprintln!("Compilation error");
+	let mut instr = compile_flisp::compile(&parsed, &flags).unwrap_or_else(|e| {
+		eprintln!("Compilation error ({})", e);
 		exit(-1);
 	});
 	if !flags.debug {
 		optimise_flisp::remove_unused_labels(&mut instr);
 		optimise_flisp::repeat_rts(&mut instr);
 	}
-	let mut compiled = text::instructions_to_text(&instr, &flags).unwrap_or_else(|_| {
-		eprintln!("Program too large?");
+	let mut compiled = text::instructions_to_text(&instr, &flags).unwrap_or_else(|e| {
+		eprintln!("Program too large? ({})", e);
 		exit(-1);
 	});
 	text::automatic_imports(&mut compiled, flags.debug);
@@ -87,8 +87,8 @@ fn main() {
 		println!("{}", &compiled);
 	}
 	if !flags.print_result || flags.assemble {
-		fs::write(&flags.out, &compiled).unwrap_or_else(|_| {
-			eprintln!("IO Error: Could not save file");
+		fs::write(&flags.out, &compiled).unwrap_or_else(|e| {
+			eprintln!("IO Error: Could not save file ({})", e);
 			exit(-1);
 		});
 	}

@@ -64,65 +64,51 @@ impl<'a> StatementToken<'a> {
 				Token::NotCmp => StatementToken::NotCmp,
 				Token::AdrOf(n) => StatementToken::AdrOf(n),
 				Token::Deref(b) => StatementToken::Deref(StatementToken::from_tokens(b.as_ref())?),
-				Token::Args(b) => {
-					assert!(b.is_empty());
+				Token::UnparsedParentheses(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						res[last] = StatementToken::FunctionCall(n, vec![]);
+						res[last] =
+							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
+						continue;
+					} else {
+						let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+						let as_statement = StatementToken::from_tokens(&tokenised)?;
+						StatementToken::Parentheses(as_statement)
+					}
+				}
+				Token::UnparsedArrayAccess(b) => {
+					if let Some(StatementToken::Var(n)) = res.get(last) {
+						let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+						let as_statement = StatementToken::from_tokens(&idx)?;
+						res[last] = StatementToken::ArrayAccess {
+							ptr: n,
+							idx: as_statement,
+						};
 						continue;
 					} else {
 						return Err(ParseError(
 							line!(),
-							"Empty parentheses outside of a function call?",
+							"Not (yet?) implemented: Array access to any pointer",
 						));
 					}
 				}
 				Token::UnparsedBlock(b) => {
-					if b.starts_with('(') && b.ends_with(')') {
-						if let Some(StatementToken::Var(n)) = res.get(last) {
-							res[last] = StatementToken::FunctionCall(
-								n,
-								Token::parse_arguments_tokens(Token::UnparsedBlock(b))?,
-							);
-							continue;
-						} else {
-							let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
-							let as_statement = StatementToken::from_tokens(&tokenised)?;
-							StatementToken::Parentheses(as_statement)
-						}
-					} else if b.starts_with('[') && b.ends_with(']') {
-						if let Some(StatementToken::Var(n)) = res.get(last) {
-							let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
-							let as_statement = StatementToken::from_tokens(&idx)?;
-							res[last] = StatementToken::ArrayAccess {
-								ptr: n,
-								idx: as_statement,
-							};
-							continue;
-						} else {
-							return Err(ParseError(
-								line!(),
-								"Not (yet?) implemented: Array access to any pointer",
-							));
-						}
-					} else if b.starts_with('{') && b.ends_with('}') {
-						let items = helper::remove_parentheses(b)
-							.split(',')
-							.map(|s| s.trim())
-							.collect::<Vec<_>>();
-						let mut v = Vec::new();
-						for item in items {
-							v.push(StatementToken::from_tokens(&Token::parse_str_to_vec(
-								item,
-							)?)?);
-						}
-						StatementToken::Array(v)
-					} else {
-						StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(
-							helper::remove_parentheses(b),
-						)?])?)
+					let items = helper::remove_parentheses(b)
+						.split(',')
+						.map(|s| s.trim())
+						.collect::<Vec<_>>();
+					let mut v = Vec::new();
+					for item in items {
+						v.push(StatementToken::from_tokens(&Token::parse_str_to_vec(
+							item,
+						)?)?);
 					}
+					StatementToken::Array(v)
+				}
+				Token::UnparsedSource(b) => {
+					StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(b)?])?)
 				}
 				_ => {
+					dbg!(tokens);
 					dbg!(token);
 					return Err(ParseError(line!(), "Token is not valid in this context"));
 				}

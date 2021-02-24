@@ -34,21 +34,9 @@ fn construct_structure_from_tokens<'a>(
 	let element = {
 		match tokens {
 			//Function declaration
-			[Decl(t), Token::Name(n), Args(args), UnparsedBlock(code)] => {
-				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
-				let code_parsed = construct_block(&code_tokenised, move_first)?;
-				LanguageElement::FunctionDeclaration {
-					typ: t.clone(),
-					name: *n,
-					args: args.clone(),
-					block: code_parsed,
-				}
-			}
-
-			//Function declaration
-			[Decl(t), Token::Name(n), UnparsedBlock(args), UnparsedBlock(code)] => {
-				let args_parsed = Token::parse_argument_list_tokens(UnparsedBlock(args))?;
-				let code_tokenised = Token::parse_block_tokens(UnparsedBlock(code))?;
+			[Decl(t), Token::Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+				let args_parsed = Token::parse_argument_list_tokens(args)?;
+				let code_tokenised = Token::parse_block_tokens(code)?;
 				let code_parsed = construct_block(&code_tokenised, move_first)?;
 				LanguageElement::FunctionDeclaration {
 					typ: t.clone(),
@@ -60,22 +48,16 @@ fn construct_structure_from_tokens<'a>(
 
 			//Pointer variable declaration
 			[Decl(t), Deref(d), Assign, ..] => {
-				let mut typ = t.clone();
-				let mut r = d;
-				let mut name = "";
-				while let [UnparsedBlock(b)] = r.as_ref() {
+				let mut typ = Type::Ptr(Box::new(t.clone()));
+				let mut r = d.as_ref();
+				let name;
+				while let [Deref(b)] = r.as_ref() {
 					typ = Type::Ptr(Box::new(typ));
-					if let [Token::Name(n)] = Token::parse_str_to_vec(b)?.as_slice() {
-						name = *n;
-						break;
-					} else if let [Token::Deref(d)] = r.as_ref() {
-						r = d;
-					} else {
-						dbg!(tokens);
-						return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
-					}
+					r = b;
 				}
-				if name.is_empty() {
+				if let [Token::Name(n)] = r {
+					name = *n;
+				} else {
 					dbg!(tokens);
 					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
 				}
@@ -131,10 +113,10 @@ fn construct_structure_from_tokens<'a>(
 			},
 
 			//If else if
-			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, If, ..] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
+				let condition = Token::parse_statement_tokens(cond)?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(then_code), move_first)?;
+				let then_parsed = parse(then_code, move_first)?;
 				let else_if_tokens = &tokens[4..];
 				let else_if_parsed = construct_structure_from_tokens(else_if_tokens, move_first)?;
 				LanguageElement::IfStatement {
@@ -145,11 +127,12 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//If else
-			[If, UnparsedBlock(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] =>
+			{
+				let condition = Token::parse_statement_tokens(cond)?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(then_code), move_first)?;
-				let else_parsed = parse(helper::remove_parentheses(else_code), move_first)?;
+				let then_parsed = parse(then_code, move_first)?;
+				let else_parsed = parse(else_code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -158,10 +141,10 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//If
-			[If, UnparsedBlock(cond), UnparsedBlock(code)] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+			[If, UnparsedParentheses(cond), UnparsedBlock(code)] => {
+				let condition = Token::parse_statement_tokens(cond)?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let then_parsed = parse(helper::remove_parentheses(code), move_first)?;
+				let then_parsed = parse(code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -170,11 +153,8 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//For
-			[For, UnparsedBlock(init_cond_post), UnparsedBlock(code)] => {
-				let split = helper::remove_parentheses(init_cond_post)
-					.split(';')
-					.map(str::trim)
-					.collect::<Vec<_>>();
+			[For, UnparsedParentheses(init_cond_post), UnparsedBlock(code)] => {
+				let split = init_cond_post.split(';').map(str::trim).collect::<Vec<_>>();
 				if split.len() != 3 {
 					return Err(ParseError(
 						line!(),
@@ -188,7 +168,7 @@ fn construct_structure_from_tokens<'a>(
 
 				let init = parse(split[0], move_first)?;
 				let post = parse(split[2], move_first)?;
-				let body = parse(helper::remove_parentheses(code), move_first)?;
+				let body = parse(code, move_first)?;
 
 				LanguageElement::For {
 					init,
@@ -199,10 +179,10 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//While
-			[While, UnparsedBlock(cond), UnparsedBlock(code)] => {
-				let condition = Token::parse_statement_tokens(UnparsedBlock(cond))?;
+			[While, UnparsedParentheses(cond), UnparsedBlock(code)] => {
+				let condition = Token::parse_statement_tokens(cond)?;
 				let condition_parsed = StatementElement::from_tokens(condition)?;
-				let body_parsed = parse(helper::remove_parentheses(code), move_first)?;
+				let body_parsed = parse(code, move_first)?;
 				LanguageElement::While {
 					condition: condition_parsed,
 					body: body_parsed,
@@ -350,7 +330,7 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 			}
 			last = idx + 1;
 		}
-		if matches!(tokens[idx], Token::UnparsedBlock(raw) if helper::is_block(raw))
+		if matches!(tokens[idx], Token::UnparsedBlock(_))
 			&& !matches!(tokens.get(idx + 1), Some(Token::Else))
 		{
 			let slice = &tokens[last..=idx];

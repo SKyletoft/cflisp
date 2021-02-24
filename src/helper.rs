@@ -121,6 +121,16 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 				escape = true;
 				continue;
 			}
+
+			(0, 0, 0, 0, c) if "+-*/^".contains(c) => {
+				let slice = &s[start..i];
+				if keep_closure(slice) {
+					vec.push(slice);
+				}
+				vec.push(&s[i..i + 1]);
+				start = i + 1;
+			}
+
 			_ => {}
 		}
 		escape = false;
@@ -129,6 +139,7 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 	if keep_closure(slice) {
 		vec.push(slice);
 	}
+
 	if parentheses == 0 && brackets == 0 && quotes == 0 {
 		Ok(vec)
 	} else {
@@ -144,9 +155,4 @@ pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
 pub(crate) fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
 	s[1..s.len() - 1].trim()
-}
-
-///A block starts with `{` and ends with `}`
-pub(crate) fn is_block(s: &str) -> bool {
-	s.starts_with('{') && s.ends_with('}')
 }

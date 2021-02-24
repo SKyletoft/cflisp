@@ -94,6 +94,9 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::VariableAssignment { name, value } => {
+			if state.scope_name == "global" {
+				return Err(CompileError(line!(), "Lone statement in global scope"));
+			}
 			let adr = adr_for_name(
 				name,
 				state.variables,
@@ -173,6 +176,9 @@ fn compile_element<'a>(
 		}
 
 		LanguageElement::PointerAssignment { ptr, value } => {
+			if state.scope_name == "global" {
+				return Err(CompileError(line!(), "Lone statement in global scope"));
+			}
 			let get_adr = compile_statement(ptr, state)?;
 			let mut value = compile_statement(value, state)?;
 			let mut statement = get_adr;
@@ -419,7 +425,12 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::Statement(statement) => compile_statement(statement, state)?,
+		LanguageElement::Statement(statement) => {
+			if state.scope_name == "global" {
+				return Err(CompileError(line!(), "Lone statement in global scope"));
+			}
+			compile_statement(statement, state)?
+		}
 	};
 	Ok(res)
 }

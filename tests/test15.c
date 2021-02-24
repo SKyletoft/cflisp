@@ -22,7 +22,7 @@ int main() {
 	*0xFC   = foo;
 
 	//int bar = a + b + c + d + e + f + g + h;
-	int bar = a+b+c+d+e+f+g+h;
-	*0xFB   = bar;
+	//int bar = a+b+c+d+e+f+g+h;
+	//*0xFB   = bar;
 	// printf("0x%X\n", foo);
 }
