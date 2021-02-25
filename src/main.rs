@@ -1,7 +1,7 @@
 use std::{
 	env, fmt, fs,
 	path::PathBuf,
-	process::{exit, Command},
+	{process, process::Command},
 };
 
 pub mod compile_flisp;
@@ -39,29 +39,29 @@ fn main() {
 		.collect::<Vec<&str>>();
 	if files.is_empty() {
 		eprintln!("Error: No input files");
-		exit(-1);
+		process::exit(-1);
 	}
 	let mut source = String::new();
 	for file in files {
 		source.push_str(&fs::read_to_string(file).unwrap_or_else(|e| {
 			eprintln!("IO Error: Could not read file ({})", e);
-			exit(-1);
+			process::exit(-1);
 		}));
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
 	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|e| {
 		eprintln!("Parse Error ({})", e);
-		exit(-1);
+		process::exit(-1);
 	});
 	if flags.type_check {
 		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);
-			exit(-1);
+			process::exit(-1);
 		});
 		if !ok {
 			eprintln!("Error: type check or name resolution error");
-			exit(-1);
+			process::exit(-1);
 		}
 	}
 	if flags.tree {
@@ -69,7 +69,7 @@ fn main() {
 	}
 	let mut instr = compile_flisp::compile(&parsed, &flags).unwrap_or_else(|e| {
 		eprintln!("Compilation error ({})", e);
-		exit(-1);
+		process::exit(-1);
 	});
 	if !flags.debug {
 		optimise_flisp::remove_unused_labels(&mut instr);
@@ -77,7 +77,7 @@ fn main() {
 	}
 	let mut compiled = text::instructions_to_text(&instr, &flags).unwrap_or_else(|e| {
 		eprintln!("Program too large? ({})", e);
-		exit(-1);
+		process::exit(-1);
 	});
 	text::automatic_imports(&mut compiled, flags.debug);
 	if flags.debug {
@@ -89,7 +89,7 @@ fn main() {
 	if !flags.print_result || flags.assemble {
 		fs::write(&flags.out, &compiled).unwrap_or_else(|e| {
 			eprintln!("IO Error: Could not save file ({})", e);
-			exit(-1);
+			process::exit(-1);
 		});
 	}
 	if flags.assemble {
@@ -118,16 +118,16 @@ fn main() {
 				.map(|out| String::from_utf8(out.stdout))
 				.unwrap_or_else(|_| {
 					eprintln!("Failed to call qaflisp");
-					exit(-1);
+					process::exit(-1);
 				})
 				.unwrap_or_else(|_| {
 					eprintln!("Output isn't utf8?");
-					exit(-1);
+					process::exit(-1);
 				});
 			print!("{}", res);
 		} else {
 			eprintln!("Couldn't find qaflisp");
-			exit(-1);
+			process::exit(-1);
 		}
 	}
 }
