@@ -64,3 +64,11 @@ a|assemble|Calls qaflisp directly. Requires qaflisp to be on $PATH. Probably doe
 o|out|Sets the name of the output file (following argument)
 g|debug|Adds debug info. Disables removal of unused names and adds `ORG $20` to the top for easier digiflisp debugging
 O|optimise| Enables optimisations. In practice it mostly just fixes bad code generation rather than actually optimising the code. (Capital o, not zero)
+
+## Todo
+(additional features still under consideration)
+* Structs
+* Line numbers for parse errors
+* Inline assembly
+* -a flag on Windows and Mac
+* Figure out licensing
