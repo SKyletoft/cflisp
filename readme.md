@@ -69,6 +69,12 @@ O|optimise| Enables optimisations. In practice it mostly just fixes bad code gen
 (additional features still under consideration)
 * Structs
 * Line numbers for parse errors
+* Interrupts
 * Inline assembly
-* -a flag on Windows and Mac
+* `-a` flag on Windows and Mac
 * Figure out licensing
+* Implement own flisp simulator (16 bit addressing?)
+* Web interface like godbolt
+* Fix the type checker
+* Mutlibyte size variables?
+* Actual optimisations
