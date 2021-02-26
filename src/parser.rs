@@ -197,6 +197,19 @@ fn construct_structure_from_tokens<'a>(
 				LanguageElement::Return(Some(return_statement))
 			}
 
+			[TypeDef, Struct, Name(name), UnparsedBlock(members), Name(name2)] => {
+				if name != name2 {
+					return Err(ParseError(
+						line!(),
+						"Struct doesn't have the same name as its typedef",
+					));
+				}
+				return Err(ParseError(line!(), "structs are not yet supported"));
+			}
+			[Struct, Name(name), UnparsedBlock(members)] => {
+				return Err(ParseError(line!(), "structs are not yet supported"))
+			}
+
 			_ => {
 				let tokenised = StatementToken::from_tokens(tokens)?;
 				let element = StatementElement::from_tokens(tokenised)?;
@@ -332,7 +345,10 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 		}
 		if matches!(tokens[idx], Token::UnparsedBlock(_))
 			&& !matches!(tokens.get(idx + 1), Some(Token::Else))
-		{
+			&& !matches!(
+				(tokens.get(idx + 1), tokens.get(idx + 2)),
+				(Some(Token::Name(_)), Some(Token::NewLine))
+			) {
 			let slice = &tokens[last..=idx];
 			if !slice.is_empty() {
 				vec.push(slice);
