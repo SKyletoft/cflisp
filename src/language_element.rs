@@ -9,6 +9,7 @@ pub(crate) enum LanguageElement<'a> {
 	VariableDeclaration {
 		typ: Type,
 		name: &'a str,
+		is_static: bool,
 	},
 	VariableAssignment {
 		name: &'a str,
@@ -18,6 +19,7 @@ pub(crate) enum LanguageElement<'a> {
 		typ: Type,
 		name: &'a str,
 		value: StatementElement<'a>,
+		is_static: bool,
 	},
 	PointerAssignment {
 		ptr: StatementElement<'a>,

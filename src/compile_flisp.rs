@@ -5,11 +5,20 @@ use crate::*;
 ///Technically illegal address for use in register -> register transfers
 const ABOVE_STACK_OFFSET: isize = -1;
 
+///Name (lifetime from source code), (Type, Stack position (from the bottom))
+type Variables<'a, 'b> = &'b mut HashMap<&'a str, (Type, isize)>;
+
+///Name (lifetime from source code), Type
+type GlobalVariables<'a, 'b> = &'b mut HashMap<&'a str, Type>;
+
+///Name, Argument list (not named)
+type Functions<'a, 'b> = &'b mut HashMap<&'a str, &'a [Variable<'a>]>;
+
 #[derive(Debug, PartialEq)]
 struct State<'a, 'b, 'c, 'd, 'e, 'f> {
-	variables: &'b mut HashMap<&'a str, (Type, isize)>,
-	global_variables: &'c mut HashMap<&'a str, Type>,
-	functions: &'d mut HashMap<&'a str, &'a [Variable<'a>]>,
+	variables: Variables<'a, 'b>,
+	global_variables: GlobalVariables<'a, 'c>,
+	functions: Functions<'a, 'd>,
 	stack_size: &'f mut isize,
 	scope_name: &'e str,
 	line_id: usize,
@@ -66,8 +75,15 @@ fn compile_element<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElement::VariableDeclaration { typ, name } => {
-			if state.scope_name == "global" {
+		LanguageElement::VariableDeclaration {
+			typ,
+			name,
+			is_static,
+		} => {
+			if state.scope_name == "global" || *is_static {
+				if state.scope_name == "global" && !is_static {
+					return Err(CompileError(line!(), "Nonstatic global variable!"));
+				}
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
@@ -108,7 +124,12 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
+		LanguageElement::VariableDeclarationAssignment {
+			typ,
+			name,
+			value,
+			is_static,
+		} => {
 			let global_def = |val: &StatementElement| match val {
 				StatementElement::Num(n) => Ok(*n),
 				StatementElement::Char(c) => Ok(*c as isize),
@@ -118,7 +139,10 @@ fn compile_element<'a>(
 					"Non constant in array initialisation",
 				)),
 			};
-			if state.scope_name == "global" {
+			if state.scope_name == "global" || *is_static {
+				if state.scope_name == "global" && !is_static {
+					return Err(CompileError(line!(), "Nonstatic global variable!"));
+				}
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));

@@ -68,6 +68,33 @@ fn construct_structure_from_tokens<'a>(
 					typ,
 					name,
 					value: rhs_parsed,
+					is_static: false,
+				}
+			}
+
+			//Static pointer variable declaration
+			[Static, Decl(t), Deref(d), Assign, ..] => {
+				let mut typ = Type::Ptr(Box::new(t.clone()));
+				let mut r = d.as_ref();
+				let name;
+				while let [Deref(b)] = r.as_ref() {
+					typ = Type::Ptr(Box::new(typ));
+					r = b;
+				}
+				if let [Token::Name(n)] = r {
+					name = *n;
+				} else {
+					dbg!(tokens);
+					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
+				}
+				let rhs = &tokens[4..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::VariableDeclarationAssignment {
+					typ,
+					name,
+					value: rhs_parsed,
+					is_static: true,
 				}
 			}
 
@@ -80,6 +107,20 @@ fn construct_structure_from_tokens<'a>(
 					typ: t.clone(),
 					name: *n,
 					value: rhs_parsed,
+					is_static: false,
+				}
+			}
+
+			//Static variable declaration
+			[Static, Decl(t), Token::Name(n), Assign, ..] => {
+				let rhs = &tokens[4..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::VariableDeclarationAssignment {
+					typ: t.clone(),
+					name: *n,
+					value: rhs_parsed,
+					is_static: true,
 				}
 			}
 
@@ -110,6 +151,14 @@ fn construct_structure_from_tokens<'a>(
 			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
 				typ: t.clone(),
 				name: *n,
+				is_static: false,
+			},
+
+			//Static variable declaration (without init)
+			[Static, Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
+				typ: t.clone(),
+				name: *n,
+				is_static: true,
 			},
 
 			//If else if
@@ -231,7 +280,11 @@ pub(crate) fn type_check(
 
 	for line in block {
 		match line {
-			LanguageElement::VariableDeclaration { typ, name } => variables.push(Variable {
+			LanguageElement::VariableDeclaration {
+				typ,
+				name,
+				is_static: _,
+			} => variables.push(Variable {
 				typ: typ.clone(),
 				name: *name,
 			}),
@@ -242,7 +295,12 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::VariableDeclarationAssignment { typ, name, value } => {
+			LanguageElement::VariableDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static: _,
+			} => {
 				variables.push(Variable {
 					typ: typ.clone(),
 					name: *name,

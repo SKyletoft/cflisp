@@ -88,7 +88,7 @@ impl fmt::Display for Instruction {
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
 			Instruction::RTS => write!(f, "\tRTS\t"),
-			Instruction::Label(l) => write!(f, "{}", l),
+			Instruction::Label(l) => write!(f, "{}", l.strip_prefix("global::").unwrap_or(l)),
 			Instruction::FCB(bytes) => {
 				//Maybe insert a newline every eight values?
 				write!(f, "\tFCB\t")?;
@@ -126,16 +126,6 @@ impl fmt::UpperHex for Instruction {
 			Instruction::DEC(a) => write!(f, "\tDEC\t{:X}", *a),
 			Instruction::LSL(a) => write!(f, "\rLSL\t{:X}", *a),
 			Instruction::LSR(a) => write!(f, "\tLSR\t{:X}", *a),
-			Instruction::LSLA => write!(f, "\tLSLA\t"),
-			Instruction::LSRA => write!(f, "\tLSRA\t"),
-			Instruction::INCA => write!(f, "\tINCA\t"),
-			Instruction::DECA => write!(f, "\tDECA\t"),
-			Instruction::PSHA => write!(f, "\tPSHA\t"),
-			Instruction::PULA => write!(f, "\tPULA\t"),
-			Instruction::TSTA => write!(f, "\tTSTA\t"),
-			Instruction::COMA => write!(f, "\tCOMA\t"),
-			Instruction::RTS => write!(f, "\tRTS\t"),
-			Instruction::Label(l) => write!(f, "{}", l),
 			Instruction::FCB(bytes) => {
 				write!(f, "\tFCB\t")?;
 				for &val in bytes.iter().take(bytes.len() - 1) {
@@ -143,6 +133,7 @@ impl fmt::UpperHex for Instruction {
 				}
 				write!(f, "${:02X}", bytes[bytes.len() - 1])
 			}
+			instruction => write!(f, "{}", instruction),
 		}
 	}
 }
@@ -310,8 +301,8 @@ impl fmt::Display for Addressing {
 			Addressing::SP(d) => write!(f, "{:03},SP", *d % 256),
 			Addressing::Xn(d) => write!(f, "{:03},X", *d % 256),
 			Addressing::Yn(d) => write!(f, "{:03},Y", *d % 256),
-			Addressing::Label(l) => write!(f, "{}", l),
-			Addressing::DataLabel(l) => write!(f, "#{}", l),
+			Addressing::Label(l) => write!(f, "{}", l.strip_prefix("global::").unwrap_or(l)),
+			Addressing::DataLabel(l) => write!(f, "#{}", l.strip_prefix("global::").unwrap_or(l)),
 			Addressing::AX => write!(f, "A,X"),
 			Addressing::AY => write!(f, "A,Y"),
 		}
@@ -326,10 +317,7 @@ impl fmt::UpperHex for Addressing {
 			Addressing::SP(d) => write!(f, "${:02X},SP", *d as u8),
 			Addressing::Xn(d) => write!(f, "${:02X},X", *d as u8),
 			Addressing::Yn(d) => write!(f, "${:02X},Y", *d as u8),
-			Addressing::Label(l) => write!(f, "{}", l),
-			Addressing::DataLabel(l) => write!(f, "#{}", l),
-			Addressing::AX => write!(f, "A,X"),
-			Addressing::AY => write!(f, "A,Y"),
+			adr => write!(f, "{}", adr),
 		}
 	}
 }

@@ -1,4 +1,5 @@
-int foo = 54;
+static int foo = 54;
 
-***foo = 56;
-*58    = ****foo;
+int main() {
+	static int bar = 432;
+}

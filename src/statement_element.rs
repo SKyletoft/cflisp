@@ -595,21 +595,39 @@ fn do_operation<'a>(
 pub(crate) fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
-			LanguageElement::VariableDeclaration { typ: _, name: _ } => 0,
+			LanguageElement::VariableDeclaration {
+				typ: _,
+				name: _,
+				is_static: true,
+			} => 0,
 
 			LanguageElement::VariableDeclarationAssignment {
 				typ: _,
 				name: _,
 				value: _,
+				is_static: true,
 			} => 0,
+
+			LanguageElement::VariableDeclaration {
+				typ: _,
+				name: _,
+				is_static: false,
+			} => 1,
+
+			LanguageElement::VariableDeclarationAssignment {
+				typ: _,
+				name: _,
+				value: _,
+				is_static: false,
+			} => 1,
 
 			LanguageElement::FunctionDeclaration {
 				typ: _,
 				name: _,
 				args: _,
 				block: _,
-			} => 0,
-			_ => 1,
+			} => 2,
+			_ => 3,
 		}
 	};
 	block.sort_by_key(give_value);
