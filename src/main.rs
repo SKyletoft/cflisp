@@ -27,6 +27,12 @@ use statement_token::StatementToken;
 use token::{Token, Token::*};
 use types::{Block, Function, Statement, Type, Variable};
 
+const PATH: &str = "PATH";
+#[cfg(unix)]
+const QAFLISP: &str = "/qaflisp";
+#[cfg(windows)]
+const QAFLISP: &str = "\\qaflisp.exe";
+
 //Yes, this is a horrible mess
 fn main() {
 	let args = env::args().skip(1).collect::<Vec<_>>();
@@ -94,14 +100,14 @@ fn main() {
 	}
 	if flags.assemble {
 		let path = std::env::vars()
-			.find(|(name, _)| name == "PATH")
+			.find(|(name, _)| name == PATH)
 			.map(|(_, paths)| paths);
 		if let Some(p) = path
 			.as_ref()
 			.map(|s| {
 				s.split(':')
 					.filter_map(|p| {
-						let path: PathBuf = (p.to_string() + "/qaflisp").into();
+						let path: PathBuf = (p.to_string() + QAFLISP).into();
 						if path.exists() {
 							Some(path)
 						} else {
