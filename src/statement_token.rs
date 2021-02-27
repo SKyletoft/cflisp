@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::*;
 
 ///A reduced set of tokens for use in statements
@@ -6,8 +8,8 @@ pub(crate) enum StatementToken<'a> {
 	Num(isize),
 	Bool(bool),
 	Char(char),
-	Var(&'a str),
-	FunctionCall(&'a str, Vec<Vec<StatementToken<'a>>>),
+	Var(Cow<'a, str>),
+	FunctionCall(Cow<'a, str>, Vec<Vec<StatementToken<'a>>>),
 	Add,
 	Sub,
 	Mul,
@@ -26,10 +28,10 @@ pub(crate) enum StatementToken<'a> {
 	NotCmp,
 	Not,
 	Parentheses(Vec<StatementToken<'a>>),
-	AdrOf(&'a str),
+	AdrOf(Cow<'a, str>),
 	Deref(Vec<StatementToken<'a>>),
 	ArrayAccess {
-		ptr: &'a str,
+		ptr: Cow<'a, str>,
 		idx: Vec<StatementToken<'a>>,
 	},
 	Array(Vec<Vec<StatementToken<'a>>>),
@@ -37,14 +39,14 @@ pub(crate) enum StatementToken<'a> {
 
 impl<'a> StatementToken<'a> {
 	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
-		let mut res = Vec::new();
+		let mut res = Vec::with_capacity(tokens.len());
 		for token in tokens {
 			let last = res.len().wrapping_sub(1);
 			let new = match token {
-				Token::Bool(b) => StatementToken::Bool(*b),
+				/*Token::Bool(b) => StatementToken::Bool(*b),
 				Token::Num(n) => StatementToken::Num(*n),
 				Token::Char(c) => StatementToken::Char(*c),
-				Token::Name(n) => StatementToken::Var(n),
+				Token::Name(n) => StatementToken::Var(Cow::Borrowed(n.as_ref())),
 				Token::Add => StatementToken::Add,
 				Token::Sub => StatementToken::Sub,
 				Token::Mul => StatementToken::Mul,
@@ -62,12 +64,14 @@ impl<'a> StatementToken<'a> {
 				Token::LessThanEqual => StatementToken::LessThanEqual,
 				Token::Cmp => StatementToken::Cmp,
 				Token::NotCmp => StatementToken::NotCmp,
-				Token::AdrOf(n) => StatementToken::AdrOf(n),
+				Token::AdrOf(n) => StatementToken::AdrOf(Cow::Borrowed(n.as_ref())),
 				Token::Deref(b) => StatementToken::Deref(StatementToken::from_tokens(b.as_ref())?),
 				Token::UnparsedParentheses(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						res[last] =
-							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
+						res[last] = StatementToken::FunctionCall(
+							Cow::Borrowed(n.as_ref()),
+							Token::parse_arguments_tokens(b)?,
+						);
 						continue;
 					} else {
 						let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
@@ -80,7 +84,7 @@ impl<'a> StatementToken<'a> {
 						let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
-							ptr: n,
+							ptr: Cow::Borrowed(n.as_ref()),
 							idx: as_statement,
 						};
 						continue;
@@ -103,10 +107,10 @@ impl<'a> StatementToken<'a> {
 						)?)?);
 					}
 					StatementToken::Array(v)
-				}
-				Token::UnparsedSource(b) => {
-					StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(b)?])?)
-				}
+				}*/
+				Token::UnparsedSource(b) => StatementToken::Parentheses(
+					StatementToken::from_tokens(&[Token::parse(b.as_ref())?])?,
+				),
 				_ => {
 					dbg!(tokens);
 					dbg!(token);

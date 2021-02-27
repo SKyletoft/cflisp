@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::*;
 
-// Replace &'a str with a Cow<String>?
-///`(Instruction, Option<&'a str>)`
+// Replace Cow<'a, str> with a Cow<String>?
+///`(Instruction, Option<Cow<'a, str>>)`
 ///
 /// The comment should have the same lifetime as the input source code (or `&'static`)
-pub(crate) type CommentedInstruction<'a> = (Instruction, Option<&'a str>);
+pub(crate) type CommentedInstruction<'a> = (Instruction, Option<Cow<'a, str>>);
 
 ///A flisp instruction. Usually appears as the first half of a `CommentedInstruction` tuple.
 /// Can also be a label or FCB assembler directive.

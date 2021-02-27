@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::*;
 
 ///All possible tokens in the source (after comments have been removed)
@@ -22,9 +24,9 @@ pub(crate) enum Token<'a> {
 	LShift,
 	Char(char),
 	Bool(bool),
-	AdrOf(&'a str),
+	AdrOf(Cow<'a, str>),
 	Deref(Box<[Token<'a>; 1]>),
-	Name(&'a str),
+	Name(Cow<'a, str>),
 	And,
 	Or,
 	Return,
@@ -37,10 +39,10 @@ pub(crate) enum Token<'a> {
 	Static,
 	Struct,
 	TypeDef,
-	UnparsedSource(&'a str),
-	UnparsedBlock(&'a str),
-	UnparsedParentheses(&'a str),
-	UnparsedArrayAccess(&'a str),
+	UnparsedSource(Cow<'a, str>),
+	UnparsedBlock(Cow<'a, str>),
+	UnparsedParentheses(Cow<'a, str>),
+	UnparsedArrayAccess(Cow<'a, str>),
 	NewLine,
 	Xor,
 	Not,
@@ -89,7 +91,7 @@ impl<'a> Token<'a> {
 	}
 
 	///Maps words to tokens and parses literals
-	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
+	pub(crate) fn parse(name: &'a str) -> Result<Token<'a>, ParseError> {
 		let token =
 			match name {
 				";" => NewLine,
@@ -137,16 +139,16 @@ impl<'a> Token<'a> {
 				"static" => Static,
 				"struct" => Struct,
 				"typedef" => TypeDef,
-				n if n.starts_with('&') => AdrOf(&n[1..]),
-				n if n.starts_with('*') => Deref(Box::new([UnparsedBlock(&n[1..])])),
+				n if n.starts_with('&') => AdrOf(Cow::Borrowed(&n[1..])),
+				n if n.starts_with('*') => Deref(Box::new([UnparsedBlock(Cow::Borrowed(&n[1..]))])),
 				n if n.starts_with('(') && n.ends_with(')') && n.len() >= 2 => {
-					UnparsedParentheses(&n[1..n.len() - 1].trim())
+					UnparsedParentheses(Cow::Borrowed(n[1..n.len() - 1].trim()))
 				}
 				n if n.starts_with('{') && n.ends_with('}') && n.len() >= 2 => {
-					UnparsedBlock(&n[1..n.len() - 1].trim())
+					UnparsedBlock(Cow::Borrowed(n[1..n.len() - 1].trim()))
 				}
 				n if n.starts_with('[') && n.ends_with(']') && n.len() >= 2 => {
-					UnparsedArrayAccess(&n[1..n.len() - 1].trim())
+					UnparsedArrayAccess(Cow::Borrowed(n[1..n.len() - 1].trim()))
 				}
 				n if n.starts_with('"') && n.ends_with('"') && n.len() >= 2 => {
 					return Err(ParseError(line!(), "Strings are not supported (yet?)"));
@@ -178,9 +180,9 @@ impl<'a> Token<'a> {
 					|| n.ends_with(']') || n.starts_with('"')
 					|| n.ends_with('"') || n.starts_with(|d: char| d.is_ascii_digit()) =>
 				{
-					UnparsedSource(n)
+					UnparsedSource(Cow::Borrowed(n))
 				}
-				n => Token::Name(n),
+				n => Token::Name(Cow::Borrowed(n)),
 			};
 		Ok(token)
 	}
@@ -229,7 +231,7 @@ impl<'a> Token<'a> {
 			if let (Decl(t), Name(n)) = (type_token, name_token) {
 				arguments.push(Variable {
 					typ: t.clone(),
-					name: *n,
+					name: Cow::Borrowed(n.as_ref()),
 				})
 			} else {
 				return Err(ParseError(line!(), "Couldn't parse argument list"));

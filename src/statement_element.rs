@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::*;
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
@@ -71,16 +73,16 @@ pub(crate) enum StatementElement<'a> {
 		rhs: Box<StatementElement<'a>>,
 	},
 	FunctionCall {
-		name: &'a str,
+		name: Cow<'a, str>,
 		parametres: Vec<StatementElement<'a>>,
 	},
-	Var(&'a str),
+	Var(Cow<'a, str>),
 	Num(isize),
 	Char(char),
 	Bool(bool),
 	Array(Vec<StatementElement<'a>>),
 	Deref(Box<StatementElement<'a>>),
-	AdrOf(&'a str),
+	AdrOf(Cow<'a, str>),
 }
 
 ///Takes two `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::*;
 
@@ -6,13 +6,13 @@ use crate::*;
 const ABOVE_STACK_OFFSET: isize = -1;
 
 ///Name (lifetime from source code), (Type, Stack position (from the bottom))
-type Variables<'a, 'b> = &'b mut HashMap<&'a str, (Type, isize)>;
+type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (Type, isize)>;
 
 ///Name (lifetime from source code), Type
-type GlobalVariables<'a, 'b> = &'b mut HashMap<&'a str, Type>;
+type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, Type>;
 
 ///Name, Argument list (not named)
-type Functions<'a, 'b> = &'b mut HashMap<&'a str, &'a [Variable<'a>]>;
+type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [Variable<'a>]>;
 
 #[derive(Debug, PartialEq)]
 struct State<'a, 'b, 'c, 'd, 'e, 'f> {
@@ -88,7 +88,7 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				state.global_variables.insert(*name, typ.clone());
+				state.global_variables.insert(name.clone(), typ.clone());
 				vec![]
 			} else {
 				if state.variables.contains_key(name) {
@@ -100,11 +100,11 @@ fn compile_element<'a>(
 				}
 				state
 					.variables
-					.insert(*name, (typ.clone(), *state.stack_size));
+					.insert(name.clone(), (typ.clone(), *state.stack_size));
 				*state.stack_size += 1;
 				vec![(
 					Instruction::LEASP(Addressing::SP(ABOVE_STACK_OFFSET)),
-					Some(*name),
+					Some(Cow::Borrowed(name.as_ref())),
 				)]
 			}
 		}
@@ -120,7 +120,7 @@ fn compile_element<'a>(
 				*state.stack_size,
 			)?;
 			let mut statement = compile_statement(value, state)?;
-			statement.push((Instruction::STA(adr), Some(name)));
+			statement.push((Instruction::STA(adr), Some(Cow::Borrowed(name.as_ref()))));
 			statement
 		}
 
@@ -148,7 +148,9 @@ fn compile_element<'a>(
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
 				if let StatementElement::Array(elements) = value {
-					state.global_variables.insert(*name, typ.clone());
+					state
+						.global_variables
+						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					let values = elements
 						.iter()
 						.map(global_def)
@@ -158,7 +160,9 @@ fn compile_element<'a>(
 						(Instruction::FCB(values), None),
 					]
 				} else {
-					state.global_variables.insert(*name, typ.clone());
+					state
+						.global_variables
+						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					vec![
 						(Instruction::Label(name.to_string()), None),
 						(Instruction::FCB(vec![global_def(value)?]), None),
@@ -179,21 +183,23 @@ fn compile_element<'a>(
 						statement.append(&mut compile_statement(element, state)?);
 						assert_eq!(*state.stack_size, stack_copy);
 						*state.stack_size += 1;
-						statement.push((Instruction::PSHA, Some(*name)));
+						statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
 					}
-					state
-						.variables
-						.insert(*name, (typ.clone(), *state.stack_size));
+					state.variables.insert(
+						Cow::Borrowed(name.as_ref()),
+						(typ.clone(), *state.stack_size),
+					);
 					statement
 				} else {
 					let stack_copy = *state.stack_size;
 					let mut statement = compile_statement(value, state)?;
 					assert_eq!(*state.stack_size, stack_copy);
-					state
-						.variables
-						.insert(*name, (typ.clone(), *state.stack_size));
+					state.variables.insert(
+						Cow::Borrowed(name.as_ref()),
+						(typ.clone(), *state.stack_size),
+					);
 					*state.stack_size += 1;
-					statement.push((Instruction::PSHA, Some(*name)));
+					statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
 					statement
 				}
 			}
@@ -208,11 +214,11 @@ fn compile_element<'a>(
 			let mut statement = get_adr;
 			statement.push((
 				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X part 1"),
+				Some("A to X part 1".into()),
 			));
 			statement.push((
 				Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X part 2"),
+				Some("A to X part 2".into()),
 			));
 			statement.append(&mut value);
 			statement.push((Instruction::STA(Addressing::Xn(0)), None));
@@ -231,7 +237,9 @@ fn compile_element<'a>(
 					"Function name already exists in scope!",
 				));
 			}
-			state.functions.insert(*name, args.as_slice());
+			state
+				.functions
+				.insert(Cow::Borrowed(name.as_ref()), args.as_slice());
 			//Stack: Start -> Arguments -> Return adr -> Variables -> Whatever the stack grows to
 			// If this +1 is removed we can no longer have arguments
 			// This might waste a byte if there are no arguments?
@@ -239,7 +247,7 @@ fn compile_element<'a>(
 			let args_base = args_count;
 			let mut local_variables = HashMap::new();
 			for (idx, Variable { name, typ }) in args.iter().enumerate() {
-				local_variables.insert(*name, (typ.clone(), idx as isize));
+				local_variables.insert(Cow::Borrowed(name.as_ref()), (typ.clone(), idx as isize));
 			}
 			let mut function_body = compile_elements(
 				block,
@@ -258,7 +266,7 @@ fn compile_element<'a>(
 			if args_count != 0 {
 				function_body.push((
 					Instruction::LEASP(Addressing::SP(args_count)),
-					Some("Clearing variables"),
+					Some("Clearing variables".into()),
 				));
 			}
 			function_body.push((Instruction::RTS, None));
@@ -317,7 +325,7 @@ fn compile_element<'a>(
 				if else_stack != *state.stack_size {
 					cond.push((
 						Instruction::LEASP(Addressing::SP(else_stack - *state.stack_size)),
-						Some("This happened"),
+						Some("This happened".into()),
 					));
 				}
 			} else {
@@ -480,12 +488,12 @@ fn compile_statement<'a>(
 	if tmps > 0 {
 		let mut block = vec![(
 			Instruction::LEASP(Addressing::SP(-tmps)),
-			Some("Reserving memory for statement"),
+			Some(Cow::from("Reserving memory for statement")),
 		)];
 		block.append(&mut statement_instructions);
 		block.append(&mut vec![(
 			Instruction::LEASP(Addressing::SP(tmps)), //why not -1?
-			Some("Clearing memory for statement"),
+			Some(Cow::from("Clearing memory for statement")),
 		)]);
 		statement_instructions = block;
 	};
@@ -534,7 +542,7 @@ fn compile_statement_inner<'a>(
 			};
 			match statement {
 				StatementElement::Mul { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("mul rhs")));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__mul__".to_string())),
@@ -543,7 +551,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElement::Cmp { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("cmp rhs")));
+					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
@@ -552,7 +560,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElement::NotCmp { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("cmp rhs")));
+					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__eq__".to_string())),
@@ -566,7 +574,10 @@ fn compile_statement_inner<'a>(
 					*tmps_used -= 1;
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
+						instructions.push((
+							statement.as_flisp_instruction(adr.clone())?,
+							comment.clone(),
+						));
 					} else {
 						assert!(right_instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
@@ -613,7 +624,7 @@ fn compile_statement_inner<'a>(
 			};
 			match statement {
 				StatementElement::Div { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("div rhs")));
+					instructions.push((Instruction::PSHA, Some("div rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__div__".to_string())),
@@ -622,7 +633,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElement::Mod { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("mod rhs")));
+					instructions.push((Instruction::PSHA, Some("mod rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__mod__".to_string())),
@@ -632,7 +643,7 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::GreaterThan { rhs: _, lhs: _ }
 				| StatementElement::LessThan { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("gt rhs")));
+					instructions.push((Instruction::PSHA, Some("gt rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
@@ -642,7 +653,7 @@ fn compile_statement_inner<'a>(
 				}
 				StatementElement::LessThanEqual { rhs: _, lhs: _ }
 				| StatementElement::GreaterThanEqual { rhs: _, lhs: _ } => {
-					instructions.push((Instruction::PSHA, Some("lte rhs")));
+					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label("__gt__".to_string())),
@@ -696,7 +707,10 @@ fn compile_statement_inner<'a>(
 					*tmps_used -= 1;
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
-						instructions.push((statement.as_flisp_instruction(adr.clone())?, *comment));
+						instructions.push((
+							statement.as_flisp_instruction(adr.clone())?,
+							comment.clone(),
+						));
 					} else {
 						assert!(instructions.len() >= 2);
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
@@ -727,7 +741,7 @@ fn compile_statement_inner<'a>(
 			) in parametres.iter().zip(arg_names.iter())
 			{
 				instructions.append(&mut compile_statement(statement, state)?);
-				instructions.push((Instruction::PSHA, Some(v_name)));
+				instructions.push((Instruction::PSHA, Some(Cow::Borrowed(v_name.as_ref()))));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
 			instructions.push((
@@ -744,7 +758,7 @@ fn compile_statement_inner<'a>(
 				state.global_variables,
 				*state.stack_size,
 			)?;
-			vec![(Instruction::LDA(adr), Some(*name))]
+			vec![(Instruction::LDA(adr), Some(Cow::Borrowed(name.as_ref())))]
 		}
 
 		StatementElement::Num(n) => {
@@ -766,33 +780,33 @@ fn compile_statement_inner<'a>(
 				//Array opt
 				(
 					&StatementElement::Add { lhs: _, rhs: _ },
-					Some((&StatementElement::Var(name), &StatementElement::Num(offset))),
+					Some((StatementElement::Var(name), &StatementElement::Num(offset))),
 				) => {
 					let adr = adr_for_name(
-						name,
+						name.as_ref(),
 						state.variables,
 						state.global_variables,
 						*state.stack_size,
 					)?;
 					vec![
-						(Instruction::LDY(adr), Some(name)),
+						(Instruction::LDY(adr), Some(Cow::Borrowed(name.as_ref()))),
 						(Instruction::LDA(Addressing::Yn(offset)), None),
 					]
 				}
 				//General opt
 				(
 					&StatementElement::Add { lhs: _, rhs: _ },
-					Some((&StatementElement::Var(name), rhs)),
+					Some((StatementElement::Var(name), rhs)),
 				) => {
 					let adr = adr_for_name(
-						name,
+						name.as_ref(),
 						state.variables,
 						state.global_variables,
 						*state.stack_size,
 					)?;
 					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
-						(Instruction::LDY(adr), Some(name)),
+						(Instruction::LDY(adr), Some(Cow::Borrowed(name.as_ref()))),
 						(Instruction::LDA(Addressing::AY), None),
 					]);
 					statement
@@ -802,11 +816,11 @@ fn compile_statement_inner<'a>(
 					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
 					instructions.push((
 						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to X transfer"),
+						Some("A to X transfer".into()),
 					));
 					instructions.push((
 						Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to X  continued"),
+						Some("A to X  continued".into()),
 					));
 					instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
 					instructions
@@ -827,12 +841,20 @@ fn compile_statement_inner<'a>(
 					vec![
 						(
 							Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)),
-							Some("SP -> Stack"),
+							Some(Cow::from("SP -> Stack")),
 						),
-						(Instruction::ADDA(Addressing::SP(n)), Some(*name)),
+						(
+							Instruction::ADDA(Addressing::SP(n)),
+							Some(Cow::Borrowed(name.as_ref())),
+						),
 					]
 				}
-				Addressing::Adr(n) => vec![(Instruction::LDA(Addressing::Data(n)), Some(*name))],
+				Addressing::Adr(n) => {
+					vec![(
+						Instruction::LDA(Addressing::Data(n)),
+						Some(Cow::Borrowed(name.as_ref())),
+					)]
+				}
 				Addressing::Label(lbl) => {
 					vec![(Instruction::LDA(Addressing::DataLabel(lbl)), None)]
 				}
@@ -852,8 +874,8 @@ fn compile_statement_inner<'a>(
 ///Returns addressing for a name. Stack offset for locals and a Label for globals (and not an absolute address)
 fn adr_for_name<'a>(
 	name: &'a str,
-	variables: &HashMap<&'a str, (Type, isize)>,
-	global_variables: &HashMap<&'a str, Type>,
+	variables: &HashMap<Cow<'a, str>, (Type, isize)>,
+	global_variables: &HashMap<Cow<'a, str>, Type>,
 	stack_size: isize,
 ) -> Result<Addressing, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {

@@ -34,7 +34,7 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		if let (
-			(Instruction::LDA(addressing), comment),
+			(Instruction::LDA(addressing), _),
 			(Instruction::STA(Addressing::SP(-1)), _),
 			(Instruction::LDX(Addressing::SP(-1)), _),
 		) = (
@@ -42,12 +42,12 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			instructions[idx] = (Instruction::LDX(addressing.clone()), *comment);
+			instructions[idx].0 = Instruction::LDX(addressing.clone());
 			instructions.remove(idx + 2); //Order matters!
 			instructions.remove(idx + 1);
 		}
 		if let (
-			(Instruction::LDA(addressing), comment),
+			(Instruction::LDA(addressing), _),
 			(Instruction::STA(Addressing::SP(-1)), _),
 			(Instruction::LDY(Addressing::SP(-1)), _),
 		) = (
@@ -55,12 +55,12 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			instructions[idx] = (Instruction::LDY(addressing.clone()), *comment);
+			instructions[idx].0 = Instruction::LDY(addressing.clone());
 			instructions.remove(idx + 2); //Order matters!
 			instructions.remove(idx + 1);
 		}
 		if let (
-			&(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
+			(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
 			(Instruction::LDA(a_adr), a_comment),
 			(Instruction::STA(Addressing::Xn(0)), _),
 		) = (
@@ -68,8 +68,10 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			let a_comment = *a_comment;
+			let a_comment = a_comment.clone();
 			let a_adr = a_adr.clone();
+			let x_comment = x_comment.clone();
+			let x_adr = x_adr.clone();
 			instructions[idx] = (Instruction::LDA(a_adr), a_comment);
 			instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
 			instructions.remove(idx + 2);
@@ -228,15 +230,15 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 		if let (
 			(Instruction::STA(Addressing::SP(-1)), _),
 			(Instruction::LDX(Addressing::SP(-1)), _),
-			(Instruction::LDA(Addressing::Xn(0)), comment),
+			(Instruction::LDA(Addressing::Xn(0)), _),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			instructions[idx + 1] = (Instruction::LDA(Addressing::AX), *comment);
 			instructions[idx] = (Instruction::LDX(Addressing::Data(0)), None);
-			instructions.remove(idx + 2);
+			instructions[idx + 2].0 = Instruction::LDA(Addressing::AX); //To keep the existing comment on the third instruction
+			instructions.remove(idx + 1);
 		}
 		if let ((Instruction::PSHA, _), (Instruction::LDA(Addressing::SP(0)), _)) =
 			(&instructions[idx], &instructions[idx + 1])
@@ -402,7 +404,7 @@ fn dec(instructions: &mut Vec<CommentedInstruction>) {
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(Addressing::Data(1)), _),
-			(Instruction::SUBA(from), comment),
+			(Instruction::SUBA(from), _),
 			(Instruction::STA(to), _),
 		) = (
 			&instructions[idx],
@@ -410,9 +412,9 @@ fn dec(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 2],
 		) {
 			if to == from {
-				instructions[idx] = (Instruction::DEC(to.clone()), *comment);
+				instructions[idx + 1].0 = Instruction::DEC(to.clone());
 				instructions.remove(idx + 2);
-				instructions.remove(idx + 1);
+				instructions.remove(idx + 0);
 			}
 		}
 		idx += 1;
@@ -424,7 +426,7 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		if let (
-			(Instruction::LDA(from), comment),
+			(Instruction::LDA(from), _),
 			(Instruction::ADDA(Addressing::Data(1)), _),
 			(Instruction::STA(to), _),
 		) = (
@@ -433,7 +435,7 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 2],
 		) {
 			if to == from {
-				instructions[idx] = (Instruction::INC(to.clone()), *comment);
+				instructions[idx].0 = Instruction::INC(to.clone());
 				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 			}
@@ -466,7 +468,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx < instructions.len() - 6 {
 		if let (
-			(Instruction::PSHA, Some("cmp rhs")),
+			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
 			(Instruction::JSR(Addressing::Label(function_name)), None),
 			(Instruction::LEASP(Addressing::SP(1)), None),
@@ -480,7 +482,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 4],
 			&instructions[idx + 5],
 		) {
-			if function_name != "__eq__" {
+			if !(function_name == "__eq__" && text == "cmp rhs") {
 				idx += 1;
 				continue;
 			}
@@ -489,7 +491,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			} else {
 				lhs.clone()
 			};
-			let lhs_comment = *lhs_comment;
+			let lhs_comment = lhs_comment.clone();
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
 			instructions[idx + 5] = (Instruction::BNE(jump_adr), None);
@@ -508,7 +510,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx < instructions.len() - 7 {
 		if let (
-			(Instruction::PSHA, Some("cmp rhs")),
+			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
 			(Instruction::JSR(Addressing::Label(function_name)), None),
 			(Instruction::LEASP(Addressing::SP(1)), None),
@@ -524,7 +526,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 5],
 			&instructions[idx + 6],
 		) {
-			if function_name != "__eq__" {
+			if !(function_name == "__eq__" && text == "cmp rhs") {
 				idx += 1;
 				continue;
 			}
@@ -533,7 +535,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			} else {
 				lhs.clone()
 			};
-			let lhs_comment = *lhs_comment;
+			let lhs_comment = lhs_comment.clone();
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
 			instructions[idx + 1] = (Instruction::BEQ(jump_adr), None);
@@ -553,7 +555,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx < instructions.len() - 6 {
 		if let (
-			(Instruction::PSHA, Some("gt rhs")),
+			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
 			(Instruction::JSR(Addressing::Label(function_name)), None),
 			(Instruction::LEASP(Addressing::SP(1)), None),
@@ -567,7 +569,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 4],
 			&instructions[idx + 5],
 		) {
-			if function_name != "__gt__" {
+			if !(function_name == "__gt__" && text == "gt rhs") {
 				idx += 1;
 				continue;
 			}
@@ -576,7 +578,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			} else {
 				lhs.clone()
 			};
-			let lhs_comment = *lhs_comment;
+			let lhs_comment = lhs_comment.clone();
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
 			instructions[idx + 1] = (Instruction::BGE(jump_adr), None);
@@ -595,7 +597,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx < instructions.len() - 7 {
 		if let (
-			(Instruction::PSHA, Some("lte rhs")),
+			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
 			(Instruction::JSR(Addressing::Label(function_name)), None),
 			(Instruction::LEASP(Addressing::SP(1)), None),
@@ -611,7 +613,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 5],
 			&instructions[idx + 6],
 		) {
-			if function_name != "__gt__" {
+			if !(function_name == "__gt__" && text == "lte rhs") {
 				idx += 1;
 				continue;
 			}
@@ -620,7 +622,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			} else {
 				lhs.clone()
 			};
-			let lhs_comment = *lhs_comment;
+			let lhs_comment = lhs_comment.clone();
 			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
 			instructions[idx + 1] = (Instruction::BLT(jump_adr), None);
