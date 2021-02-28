@@ -1,4 +1,5 @@
 use crate::*;
+use std::borrow::Cow;
 
 pub(crate) fn parse<'a>(
 	source: &'a str,
@@ -40,7 +41,7 @@ fn construct_structure_from_tokens<'a>(
 				let code_parsed = construct_block(&code_tokenised, move_first)?;
 				LanguageElement::FunctionDeclaration {
 					typ: t.clone(),
-					name: *n,
+					name: Cow::Borrowed(n),
 					args: args_parsed,
 					block: code_parsed,
 				}
@@ -66,7 +67,7 @@ fn construct_structure_from_tokens<'a>(
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ,
-					name,
+					name: Cow::Borrowed(name),
 					value: rhs_parsed,
 					is_static: false,
 				}
@@ -92,7 +93,7 @@ fn construct_structure_from_tokens<'a>(
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ,
-					name,
+					name: Cow::Borrowed(name),
 					value: rhs_parsed,
 					is_static: true,
 				}
@@ -105,7 +106,7 @@ fn construct_structure_from_tokens<'a>(
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ: t.clone(),
-					name: *n,
+					name: Cow::Borrowed(n),
 					value: rhs_parsed,
 					is_static: false,
 				}
@@ -118,7 +119,7 @@ fn construct_structure_from_tokens<'a>(
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ: t.clone(),
-					name: *n,
+					name: Cow::Borrowed(n),
 					value: rhs_parsed,
 					is_static: true,
 				}
@@ -130,7 +131,7 @@ fn construct_structure_from_tokens<'a>(
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::VariableAssignment {
-					name: *n,
+					name: Cow::Borrowed(n),
 					value: rhs_parsed,
 				}
 			}
@@ -150,14 +151,14 @@ fn construct_structure_from_tokens<'a>(
 			//Variable declaration (without init)
 			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
 				typ: t.clone(),
-				name: *n,
+				name: Cow::Borrowed(n),
 				is_static: false,
 			},
 
 			//Static variable declaration (without init)
 			[Static, Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
 				typ: t.clone(),
-				name: *n,
+				name: Cow::Borrowed(n),
 				is_static: true,
 			},
 
@@ -286,7 +287,7 @@ pub(crate) fn type_check(
 				is_static: _,
 			} => variables.push(Variable {
 				typ: typ.clone(),
-				name: *name,
+				name: name.as_ref(),
 			}),
 
 			LanguageElement::VariableAssignment { name: _, value } => {
@@ -303,7 +304,7 @@ pub(crate) fn type_check(
 			} => {
 				variables.push(Variable {
 					typ: typ.clone(),
-					name: *name,
+					name: name.as_ref(),
 				});
 				if !value.type_check(&variables, &functions)? {
 					return Ok(false);
@@ -326,7 +327,7 @@ pub(crate) fn type_check(
 			} => {
 				functions.push(Function {
 					return_type: typ.clone(),
-					name: *name,
+					name: name.as_ref(),
 					parametres: args.clone(),
 				});
 

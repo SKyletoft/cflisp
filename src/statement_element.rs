@@ -1,4 +1,5 @@
 use crate::*;
+use std::borrow::Cow;
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
@@ -71,16 +72,16 @@ pub(crate) enum StatementElement<'a> {
 		rhs: Box<StatementElement<'a>>,
 	},
 	FunctionCall {
-		name: &'a str,
+		name: Cow<'a, str>,
 		parametres: Vec<StatementElement<'a>>,
 	},
-	Var(&'a str),
+	Var(Cow<'a, str>),
 	Num(isize),
 	Char(char),
 	Bool(bool),
 	Array(Vec<StatementElement<'a>>),
 	Deref(Box<StatementElement<'a>>),
-	AdrOf(&'a str),
+	AdrOf(Cow<'a, str>),
 }
 
 ///Takes two `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same
@@ -184,15 +185,18 @@ impl<'a> StatementElement<'a> {
 			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
 			StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
 			StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
-			StatementToken::Var(v) => Parsed(StatementElement::Var(v)),
-			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(n)),
+			StatementToken::Var(v) => Parsed(StatementElement::Var(Cow::Borrowed(v))),
+			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(Cow::Borrowed(n))),
 
 			StatementToken::FunctionCall(name, ts) => {
 				let parametres = ts
 					.into_iter()
 					.map(StatementElement::from_tokens)
 					.collect::<Result<Vec<_>, _>>()?;
-				Parsed(StatementElement::FunctionCall { name, parametres })
+				Parsed(StatementElement::FunctionCall {
+					name: Cow::Borrowed(name),
+					parametres,
+				})
 			}
 
 			StatementToken::Array(arr) => {
@@ -205,7 +209,7 @@ impl<'a> StatementElement<'a> {
 
 			StatementToken::ArrayAccess { ptr, idx } => {
 				Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
-					lhs: Box::new(StatementElement::Var(ptr)),
+					lhs: Box::new(StatementElement::Var(Cow::Borrowed(ptr))),
 					rhs: Box::new(StatementElement::from_tokens(idx)?),
 				})))
 			}
@@ -399,13 +403,13 @@ impl<'a> StatementElement<'a> {
 				parametres: _,
 			} => functions
 				.iter()
-				.find(|f| &f.name == name)
+				.find(|f| f.name == name)
 				.map(|f| f.return_type.clone())
 				.ok_or(ParseError(line!(), "Cannot resolve function!"))?,
 
 			StatementElement::Var(name) => variables
 				.iter()
-				.find(|f| &f.name == name)
+				.find(|f| f.name == name)
 				.map(|v| v.typ.clone())
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 
@@ -420,7 +424,7 @@ impl<'a> StatementElement<'a> {
 			StatementElement::AdrOf(name) => Type::Ptr(Box::new(
 				variables
 					.iter()
-					.find(|f| &f.name == name)
+					.find(|f| f.name == name)
 					.map(|v| v.typ.clone())
 					.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 			)),
@@ -435,7 +439,7 @@ impl<'a> StatementElement<'a> {
 	) -> Result<bool, ParseError> {
 		let res = match self {
 			StatementElement::FunctionCall { name, parametres } => {
-				if let Some(f) = functions.iter().find(|f| &f.name == name) {
+				if let Some(f) = functions.iter().find(|f| f.name == name) {
 					let len_eq = f.parametres.len() == parametres.len();
 					let types_are_eq = {
 						for (l, r) in f

@@ -1,4 +1,5 @@
 use crate::*;
+use std::borrow::Cow;
 
 ///Internal representation of the program.
 /// Can represent any language pattern considered valid.
@@ -8,16 +9,16 @@ use crate::*;
 pub(crate) enum LanguageElement<'a> {
 	VariableDeclaration {
 		typ: Type,
-		name: &'a str,
+		name: Cow<'a, str>,
 		is_static: bool,
 	},
 	VariableAssignment {
-		name: &'a str,
+		name: Cow<'a, str>,
 		value: StatementElement<'a>,
 	},
 	VariableDeclarationAssignment {
 		typ: Type,
-		name: &'a str,
+		name: Cow<'a, str>,
 		value: StatementElement<'a>,
 		is_static: bool,
 	},
@@ -27,7 +28,7 @@ pub(crate) enum LanguageElement<'a> {
 	},
 	FunctionDeclaration {
 		typ: Type,
-		name: &'a str,
+		name: Cow<'a, str>,
 		args: Vec<Variable<'a>>,
 		block: Block<'a>,
 	},
