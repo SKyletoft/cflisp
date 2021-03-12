@@ -1,11 +1,9 @@
 use crate::*;
 use std::borrow::Cow;
 
-pub(crate) fn parse<'a>(
-	source: &'a str,
-	move_first: bool,
-) -> Result<Vec<LanguageElement<'a>>, ParseError> {
-	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
+pub(crate) fn parse(source: &str, move_first: bool) -> Result<Vec<LanguageElement>, ParseError> {
+	//let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
+	let tokens = Token::by_byte(source)?;
 	construct_block(&tokens, move_first)
 }
 
@@ -15,10 +13,10 @@ fn construct_block<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
-	let mut res = Vec::new();
-	for token in split_token_lines(tokens) {
-		res.push(construct_structure_from_tokens(token, move_first)?);
-	}
+	let mut res = split_token_lines(tokens)
+		.into_iter()
+		.map(|token| construct_structure_from_tokens(token, move_first))
+		.collect::<Result<Vec<_>, _>>()?;
 	if move_first {
 		statement_element::move_declarations_first(&mut res);
 	}
@@ -27,7 +25,7 @@ fn construct_block<'a>(
 
 ///Matches a line of `Token`s into a `LanguageElement`, defaulting to a statement if no match can be made.
 /// Does recursively parse all contained parts so a returned LanguageElement can be trusted as valid, apart
-/// from type checking.
+/// from type checking. (Struct types and fields count as type checking)
 fn construct_structure_from_tokens<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
@@ -48,8 +46,9 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//Pointer variable declaration
-			[Decl(t), Deref(d), Assign, ..] => {
-				let mut typ = Type::Ptr(Box::new(t.clone()));
+			[Decl(t), Deref, Name(d), Assign, ..] => {
+				todo!("Revamp pointers")
+				/*let mut typ = Type::Ptr(Box::new(t.clone()));
 				let mut r = d.as_ref();
 				let name;
 				while let [Deref(b)] = r.as_ref() {
@@ -70,12 +69,13 @@ fn construct_structure_from_tokens<'a>(
 					name: Cow::Borrowed(name),
 					value: rhs_parsed,
 					is_static: false,
-				}
+				}*/
 			}
 
 			//Static pointer variable declaration
-			[Static, Decl(t), Deref(d), Assign, ..] => {
-				let mut typ = Type::Ptr(Box::new(t.clone()));
+			[Static, Decl(t), Deref, Name(d), Assign, ..] => {
+				todo!("Revamp pointers")
+				/*let mut typ = Type::Ptr(Box::new(t.clone()));
 				let mut r = d.as_ref();
 				let name;
 				while let [Deref(b)] = r.as_ref() {
@@ -96,7 +96,7 @@ fn construct_structure_from_tokens<'a>(
 					name: Cow::Borrowed(name),
 					value: rhs_parsed,
 					is_static: true,
-				}
+				}*/
 			}
 
 			//Variable declaration
@@ -109,6 +109,34 @@ fn construct_structure_from_tokens<'a>(
 					name: Cow::Borrowed(n),
 					value: rhs_parsed,
 					is_static: false,
+				}
+			}
+
+			//Struct declaration assignment
+			[Name(type_name), Name(name), Assign, UnparsedBlock(members)] => {
+				let member_values = Token::parse_arguments_tokens(members)?
+					.into_iter()
+					.map(StatementElement::from_tokens)
+					.collect::<Result<Vec<_>, _>>()?;
+				LanguageElement::StructDeclarationAssignment {
+					typ: Cow::Borrowed(*type_name),
+					name: Cow::Borrowed(*name),
+					value: member_values,
+					is_static: false,
+				}
+			}
+
+			//Static struct declaration assignment
+			[Static, Name(type_name), Name(name), Assign, UnparsedBlock(members)] => {
+				let member_values = Token::parse_arguments_tokens(members)?
+					.into_iter()
+					.map(StatementElement::from_tokens)
+					.collect::<Result<Vec<_>, _>>()?;
+				LanguageElement::StructDeclarationAssignment {
+					typ: Cow::Borrowed(*type_name),
+					name: Cow::Borrowed(*name),
+					value: member_values,
+					is_static: true,
 				}
 			}
 
@@ -125,6 +153,21 @@ fn construct_structure_from_tokens<'a>(
 				}
 			}
 
+			//Struct assignment
+			[Token::Name(n), Assign, UnparsedBlock(members)] => {
+				todo!()
+			}
+
+			//Struct member assignment
+			[Token::Name(n), FieldAccess, Token::Name(field), Assign, ..] => {
+				todo!()
+			}
+
+			//Struct member assignment through pointer
+			[Token::Name(n), FieldPointerAccess, Token::Name(field), Assign, ..] => {
+				todo!()
+			}
+
 			//Variable assignment
 			[Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[2..];
@@ -137,15 +180,17 @@ fn construct_structure_from_tokens<'a>(
 			}
 
 			//Pointer assignment
-			[Deref(d), Assign, ..] => {
-				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(d.as_ref())?)?;
+			[Deref, Name(d), Assign, ..] => {
+				todo!("Revamp pointers")
+				/*
+				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(&[d])?)?;
 				let rhs = &tokens[2..];
 				let rhs_verified = StatementToken::from_tokens(rhs)?;
 				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
 				LanguageElement::PointerAssignment {
 					ptr,
 					value: rhs_parsed,
-				}
+				}*/
 			}
 
 			//Variable declaration (without init)
@@ -161,6 +206,22 @@ fn construct_structure_from_tokens<'a>(
 				name: Cow::Borrowed(n),
 				is_static: true,
 			},
+
+			//Struct declaration (without init)
+			[Token::Name(type_name), Token::Name(name)] => LanguageElement::StructDeclaration {
+				typ: Cow::Borrowed(*type_name),
+				name: Cow::Borrowed(*name),
+				is_static: false,
+			},
+
+			//Static struct declaration (without init)
+			[Static, Token::Name(type_name), Token::Name(name)] => {
+				LanguageElement::StructDeclaration {
+					typ: Cow::Borrowed(*type_name),
+					name: Cow::Borrowed(*name),
+					is_static: true,
+				}
+			}
 
 			//If else if
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
@@ -212,7 +273,8 @@ fn construct_structure_from_tokens<'a>(
 					));
 				}
 
-				let condition_tokens = Token::parse_str_to_vec(split[1])?;
+				//let condition_tokens = Token::parse_str_to_vec(split[1])?;
+				let condition_tokens = Token::by_byte(split[1])?;
 				let condition_statement_tokens = StatementToken::from_tokens(&condition_tokens)?;
 				let condition = StatementElement::from_tokens(condition_statement_tokens)?;
 
@@ -254,10 +316,19 @@ fn construct_structure_from_tokens<'a>(
 						"Struct doesn't have the same name as its typedef",
 					));
 				}
-				return Err(ParseError(line!(), "structs are not yet supported"));
+				//Reuse second definition
+				construct_structure_from_tokens(
+					&[Struct, Name(name), UnparsedBlock(members)],
+					move_first,
+				)?
 			}
+
 			[Struct, Name(name), UnparsedBlock(members)] => {
-				return Err(ParseError(line!(), "structs are not yet supported"))
+				let members_parsed = Token::parse_struct_member_tokens(members)?;
+				LanguageElement::StructDefinition {
+					name: Cow::Borrowed(*name),
+					members: members_parsed,
+				}
 			}
 
 			_ => {
@@ -272,7 +343,7 @@ fn construct_structure_from_tokens<'a>(
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub(crate) fn type_check(
-	block: &[LanguageElement],
+	block: &[LanguageElementStructless],
 	upper_variables: &[Variable],
 	outer_functions: &[Function],
 ) -> Result<bool, ParseError> {
@@ -281,7 +352,7 @@ pub(crate) fn type_check(
 
 	for line in block {
 		match line {
-			LanguageElement::VariableDeclaration {
+			LanguageElementStructless::VariableDeclaration {
 				typ,
 				name,
 				is_static: _,
@@ -290,13 +361,13 @@ pub(crate) fn type_check(
 				name: name.as_ref(),
 			}),
 
-			LanguageElement::VariableAssignment { name: _, value } => {
+			LanguageElementStructless::VariableAssignment { name: _, value } => {
 				if !value.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
 
-			LanguageElement::VariableDeclarationAssignment {
+			LanguageElementStructless::VariableDeclarationAssignment {
 				typ,
 				name,
 				value,
@@ -311,7 +382,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::PointerAssignment { ptr, value } => {
+			LanguageElementStructless::PointerAssignment { ptr, value } => {
 				if !ptr.type_check(&variables, &functions)?
 					|| !value.type_check(&variables, &functions)?
 				{
@@ -319,7 +390,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::FunctionDeclaration {
+			LanguageElementStructless::FunctionDeclaration {
 				typ,
 				name,
 				args,
@@ -336,7 +407,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::IfStatement {
+			LanguageElementStructless::IfStatement {
 				condition,
 				then,
 				else_then,
@@ -352,7 +423,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::For {
+			LanguageElementStructless::For {
 				init,
 				condition,
 				post,
@@ -367,7 +438,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::While { condition, body } => {
+			LanguageElementStructless::While { condition, body } => {
 				if !condition.type_check(&variables, &functions)?
 					|| !type_check(body, &variables, &functions)?
 				{
@@ -375,11 +446,11 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::Return(_) => {
+			LanguageElementStructless::Return(_) => {
 				//Is handled by function def instead
 			}
 
-			LanguageElement::Statement(statement) => {
+			LanguageElementStructless::Statement(statement) => {
 				if !statement.type_check(&variables, &functions)? {
 					return Ok(false);
 				}

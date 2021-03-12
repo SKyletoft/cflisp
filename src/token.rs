@@ -22,11 +22,16 @@ pub(crate) enum Token<'a> {
 	LShift,
 	Char(char),
 	Bool(bool),
-	AdrOf(&'a str),
-	Deref(Box<[Token<'a>; 1]>),
+	AdrOf,
+	Deref,
 	Name(&'a str),
-	And,
-	Or,
+	BitAnd,
+	BitOr,
+	BoolAnd,
+	BoolOr,
+	Xor,
+	BoolNot,
+	BitNot,
 	Return,
 	Num(isize),
 	For,
@@ -37,58 +42,48 @@ pub(crate) enum Token<'a> {
 	Static,
 	Struct,
 	TypeDef,
+	FieldAccess,
+	FieldPointerAccess,
 	UnparsedSource(&'a str),
 	UnparsedBlock(&'a str),
 	UnparsedParentheses(&'a str),
 	UnparsedArrayAccess(&'a str),
 	NewLine,
-	Xor,
-	Not,
+	Comma,
 }
 
 impl<'a> Token<'a> {
-	//It was at this point I realised that having clang-format work on all my test cases
-	// sheltered me from realising that I was only splitting at whitespace
-	///Splits a string into a list of tokens, splitting at whitespace and removing trailing commas
-	pub(crate) fn parse_str_to_vec(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
-		helper::split(source)?
-			.into_iter()
-			.map(|s| s.strip_suffix(',').unwrap_or(s))
-			.map(Token::parse)
-			.collect::<Result<_, _>>()
-			.map(Token::fix_deref)
+	///Splits a string into a list of tokens by matching pattern by pattern instead of
+	/// splitting and then converting into tokens
+	pub(crate) fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
+		let mut src = source.trim_start();
+		let mut vec = Vec::new();
+		while !src.is_empty() {
+			let (token, rest) = helper::get_token(src)?;
+			vec.push(token);
+			src = rest.trim_start();
+		}
+		//vec = Token::fix_deref(vec);
+		dbg!(source, &vec);
+		Ok(vec)
 	}
 
+	//Doesn't work with structs
 	//Takes ownership and returns it instead of taking a reference for easier use in a map
-	///Fixes operator misread as multiplication into deref
-	fn fix_deref(mut vec: Vec<Token<'a>>) -> Vec<Token<'a>> {
-		//dbg!(&vec);
-		let mut i = 0;
-		while i < vec.len() {
-			if vec[i] == Token::Mul
-				&& matches!(
-					vec.get(i + 1),
-					Some(UnparsedParentheses(_)) | Some(Num(_)) | Some(Name(_)) | Some(Deref(_))
-				) && vec.get(i.wrapping_sub(1)).map(Token::is_op) != Some(false)
-			{
-				let following = vec.remove(i + 1);
-				vec[i] = Token::Deref(Box::new([following]));
-				i = i.saturating_sub(2);
+	///Fixes operator misread as multiplication into deref and bitand into adrof
+	fn fix_deref(mut vec: Vec<Token>) -> Vec<Token> {
+		for i in (1..vec.len() - 1).rev() {
+			if vec[i] == Mul && vec[i - 1].is_op() {
+				vec[i] = Deref;
 			}
-			i += 1;
-		}
-		if vec[0] == Token::Mul
-			|| vec
-				.windows(2)
-				.any(|win| win[0] == NewLine && win[1] == Token::Mul)
-		{
-			dbg!(vec);
-			panic!();
+			if vec[i] == BitAnd && vec[i - 1].is_op() {
+				vec[i] = AdrOf;
+			}
 		}
 		vec
 	}
 
-	///Maps words to tokens and parses literals
+	/*///Maps words to tokens and parses literals
 	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
 		let token =
 			match name {
@@ -117,13 +112,15 @@ impl<'a> Token<'a> {
 				">=" => GreaterThanEqual,
 				"<" => LessThan,
 				"<=" => LessThanEqual,
-				"&&" => And,
-				"&" => And,
-				"|" => Or,
-				"||" => Or,
+				"&&" => BoolAnd,
+				"&" => BitAnd,
+				"|" => BitOr,
+				"||" => BoolOr,
 				"^" => Xor,
-				"!" => Not,
-				"~" => Not,
+				"!" => BoolNot,
+				"~" => BitNot,
+				"." => FieldAccess,
+				"->" => FieldPointerAccess,
 				"true" => Bool(true),
 				"false" => Bool(false),
 				"return" => Return,
@@ -137,8 +134,6 @@ impl<'a> Token<'a> {
 				"static" => Static,
 				"struct" => Struct,
 				"typedef" => TypeDef,
-				n if n.starts_with('&') => AdrOf(&n[1..]),
-				n if n.starts_with('*') => Deref(Box::new([UnparsedBlock(&n[1..])])),
 				n if n.starts_with('(') && n.ends_with(')') && n.len() >= 2 => {
 					UnparsedParentheses(&n[1..n.len() - 1].trim())
 				}
@@ -183,31 +178,36 @@ impl<'a> Token<'a> {
 				n => Token::Name(n),
 			};
 		Ok(token)
-	}
+	}*/
 
 	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
 	pub(crate) fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		Token::parse_str_to_vec(s)
+		//Token::parse_str_to_vec(s)
+		Token::by_byte(s)
 	}
 
 	///Converts string from `Token::UnparsedBlock` into `StatementToken`s
 	pub(crate) fn parse_statement_tokens(
 		s: &'a str,
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
-		let res = Token::parse_str_to_vec(s)?;
+		//let res = Token::parse_str_to_vec(s)?;
+		let res = Token::by_byte(s)?;
 		if res.contains(&NewLine) {
 			return Err(ParseError(line!(), "Statement ended early?"));
 		}
 		StatementToken::from_tokens(&res)
 	}
 
-	///Parses `Token::UnparsedBlock` as a list of statements. (Function *call*, not declaration)
+	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
 	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
+		eprintln!("Expected error here");
+		dbg!(s);
 		s.split(',')
-			.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
+			//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
+			.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
 			.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
 	}
 
@@ -216,23 +216,52 @@ impl<'a> Token<'a> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		let tokens = Token::parse_str_to_vec(s)?;
+		let tokens = Token::by_byte(s)?;
 		if tokens.contains(&NewLine) {
 			return Err(ParseError(line!(), "Statement ended early?"));
 		}
+		if tokens.len() % 2 != 0 {
+			return Err(ParseError(
+				line!(),
+				"Wrong amount of tokens in function argument declaration",
+			));
+		}
 		let mut arguments = Vec::new();
-		for (type_token, name_token) in tokens
-			.iter()
-			.step_by(2)
-			.zip(tokens.iter().skip(1).step_by(2))
-		{
-			if let (Decl(t), Name(n)) = (type_token, name_token) {
+		for slice in tokens.windows(2).step_by(2) {
+			if let [Decl(t), Name(n)] = slice {
 				arguments.push(Variable {
 					typ: t.clone(),
 					name: *n,
 				})
 			} else {
 				return Err(ParseError(line!(), "Couldn't parse argument list"));
+			}
+		}
+		Ok(arguments)
+	}
+
+	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
+	pub(crate) fn parse_struct_member_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+		if s.is_empty() {
+			return Ok(Vec::new());
+		}
+		let tokens = Token::by_byte(s)?;
+		if tokens.len() % 3 != 0 {
+			return Err(ParseError(
+				line!(),
+				"Wrong amount of tokens in struct declaration",
+			));
+		}
+		let mut arguments = Vec::new();
+		for slice in tokens.windows(3).step_by(3) {
+			if let [Decl(t), Name(n), NewLine] = slice {
+				arguments.push(Variable {
+					typ: t.clone(),
+					name: *n,
+				})
+			} else {
+				dbg!(s, tokens);
+				return Err(ParseError(line!(), "Couldn't struct members"));
 			}
 		}
 		Ok(arguments)
@@ -247,8 +276,10 @@ impl<'a> Token<'a> {
 				| Mul | Div | Mod
 				| Cmp | GreaterThan
 				| LessThan | RShift
-				| LShift | And | Or
-				| Xor | Not | Assign
+				| LShift | BitAnd
+				| BoolAnd | BitOr
+				| BoolOr | Xor | BitNot
+				| BoolNot | Assign
 				| NewLine | Decl(_)
 				| UnparsedBlock(_)
 		)

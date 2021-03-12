@@ -186,7 +186,6 @@ impl<'a> StatementElement<'a> {
 			StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
 			StatementToken::Num(n) => Parsed(StatementElement::Num(n)),
 			StatementToken::Var(v) => Parsed(StatementElement::Var(Cow::Borrowed(v))),
-			StatementToken::AdrOf(n) => Parsed(StatementElement::AdrOf(Cow::Borrowed(n))),
 
 			StatementToken::FunctionCall(name, ts) => {
 				let parametres = ts
@@ -213,10 +212,6 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(StatementElement::from_tokens(idx)?),
 				})))
 			}
-
-			StatementToken::Deref(ptr) => Parsed(StatementElement::Deref(Box::new(
-				StatementElement::from_tokens(ptr)?,
-			))),
 
 			t => Unparsed(t),
 		};

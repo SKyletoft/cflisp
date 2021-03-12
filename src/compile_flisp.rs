@@ -25,7 +25,7 @@ struct State<'a, 'b, 'c, 'd, 'e, 'f> {
 }
 
 pub(crate) fn compile<'a>(
-	program: &'a [LanguageElement],
+	program: &'a [LanguageElementStructless],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	compile_elements(
@@ -44,7 +44,7 @@ pub(crate) fn compile<'a>(
 }
 
 fn compile_elements<'a>(
-	block: &'a [LanguageElement],
+	block: &'a [LanguageElementStructless],
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
@@ -69,13 +69,13 @@ fn compile_elements<'a>(
 }
 
 fn compile_element<'a>(
-	element: &'a LanguageElement,
+	element: &'a LanguageElementStructless,
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElement::VariableDeclaration {
+		LanguageElementStructless::VariableDeclaration {
 			typ,
 			name,
 			is_static,
@@ -109,7 +109,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::VariableAssignment { name, value } => {
+		LanguageElementStructless::VariableAssignment { name, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -124,7 +124,7 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElement::VariableDeclarationAssignment {
+		LanguageElementStructless::VariableDeclarationAssignment {
 			typ,
 			name,
 			value,
@@ -205,7 +205,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::PointerAssignment { ptr, value } => {
+		LanguageElementStructless::PointerAssignment { ptr, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -225,7 +225,7 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElement::FunctionDeclaration {
+		LanguageElementStructless::FunctionDeclaration {
 			typ: _,
 			name,
 			args,
@@ -273,7 +273,7 @@ fn compile_element<'a>(
 			function_body
 		}
 
-		LanguageElement::IfStatement {
+		LanguageElementStructless::IfStatement {
 			condition,
 			then,
 			else_then,
@@ -336,7 +336,7 @@ fn compile_element<'a>(
 			cond
 		}
 
-		LanguageElement::For {
+		LanguageElementStructless::For {
 			init,
 			condition,
 			post,
@@ -406,7 +406,7 @@ fn compile_element<'a>(
 			instructions
 		}
 
-		LanguageElement::While { condition, body } => {
+		LanguageElementStructless::While { condition, body } => {
 			let cond_str = format!("while_cond_{}_{}", state.scope_name, state.line_id);
 			let body_str = format!("while_body_{}_{}", state.scope_name, state.line_id);
 			let end_str = format!("while_end_{}_{}", state.scope_name, state.line_id);
@@ -437,7 +437,7 @@ fn compile_element<'a>(
 			instructions
 		}
 
-		LanguageElement::Return(ret) => {
+		LanguageElementStructless::Return(ret) => {
 			if let Some(statement) = ret {
 				let mut statement = compile_statement(statement, state)?;
 				statement.push((
@@ -457,7 +457,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::Statement(statement) => {
+		LanguageElementStructless::Statement(statement) => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}

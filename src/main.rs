@@ -21,11 +21,11 @@ pub mod types;
 use error::{CompileError, ParseError};
 use flags::Flags;
 use flisp_instructions::{Addressing, CommentedInstruction, Instruction};
-use language_element::LanguageElement;
+use language_element::{LanguageElement, LanguageElementStructless};
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
-use types::{Block, Function, Statement, Type, Variable};
+use types::{Block, BlockStructless, Function, Statement, Struct, Type, Variable};
 
 const PATH: &str = "PATH";
 #[cfg(unix)]
@@ -56,12 +56,23 @@ fn main() {
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
+
+	//let tokens = Token::by_byte(&source);
+
 	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|e| {
 		eprintln!("Parse Error ({})", e);
 		process::exit(-1);
 	});
+	if flags.tree {
+		dbg!(&parsed);
+	}
+	let struct_filtered =
+		LanguageElementStructless::from_language_elements(parsed).unwrap_or_else(|e| {
+			eprintln!("Parse Error ({})", e);
+			process::exit(-1);
+		});
 	if flags.type_check {
-		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|e| {
+		let ok = parser::type_check(&struct_filtered, &[], &[]).unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);
 			process::exit(-1);
 		});
@@ -70,10 +81,7 @@ fn main() {
 			process::exit(-1);
 		}
 	}
-	if flags.tree {
-		dbg!(&parsed);
-	}
-	let mut instr = compile_flisp::compile(&parsed, &flags).unwrap_or_else(|e| {
+	let mut instr = compile_flisp::compile(&struct_filtered, &flags).unwrap_or_else(|e| {
 		eprintln!("Compilation error ({})", e);
 		process::exit(-1);
 	});
