@@ -45,60 +45,6 @@ fn construct_structure_from_tokens<'a>(
 				}
 			}
 
-			//Pointer variable declaration
-			[Decl(t), Deref, Name(d), Assign, ..] => {
-				todo!("Revamp pointers")
-				/*let mut typ = Type::Ptr(Box::new(t.clone()));
-				let mut r = d.as_ref();
-				let name;
-				while let [Deref(b)] = r.as_ref() {
-					typ = Type::Ptr(Box::new(typ));
-					r = b;
-				}
-				if let [Token::Name(n)] = r {
-					name = *n;
-				} else {
-					dbg!(tokens);
-					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
-				}
-				let rhs = &tokens[3..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ,
-					name: Cow::Borrowed(name),
-					value: rhs_parsed,
-					is_static: false,
-				}*/
-			}
-
-			//Static pointer variable declaration
-			[Static, Decl(t), Deref, Name(d), Assign, ..] => {
-				todo!("Revamp pointers")
-				/*let mut typ = Type::Ptr(Box::new(t.clone()));
-				let mut r = d.as_ref();
-				let name;
-				while let [Deref(b)] = r.as_ref() {
-					typ = Type::Ptr(Box::new(typ));
-					r = b;
-				}
-				if let [Token::Name(n)] = r {
-					name = *n;
-				} else {
-					dbg!(tokens);
-					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
-				}
-				let rhs = &tokens[4..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ,
-					name: Cow::Borrowed(name),
-					value: rhs_parsed,
-					is_static: true,
-				}*/
-			}
-
 			//Variable declaration
 			[Decl(t), Token::Name(n), Assign, ..] => {
 				let rhs = &tokens[3..];
@@ -177,20 +123,6 @@ fn construct_structure_from_tokens<'a>(
 					name: Cow::Borrowed(n),
 					value: rhs_parsed,
 				}
-			}
-
-			//Pointer assignment
-			[Deref, Name(d), Assign, ..] => {
-				todo!("Revamp pointers")
-				/*
-				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(&[d])?)?;
-				let rhs = &tokens[2..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::PointerAssignment {
-					ptr,
-					value: rhs_parsed,
-				}*/
 			}
 
 			//Variable declaration (without init)
@@ -339,6 +271,81 @@ fn construct_structure_from_tokens<'a>(
 		}
 	};
 	Ok(element)
+}
+
+///Tries to construct pointer variables, pointer structs or pointer assignments
+fn construct_structure_with_pointers_from_tokens<'a>(
+	tokens: &[Token<'a>],
+	move_first: bool,
+) -> Option<Result<LanguageElement<'a>, ParseError>> {
+	//Pointer variable declaration
+	/*[Decl(t), Deref, Name(d), Assign, ..] => {
+		todo!("Revamp pointers")
+		let mut typ = Type::Ptr(Box::new(t.clone()));
+		let mut r = d.as_ref();
+		let name;
+		while let [Deref(b)] = r.as_ref() {
+			typ = Type::Ptr(Box::new(typ));
+			r = b;
+		}
+		if let [Token::Name(n)] = r {
+			name = *n;
+		} else {
+			dbg!(tokens);
+			return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
+		}
+		let rhs = &tokens[3..];
+		let rhs_verified = StatementToken::from_tokens(rhs)?;
+		let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+		LanguageElement::VariableDeclarationAssignment {
+			typ,
+			name: Cow::Borrowed(name),
+			value: rhs_parsed,
+			is_static: false,
+		}
+	}
+
+	//Static pointer variable declaration
+	[Static, Decl(t), Deref, Name(d), Assign, ..] => {
+		todo!("Revamp pointers")
+		let mut typ = Type::Ptr(Box::new(t.clone()));
+		let mut r = d.as_ref();
+		let name;
+		while let [Deref(b)] = r.as_ref() {
+			typ = Type::Ptr(Box::new(typ));
+			r = b;
+		}
+		if let [Token::Name(n)] = r {
+			name = *n;
+		} else {
+			dbg!(tokens);
+			return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
+		}
+		let rhs = &tokens[4..];
+		let rhs_verified = StatementToken::from_tokens(rhs)?;
+		let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+		LanguageElement::VariableDeclarationAssignment {
+			typ,
+			name: Cow::Borrowed(name),
+			value: rhs_parsed,
+			is_static: true,
+		}
+	}
+
+
+			//Pointer assignment
+			[Deref, Name(d), Assign, ..] => {
+				todo!("Revamp pointers")
+				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(&[d])?)?;
+				let rhs = &tokens[2..];
+				let rhs_verified = StatementToken::from_tokens(rhs)?;
+				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				LanguageElement::PointerAssignment {
+					ptr,
+					value: rhs_parsed,
+				}
+			}*/
+	None
 }
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
