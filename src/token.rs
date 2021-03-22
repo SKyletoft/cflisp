@@ -1,9 +1,10 @@
 use crate::*;
 
 ///All possible tokens in the source (after comments have been removed)
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Token<'a> {
-	Decl(Type),
+	Decl(NativeType),
 	If,
 	Else,
 	Assign,
@@ -50,6 +51,34 @@ pub(crate) enum Token<'a> {
 	UnparsedArrayAccess(&'a str),
 	NewLine,
 	Comma,
+	Union,
+	Complex,
+	Long,
+	Short,
+	Float,
+	Double,
+	Volatile,
+	Const,
+	Case,
+	Default,
+	Extern,
+	Signed,
+	Unsigned,
+	Goto,
+	Inline,
+	Register,
+	Restrict,
+	Enum,
+	Do,
+	SizeOf,
+	AlignAs,
+	AlignOf,
+	Atomic,
+	Generic,
+	Imaginary,
+	NoReturn,
+	StaticAssert,
+	ThreadLocal,
 }
 
 impl<'a> Token<'a> {
@@ -59,12 +88,11 @@ impl<'a> Token<'a> {
 		let mut src = source.trim_start();
 		let mut vec = Vec::new();
 		while !src.is_empty() {
-			let (token, rest) = helper::get_token(src)?;
+			let (token, rest) = lexer::get_token(src)?;
 			vec.push(token);
 			src = rest.trim_start();
 		}
 		//vec = Token::fix_deref(vec);
-		dbg!(source, &vec);
 		Ok(vec)
 	}
 
@@ -82,103 +110,6 @@ impl<'a> Token<'a> {
 		}
 		vec
 	}
-
-	/*///Maps words to tokens and parses literals
-	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
-		let token =
-			match name {
-				";" => NewLine,
-				"int" => Decl(Type::Int),
-				"bool" => Decl(Type::Bool),
-				"char" => Decl(Type::Char),
-				"uint" => Decl(Type::Uint),
-				"void" => Decl(Type::Void),
-				"int*" => Decl(Type::Ptr(Box::new(Type::Int))),
-				"bool*" => Decl(Type::Ptr(Box::new(Type::Bool))),
-				"char*" => Decl(Type::Ptr(Box::new(Type::Char))),
-				"uint*" => Decl(Type::Ptr(Box::new(Type::Uint))),
-				"void*" => Decl(Type::Ptr(Box::new(Type::Void))),
-				"if" => If,
-				"else" => Else,
-				"=" => Assign,
-				"+" => Add,
-				"-" => Sub,
-				"*" => Mul,
-				"/" => Div,
-				"%" => Mod,
-				"==" => Cmp,
-				"!=" => NotCmp,
-				">" => GreaterThan,
-				">=" => GreaterThanEqual,
-				"<" => LessThan,
-				"<=" => LessThanEqual,
-				"&&" => BoolAnd,
-				"&" => BitAnd,
-				"|" => BitOr,
-				"||" => BoolOr,
-				"^" => Xor,
-				"!" => BoolNot,
-				"~" => BitNot,
-				"." => FieldAccess,
-				"->" => FieldPointerAccess,
-				"true" => Bool(true),
-				"false" => Bool(false),
-				"return" => Return,
-				"<<" => LShift,
-				">>" => RShift,
-				"for" => For,
-				"while" => While,
-				"break" => Break,
-				"continue" => Continue,
-				"switch" => Switch,
-				"static" => Static,
-				"struct" => Struct,
-				"typedef" => TypeDef,
-				n if n.starts_with('(') && n.ends_with(')') && n.len() >= 2 => {
-					UnparsedParentheses(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('{') && n.ends_with('}') && n.len() >= 2 => {
-					UnparsedBlock(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('[') && n.ends_with(']') && n.len() >= 2 => {
-					UnparsedArrayAccess(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('"') && n.ends_with('"') && n.len() >= 2 => {
-					return Err(ParseError(line!(), "Strings are not supported (yet?)"));
-					//StringLit(&n[1..n.len()-1].trim())
-				}
-				n if n.starts_with('\'') && n.len() == 3 && n.ends_with('\'') => {
-					Token::Char(n.as_bytes()[1] as char)
-				}
-				n if n.starts_with(|c: char| c == '-' || c.is_ascii_digit())
-					&& n.chars().skip(1).all(|r| r.is_ascii_digit()) =>
-				{
-					Num(n.parse::<isize>().map_err(|_| {
-						ParseError(line!(), "Number parse error: Is the number too large?")
-					})?)
-				}
-				n if n.starts_with("0x")
-					&& n.len() > 2 && n.chars().skip(2).all(|r| r.is_ascii_hexdigit()) =>
-				{
-					Num(isize::from_str_radix(&n[2..], 16).map_err(|_| {
-						ParseError(
-							line!(),
-							"Number parse error: Is the number too large? (hex)",
-						)
-					})?)
-				}
-				n if n.starts_with('(')
-					|| n.ends_with(')') || n.starts_with('{')
-					|| n.ends_with('}') || n.starts_with('[')
-					|| n.ends_with(']') || n.starts_with('"')
-					|| n.ends_with('"') || n.starts_with(|d: char| d.is_ascii_digit()) =>
-				{
-					UnparsedSource(n)
-				}
-				n => Token::Name(n),
-			};
-		Ok(token)
-	}*/
 
 	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
 	pub(crate) fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {

@@ -73,7 +73,7 @@ impl<'a> StatementToken<'a> {
 							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
 						continue;
 					} else {
-						let tokenised = Token::by_byte(helper::remove_parentheses(b))?;
+						let tokenised = Token::by_byte(lexer::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
@@ -81,7 +81,7 @@ impl<'a> StatementToken<'a> {
 				Token::UnparsedArrayAccess(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
 						//let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
-						let idx = Token::by_byte(helper::remove_parentheses(b))?;
+						let idx = Token::by_byte(lexer::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
 							ptr: n,
@@ -96,7 +96,7 @@ impl<'a> StatementToken<'a> {
 					}
 				}
 				Token::UnparsedBlock(b) => {
-					let items = helper::remove_parentheses(b)
+					let items = lexer::remove_parentheses(b)
 						.split(',')
 						.map(|s| s.trim())
 						.collect::<Vec<_>>();
@@ -109,7 +109,7 @@ impl<'a> StatementToken<'a> {
 					StatementToken::Array(v)
 				}
 				Token::UnparsedSource(b) => {
-					let (token, rest) = helper::get_token(b)?;
+					let (token, rest) = lexer::get_token(b)?;
 					eprintln!("Should be empty?");
 					dbg!(rest);
 					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)

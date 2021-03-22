@@ -6,10 +6,10 @@ use crate::*;
 const ABOVE_STACK_OFFSET: isize = -1;
 
 ///Name (lifetime from source code), (Type, Stack position (from the bottom))
-type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (Type, isize)>;
+type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (NativeType, isize)>;
 
 ///Name (lifetime from source code), Type
-type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, Type>;
+type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, NativeType>;
 
 ///Name, Argument list (not named)
 type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [Variable<'a>]>;
@@ -874,8 +874,8 @@ fn compile_statement_inner<'a>(
 ///Returns addressing for a name. Stack offset for locals and a Label for globals (and not an absolute address)
 fn adr_for_name<'a>(
 	name: &'a str,
-	variables: &HashMap<Cow<'a, str>, (Type, isize)>,
-	global_variables: &HashMap<Cow<'a, str>, Type>,
+	variables: &HashMap<Cow<'a, str>, (NativeType, isize)>,
+	global_variables: &HashMap<Cow<'a, str>, NativeType>,
 	stack_size: isize,
 ) -> Result<Addressing, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {

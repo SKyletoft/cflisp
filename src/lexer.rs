@@ -1,156 +1,5 @@
 use crate::*;
 
-///Splits a string slice into words. Will keep anything in parentheses as a single
-/// word so you will have to recall this function after removing parentheses.
-/// `(){}[]""` count as parentheses, not just `()`
-pub(crate) fn split(s: &str) -> Result<Vec<&str>, ParseError> {
-	let keep_closure = |slice: &str| slice.chars().any(|c| !c.is_whitespace());
-	let mut vec = Vec::new();
-	let mut parentheses = 0;
-	let mut brackets = 0;
-	let mut curlies = 0;
-	let mut start = 0;
-	let mut quotes = 0;
-	let mut escape = false;
-	for (i, c) in s.char_indices() {
-		match (curlies, brackets, parentheses, quotes, c) {
-			(0, 0, 0, 0, '{') => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i;
-				curlies += 1;
-			}
-			(_, 0, 0, 0, '{') => {
-				curlies += 1;
-			}
-
-			(1, 0, 0, 0, '}') => {
-				let slice = &s[start..=i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i + 1;
-				curlies -= 1;
-			}
-			(_, 0, 0, 0, '}') => {
-				curlies -= 1;
-			}
-
-			(0, 0, 0, 0, '[') => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i;
-				brackets += 1;
-			}
-			(0, _, 0, 0, '[') => {
-				brackets += 1;
-			}
-			(0, 1, 0, 0, ']') => {
-				let slice = &s[start..=i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i + 1;
-				brackets -= 1;
-			}
-			(0, _, 0, 0, ']') => {
-				brackets -= 1;
-			}
-
-			(0, 0, 0, 0, '(') => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i;
-				parentheses += 1;
-			}
-			(0, 0, _, 0, '(') => {
-				parentheses += 1;
-			}
-			(0, 0, 1, 0, ')') => {
-				let slice = &s[start..=i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i + 1;
-				parentheses -= 1;
-			}
-			(0, 0, _, 0, ')') => {
-				parentheses -= 1;
-			}
-
-			(0, 0, 0, 0, '"') if !escape => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i;
-				quotes += 1;
-			}
-			(0, 0, 0, 1, '"') if !escape => {
-				let slice = &s[start..=i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i + 1;
-				quotes -= 1;
-			}
-
-			(0, 0, 0, 0, _) if c.is_whitespace() => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				start = i + 1;
-			}
-			(0, 0, 0, 0, ';') => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				vec.push(&s[i..i + 1]);
-				start = i + 1;
-			}
-
-			(0, 0, 0, 1, '\\') => {
-				escape = true;
-				continue;
-			}
-
-			(0, 0, 0, 0, c) if "+-*/^.".contains(c) => {
-				let slice = &s[start..i];
-				if keep_closure(slice) {
-					vec.push(slice);
-				}
-				vec.push(&s[i..i + 1]);
-				start = i + 1;
-			}
-
-			_ => {}
-		}
-		escape = false;
-	}
-	let slice = &s[start..];
-	if keep_closure(slice) {
-		vec.push(slice);
-	}
-
-	if parentheses == 0 && brackets == 0 && quotes == 0 {
-		Ok(vec)
-	} else {
-		dbg!(s);
-		Err(ParseError(
-			line!(),
-			"Couldn't split string into tokens due to uneven parentheses/brackets/quotes",
-		))
-	}
-}
-
 ///Removes the first and last characters. Panics if the string is too short
 pub(crate) fn remove_parentheses(s: &str) -> &str {
 	assert!(s.len() >= 2);
@@ -261,7 +110,23 @@ fn get_array_access(s: &str) -> Option<(Token, &str)> {
 	Some((token, rest))
 }
 
+fn get_char(s: &str) -> Option<(Token, &str)> {
+	if s.len() < 3 {
+		return None;
+	}
+	if let Some(&[b'\'', c, b'\'']) = s.as_bytes().get(0..3) {
+		return Some((Token::Char(c as char), &s[3..]));
+	}
+	None
+}
+
+///Names must start with an alphabetic character, continues till
+/// it hits a forbidden character or whitespace.
+/// ('A'..='Z'), ('a'..='z')
 fn get_name(s: &str) -> Option<(Token, &str)> {
+	if s.starts_with(|c: char| !c.is_ascii_alphabetic()) {
+		return None;
+	}
 	let ws = s
 		.chars()
 		.take_while(|d| !d.is_whitespace() && !FORBIDDEN_CHARACTERS.contains(d))
@@ -291,6 +156,7 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_parenthesis(s))
 		.or_else(|| get_block(s))
 		.or_else(|| get_array_access(s))
+		.or_else(|| get_char(s))
 		.or_else(|| get_name(s))
 		.ok_or(ParseError(line!(), "Couldn't parse token"))
 }
@@ -300,7 +166,8 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 	']', '{', '}', '`', '´', '?', '=', '@', '£', '#', '$', '¤', '%', '¨', '§', ';', ':',
 ];
 
-const PATTERNS: [(&str, bool, fn() -> Token<'static>); 48] = [
+type TokenFunction = fn() -> Token<'static>;
+const PATTERNS: [(&str, bool, TokenFunction); 48] = [
 	("true", true, || Bool(true)),
 	("false", true, || Bool(false)),
 	("return", true, || Return),
@@ -313,16 +180,26 @@ const PATTERNS: [(&str, bool, fn() -> Token<'static>); 48] = [
 	("struct", true, || Struct),
 	("typedef", true, || TypeDef),
 	(";", false, || NewLine),
-	("int*", true, || Decl(Type::Ptr(Box::new(Type::Int)))),
-	("bool*", true, || Decl(Type::Ptr(Box::new(Type::Bool)))),
-	("char*", true, || Decl(Type::Ptr(Box::new(Type::Char)))),
-	("uint*", true, || Decl(Type::Ptr(Box::new(Type::Uint)))),
-	("void*", true, || Decl(Type::Ptr(Box::new(Type::Void)))),
-	("int", true, || Decl(Type::Int)),
-	("bool", true, || Decl(Type::Bool)),
-	("char", true, || Decl(Type::Char)),
-	("uint", true, || Decl(Type::Uint)),
-	("void", true, || Decl(Type::Void)),
+	("int*", true, || {
+		Decl(NativeType::Ptr(Box::new(NativeType::Int)))
+	}),
+	("bool*", true, || {
+		Decl(NativeType::Ptr(Box::new(NativeType::Bool)))
+	}),
+	("char*", true, || {
+		Decl(NativeType::Ptr(Box::new(NativeType::Char)))
+	}),
+	("uint*", true, || {
+		Decl(NativeType::Ptr(Box::new(NativeType::Uint)))
+	}),
+	("void*", true, || {
+		Decl(NativeType::Ptr(Box::new(NativeType::Void)))
+	}),
+	("int", true, || Decl(NativeType::Int)),
+	("bool", true, || Decl(NativeType::Bool)),
+	("char", true, || Decl(NativeType::Char)),
+	("uint", true, || Decl(NativeType::Uint)),
+	("void", true, || Decl(NativeType::Void)),
 	("if", false, || If),
 	("else", false, || Else),
 	("==", false, || Cmp),

@@ -8,8 +8,8 @@ pub mod compile_flisp;
 pub mod error;
 pub mod flags;
 pub mod flisp_instructions;
-pub mod helper;
 pub mod language_element;
+pub mod lexer;
 pub mod optimise_flisp;
 pub mod parser;
 pub mod statement_element;
@@ -25,7 +25,7 @@ use language_element::{LanguageElement, LanguageElementStructless};
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
-use types::{Block, BlockStructless, Function, Statement, Struct, Type, Variable};
+use types::{Block, BlockStructless, Function, NativeType, Statement, Struct, Type, Variable};
 
 const PATH: &str = "PATH";
 #[cfg(unix)]

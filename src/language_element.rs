@@ -1,5 +1,5 @@
 use crate::*;
-use std::borrow::Cow;
+use std::{borrow::Cow, convert::TryInto};
 
 ///Internal representation of the program.
 /// Can represent any language pattern considered valid.
@@ -8,12 +8,7 @@ use std::borrow::Cow;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum LanguageElement<'a> {
 	VariableDeclaration {
-		typ: Type,
-		name: Cow<'a, str>,
-		is_static: bool,
-	},
-	StructDeclaration {
-		typ: Cow<'a, str>,
+		typ: Type<'a>,
 		name: Cow<'a, str>,
 		is_static: bool,
 	},
@@ -26,13 +21,13 @@ pub(crate) enum LanguageElement<'a> {
 		value: Vec<StatementElement<'a>>,
 	},
 	VariableDeclarationAssignment {
-		typ: Type,
+		typ: Type<'a>,
 		name: Cow<'a, str>,
 		value: StatementElement<'a>,
 		is_static: bool,
 	},
 	StructDeclarationAssignment {
-		typ: Cow<'a, str>,
+		typ: Type<'a>,
 		name: Cow<'a, str>,
 		value: Vec<StatementElement<'a>>,
 		is_static: bool,
@@ -41,8 +36,13 @@ pub(crate) enum LanguageElement<'a> {
 		ptr: StatementElement<'a>,
 		value: StatementElement<'a>,
 	},
+	StructFieldPointerAssignment {
+		name: Cow<'a, str>,
+		field: Cow<'a, str>,
+		value: StatementElement<'a>,
+	},
 	FunctionDeclaration {
-		typ: Type,
+		typ: Type<'a>,
 		name: Cow<'a, str>,
 		args: Vec<Variable<'a>>,
 		block: Block<'a>,
@@ -70,6 +70,43 @@ pub(crate) enum LanguageElement<'a> {
 	Statement(StatementElement<'a>),
 }
 
+impl<'a> LanguageElement<'a> {
+	fn make_static(mut self) -> Result<Self, ParseError> {
+		match &mut self {
+			LanguageElement::VariableDeclaration {
+				typ,
+				name,
+				is_static,
+			} => {
+				*is_static = true;
+			}
+			LanguageElement::VariableDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+			} => {
+				*is_static = true;
+			}
+			LanguageElement::StructDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+			} => {
+				*is_static = true;
+			}
+			_ => {
+				return Err(ParseError(
+					line!(),
+					"Internal error: cannot make element static",
+				))
+			}
+		}
+		Ok(self)
+	}
+}
+
 ///Internal representation of the program.
 /// Can represent any language pattern considered valid.
 /// (language patterns are complete lines. Right hand side
@@ -77,7 +114,7 @@ pub(crate) enum LanguageElement<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum LanguageElementStructless<'a> {
 	VariableDeclaration {
-		typ: Type,
+		typ: NativeType,
 		name: Cow<'a, str>,
 		is_static: bool,
 	},
@@ -86,7 +123,7 @@ pub(crate) enum LanguageElementStructless<'a> {
 		value: StatementElement<'a>,
 	},
 	VariableDeclarationAssignment {
-		typ: Type,
+		typ: NativeType,
 		name: Cow<'a, str>,
 		value: StatementElement<'a>,
 		is_static: bool,
@@ -96,7 +133,7 @@ pub(crate) enum LanguageElementStructless<'a> {
 		value: StatementElement<'a>,
 	},
 	FunctionDeclaration {
-		typ: Type,
+		typ: NativeType,
 		name: Cow<'a, str>,
 		args: Vec<Variable<'a>>,
 		block: BlockStructless<'a>,
@@ -134,21 +171,15 @@ impl<'a> LanguageElementStructless<'a> {
 				LanguageElement::StructDefinition { name, members } => {
 					struct_types.push(types::Struct { name, members })
 				}
-
 				LanguageElement::VariableDeclaration {
 					typ,
 					name,
 					is_static,
 				} => new_elements.push(LanguageElementStructless::VariableDeclaration {
-					typ,
+					typ: typ.try_into()?,
 					name,
 					is_static,
 				}),
-				LanguageElement::StructDeclaration {
-					typ,
-					name,
-					is_static,
-				} => panic!("Struct"),
 				LanguageElement::VariableAssignment { name, value } => {
 					new_elements.push(LanguageElementStructless::VariableAssignment { name, value })
 				}
@@ -159,7 +190,7 @@ impl<'a> LanguageElementStructless<'a> {
 					value,
 					is_static,
 				} => new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
-					typ,
+					typ: typ.try_into()?,
 					name,
 					value,
 					is_static,
@@ -173,13 +204,16 @@ impl<'a> LanguageElementStructless<'a> {
 				LanguageElement::PointerAssignment { ptr, value } => {
 					new_elements.push(LanguageElementStructless::PointerAssignment { ptr, value })
 				}
+				LanguageElement::StructFieldPointerAssignment { name, field, value } => {
+					panic!("struct")
+				}
 				LanguageElement::FunctionDeclaration {
 					typ,
 					name,
 					args,
 					block,
 				} => new_elements.push(LanguageElementStructless::FunctionDeclaration {
-					typ,
+					typ: typ.try_into()?,
 					name,
 					args,
 					block: LanguageElementStructless::from_language_elements(block)?,
@@ -223,6 +257,7 @@ impl<'a> LanguageElementStructless<'a> {
 				LanguageElement::Statement(stat) => {
 					new_elements.push(LanguageElementStructless::Statement(stat))
 				}
+				LanguageElement::StructDefinition { name, members } => {}
 			}
 		}
 		Ok(new_elements)
