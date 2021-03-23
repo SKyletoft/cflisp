@@ -244,14 +244,15 @@ impl<'a> StatementElement<'a> {
 		}
 
 		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::Not), |l| {
-			StatementElement::Not { lhs: Box::new(l) }
+			Ok(StatementElement::Not { lhs: Box::new(l) })
 		})?;
 		//todo: unary op for derefs
 		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::Mul), |l| {
-			StatementElement::Deref(Box::new(l))
+			Ok(StatementElement::Deref(Box::new(l)))
 		})?;
 		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::AdrOf), |l| {
-			StatementElement::AdrOf()
+			todo!()
+			//Ok(StatementElement::AdrOf(Cow::Borrowed("foo")))
 		})?;
 
 		let operations: [(MaybeParsed, OpFnPtr); 16] = [
