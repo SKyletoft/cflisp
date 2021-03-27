@@ -6,9 +6,10 @@ typedef struct myStruct {
 
 int main() {
 	myStruct foo     = {2 + 5, 4 + 2, 1 + 7};
-	myStruct *fooPtr = &foo;
+	myStruct *fooPtr = 0;
 	// printf("a: %d, b: %d, c: %d\n", foo.a, foo.b, foo.c);
 	fooPtr->a = 3;
 	foo.b     = 2;
+	// (*fooPtr).c = 86;
 	// printf("a: %d, b: %d, c: %d\n", foo.a, foo.b, foo.c);
 }

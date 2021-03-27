@@ -96,21 +96,6 @@ impl<'a> Token<'a> {
 		Ok(vec)
 	}
 
-	//Doesn't work with structs
-	//Takes ownership and returns it instead of taking a reference for easier use in a map
-	///Fixes operator misread as multiplication into deref and bitand into adrof
-	fn fix_deref(mut vec: Vec<Token>) -> Vec<Token> {
-		for i in (1..vec.len() - 1).rev() {
-			if vec[i] == Mul && vec[i - 1].is_op() {
-				vec[i] = Deref;
-			}
-			if vec[i] == BitAnd && vec[i - 1].is_op() {
-				vec[i] = AdrOf;
-			}
-		}
-		vec
-	}
-
 	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
 	pub(crate) fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		if s.is_empty() {
@@ -134,8 +119,6 @@ impl<'a> Token<'a> {
 
 	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
 	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
-		eprintln!("Expected error here");
-		dbg!(s);
 		s.split(',')
 			//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
 			.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
@@ -196,23 +179,5 @@ impl<'a> Token<'a> {
 			}
 		}
 		Ok(arguments)
-	}
-
-	//Should & and * be considered operators?
-	///Is the token an operator? Address of (&) and derefrencing (*) are not considered operators
-	fn is_op(&self) -> bool {
-		matches!(
-			self,
-			Add | Sub
-				| Mul | Div | Mod
-				| Cmp | GreaterThan
-				| LessThan | RShift
-				| LShift | BitAnd
-				| BoolAnd | BitOr
-				| BoolOr | Xor | BitNot
-				| BoolNot | Assign
-				| NewLine | Decl(_)
-				| UnparsedBlock(_)
-		)
 	}
 }

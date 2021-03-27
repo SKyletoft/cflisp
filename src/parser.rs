@@ -272,9 +272,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 	 *		static struct_name* name;
 	 */
 	match &tokens[0] {
-		Static => {
-			todo!("Call self and make static afterwards")
-		}
+		Static => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+			.map(|res| res.and_then(LanguageElement::make_static)),
 		//	`type* name` and `type* name` =
 		Decl(t) => {
 			let mut tokens_slice = &tokens[1..];
@@ -303,6 +302,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				_ => None,
 			}
 		}
+		//Struct type name
 		Name(n) => {
 			let mut tokens_slice = &tokens[1..];
 			let mut t = Type::Struct(n);
@@ -317,6 +317,13 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_static: false,
 				})),
 				[Name(n), Assign, UnparsedBlock(s)] => {
+					if !matches!(t, Type::Struct(_)) {
+						dbg!(tokens);
+						return Some(Err(ParseError(
+							line!(),
+							"Tried to initialise struct literal as pointer value",
+						)));
+					}
 					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
 						tokens
 							.into_iter()
@@ -331,13 +338,32 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
+				[Name(n), Assign, ..] => {
+					if matches!(t, Type::Struct(_)) {
+						dbg!(tokens);
+						return Some(Err(ParseError(
+							line!(),
+							"Tried to initialise struct pointer as struct literal",
+						)));
+					}
+					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|rhs| {
+						LanguageElement::VariableDeclarationAssignment {
+							typ: t,
+							name: Cow::Borrowed(n),
+							value: rhs,
+							is_static: false,
+						}
+					});
+					Some(res)
+				}
 				_ => None,
 			}
 		}
 		Mul => {
 			let assign_idx = tokens.iter().position(|t| t == &Assign);
 			assign_idx.map(|assign_idx| {
-				let lhs = StatementElement::from_tokens(&tokens[..assign_idx]);
+				//Skip the first deref as the LanaguageElement::PointerAssignment::ptr already expects a pointer
+				let lhs = StatementElement::from_tokens(&tokens[1..assign_idx]);
 				let rhs = StatementElement::from_tokens(&tokens[assign_idx + 1..]);
 				lhs.and_then(|lhs| {
 					rhs.map(|rhs| LanguageElement::PointerAssignment {

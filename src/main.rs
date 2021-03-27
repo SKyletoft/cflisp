@@ -25,7 +25,7 @@ use language_element::{LanguageElement, LanguageElementStructless};
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
-use types::{Block, BlockStructless, Function, NativeType, Statement, Struct, Type, Variable};
+use types::{Block, BlockStructless, Function, NativeType, Statement, Type, Variable};
 
 const PATH: &str = "PATH";
 #[cfg(unix)]

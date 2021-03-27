@@ -96,6 +96,16 @@ enum MaybeParsed<'a> {
 }
 use MaybeParsed::*;
 
+impl<'a> MaybeParsed<'a> {
+	fn map_unparsed<T>(&self, f: fn(&StatementToken<'a>) -> T) -> Option<T> {
+		if let Unparsed(internal) = self {
+			Some(f(internal))
+		} else {
+			None
+		}
+	}
+}
+
 impl<'a> StatementElement<'a> {
 	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
 	pub(crate) fn as_flisp_instruction(
@@ -243,19 +253,35 @@ impl<'a> StatementElement<'a> {
 			}
 		}
 
-		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::Not), |l| {
-			Ok(StatementElement::Not { lhs: Box::new(l) })
-		})?;
-		//todo: unary op for derefs
+		do_unary_operation(
+			&mut working_tokens,
+			&Unparsed(StatementToken::BitNot),
+			|l| Ok(StatementElement::Not { lhs: Box::new(l) }),
+		)?;
+		do_unary_operation(
+			&mut working_tokens,
+			&Unparsed(StatementToken::BoolNot),
+			|l| Ok(StatementElement::Not { lhs: Box::new(l) }),
+		)?;
 		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::Mul), |l| {
 			Ok(StatementElement::Deref(Box::new(l)))
 		})?;
-		do_unary_operation(&mut working_tokens, &Unparsed(StatementToken::AdrOf), |l| {
-			todo!()
-			//Ok(StatementElement::AdrOf(Cow::Borrowed("foo")))
-		})?;
+		do_unary_operation(
+			&mut working_tokens,
+			&Unparsed(StatementToken::BitAnd),
+			|l| {
+				if let StatementElement::Var(n) = l {
+					Ok(StatementElement::AdrOf(n))
+				} else {
+					Err(ParseError(
+						line!(),
+						"Internal error: Tried to take address of on a non variable",
+					))
+				}
+			},
+		)?;
 
-		let operations: [(MaybeParsed, OpFnPtr); 16] = [
+		let operations: [(MaybeParsed, OpFnPtr); 18] = [
 			(Unparsed(StatementToken::Mul), |l, r| {
 				StatementElement::Mul {
 					lhs: Box::new(l),
@@ -334,7 +360,13 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(r),
 				}
 			}),
-			(Unparsed(StatementToken::And), |l, r| {
+			(Unparsed(StatementToken::BoolAnd), |l, r| {
+				StatementElement::And {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::BitAnd), |l, r| {
 				StatementElement::And {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
@@ -346,9 +378,17 @@ impl<'a> StatementElement<'a> {
 					rhs: Box::new(r),
 				}
 			}),
-			(Unparsed(StatementToken::Or), |l, r| StatementElement::Or {
-				lhs: Box::new(l),
-				rhs: Box::new(r),
+			(Unparsed(StatementToken::BitOr), |l, r| {
+				StatementElement::Or {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
+			}),
+			(Unparsed(StatementToken::BoolOr), |l, r| {
+				StatementElement::Or {
+					lhs: Box::new(l),
+					rhs: Box::new(r),
+				}
 			}),
 		];
 		for (from, to) in operations.iter() {
@@ -551,21 +591,31 @@ fn do_unary_operation<'a>(
 	op_from: &MaybeParsed,
 	op_to: fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>, ParseError>,
 ) -> Result<(), ParseError> {
-	while let Some(idx) = tokens.iter().rev().position(|t| t == op_from) {
-		let idx = tokens.len() - idx; //Reverse for multiple derefs to work
-		if idx + 1 == tokens.len() {
-			return Err(ParseError(
-				line!(),
-				"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
-			));
+	let mut idx = tokens.len() - 1;
+	while idx != usize::MAX {
+		if !matches!(tokens.get(idx), Some(token) if token == op_from) {
+			idx = idx.wrapping_sub(1);
+			continue;
 		}
-		//todo: return Ok(()) if the thing to the left isn't an operator or out of range
-		let next = tokens.remove(idx + 1);
-		let lhs = match next {
-			Unparsed(t) => StatementElement::from_statement_tokens(vec![t])?,
-			Parsed(t) => t,
-		};
-		tokens[idx] = Parsed(op_to(lhs)?);
+		let prev_is_op = tokens
+			.get(idx.wrapping_sub(1))
+			.map(
+				|token| token.map_unparsed(StatementToken::is_op).unwrap_or(false), //Parsed is false
+			)
+			.unwrap_or(true); //Non existant is true
+		if prev_is_op {
+			let next = tokens.remove(idx + 1);
+			if let Parsed(right) = next {
+				tokens[idx] = Parsed(op_to(right)?);
+			} else {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Element that \
+					should've been parsed first has not been parsed",
+				));
+			}
+		}
+		idx = idx.wrapping_sub(1);
 	}
 	Ok(())
 }

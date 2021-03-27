@@ -1,6 +1,5 @@
 use crate::*;
 use std::borrow::Cow;
-use std::convert::TryInto;
 
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,34 +54,23 @@ pub(crate) enum NativeType {
 	Void,
 	Ptr(Box<NativeType>),
 }
-
-impl<'a> TryInto<NativeType> for Type<'a> {
-	type Error = ParseError;
-
-	fn try_into(self) -> Result<NativeType, Self::Error> {
-		(&self).try_into()
+impl<'a> From<Type<'a>> for NativeType {
+	fn from(other: Type) -> Self {
+		(&other).into()
 	}
 }
 
-impl<'a> TryInto<NativeType> for &Type<'a> {
-	type Error = ParseError;
-
-	fn try_into(self) -> Result<NativeType, Self::Error> {
-		let res = match self {
+impl<'a> From<&Type<'a>> for NativeType {
+	fn from(other: &Type) -> Self {
+		match other {
 			Type::Uint => NativeType::Uint,
 			Type::Int => NativeType::Int,
 			Type::Char => NativeType::Char,
 			Type::Bool => NativeType::Bool,
 			Type::Void => NativeType::Void,
-			Type::Ptr(target) => NativeType::Ptr(Box::new(target.as_ref().try_into()?)),
-			Type::Struct(_) => {
-				return Err(ParseError(
-					line!(),
-					"Tried to do convert struct type into native type",
-				))
-			}
-		};
-		Ok(res)
+			Type::Struct(_) => NativeType::Void,
+			Type::Ptr(target) => NativeType::Ptr(Box::new(target.as_ref().into())),
+		}
 	}
 }
 
@@ -95,6 +83,16 @@ impl<'a> From<&NativeType> for Type<'a> {
 			NativeType::Bool => Type::Bool,
 			NativeType::Void => Type::Void,
 			NativeType::Ptr(target) => Type::Ptr(Box::new((target.as_ref()).into())),
+		}
+	}
+}
+
+impl<'a> Type<'a> {
+	pub(crate) fn get_struct_type(&self) -> Option<&'a str> {
+		match self {
+			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
+			Type::Struct(n) => Some(n),
+			Type::Ptr(inner) => inner.get_struct_type(),
 		}
 	}
 }

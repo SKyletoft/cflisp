@@ -1,5 +1,5 @@
 use crate::*;
-use std::{borrow::Cow, convert::TryInto};
+use std::{borrow::Cow, collections::HashMap};
 
 ///Internal representation of the program.
 /// Can represent any language pattern considered valid.
@@ -71,27 +71,27 @@ pub(crate) enum LanguageElement<'a> {
 }
 
 impl<'a> LanguageElement<'a> {
-	fn make_static(mut self) -> Result<Self, ParseError> {
+	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
 		match &mut self {
 			LanguageElement::VariableDeclaration {
-				typ,
-				name,
+				typ: _,
+				name: _,
 				is_static,
 			} => {
 				*is_static = true;
 			}
 			LanguageElement::VariableDeclarationAssignment {
-				typ,
-				name,
-				value,
+				typ: _,
+				name: _,
+				value: _,
 				is_static,
 			} => {
 				*is_static = true;
 			}
 			LanguageElement::StructDeclarationAssignment {
-				typ,
-				name,
-				value,
+				typ: _,
+				name: _,
+				value: _,
 				is_static,
 			} => {
 				*is_static = true;
@@ -164,48 +164,142 @@ impl<'a> LanguageElementStructless<'a> {
 	pub(crate) fn from_language_elements(
 		elements: Vec<LanguageElement<'a>>,
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
-		let mut struct_types = Vec::new();
+		let mut struct_types = HashMap::new();
+		let mut structs_and_struct_pointers = HashMap::new();
+		LanguageElementStructless::from_language_elements_internal(
+			elements,
+			&mut struct_types,
+			&mut structs_and_struct_pointers,
+		)
+	}
+
+	fn from_language_elements_internal(
+		elements: Vec<LanguageElement<'a>>,
+		struct_types: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
+		structs_and_struct_pointers: &mut HashMap<Cow<'a, str>, &'a str>,
+	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
 		let mut new_elements = Vec::new();
+		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
 		for element in elements {
 			match element {
 				LanguageElement::StructDefinition { name, members } => {
-					struct_types.push(types::Struct { name, members })
+					struct_types.insert(name, members);
 				}
 				LanguageElement::VariableDeclaration {
 					typ,
 					name,
 					is_static,
-				} => new_elements.push(LanguageElementStructless::VariableDeclaration {
-					typ: typ.try_into()?,
-					name,
-					is_static,
-				}),
+				} => {
+					if let Some(n) = typ.get_struct_type() {
+						structs_and_struct_pointers.insert(name.clone(), n);
+					}
+					new_elements.push(LanguageElementStructless::VariableDeclaration {
+						typ: typ.into(),
+						name,
+						is_static,
+					})
+				}
 				LanguageElement::VariableAssignment { name, value } => {
 					new_elements.push(LanguageElementStructless::VariableAssignment { name, value })
 				}
-				LanguageElement::StructAssignment { name, value } => panic!("struct"),
+				LanguageElement::StructAssignment { name, value } => {
+					let name: &str = &name;
+					let struct_type = structs
+						.get(name)
+						.ok_or(ParseError(line!(), "Struct variable missing!"))?;
+					let fields = struct_types
+						.get(struct_type)
+						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					for (val, field) in value.into_iter().zip(fields.iter()) {
+						new_elements.push(LanguageElementStructless::VariableAssignment {
+							name: Cow::Owned(name.to_string() + "::" + field.name),
+							value: val,
+						});
+					}
+				}
 				LanguageElement::VariableDeclarationAssignment {
 					typ,
 					name,
 					value,
 					is_static,
-				} => new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
-					typ: typ.try_into()?,
-					name,
-					value,
-					is_static,
-				}),
+				} => {
+					if let Some(n) = typ.get_struct_type() {
+						structs_and_struct_pointers.insert(name.clone(), n);
+					}
+					new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
+						typ: typ.into(),
+						name,
+						value,
+						is_static,
+					})
+				}
 				LanguageElement::StructDeclarationAssignment {
 					typ,
 					name,
 					value,
 					is_static,
-				} => panic!("struct"),
+				} => {
+					let struct_type = if let Type::Struct(struct_type) = typ {
+						Ok(struct_type)
+					} else {
+						Err(ParseError(line!(), "Internal error: Type is not struct"))
+					}?;
+					structs_and_struct_pointers.insert(name.clone(), struct_type);
+					let fields = if let Some(fields) = struct_types.get(struct_type) {
+						fields
+					} else {
+						dbg!(LanguageElement::StructDeclarationAssignment {
+							typ,
+							name,
+							value,
+							is_static
+						});
+						dbg!(struct_types);
+						return Err(ParseError(line!(), "Undefined struct type"));
+					};
+					for (val, field) in value.into_iter().zip(fields.iter()) {
+						new_elements.push(
+							LanguageElementStructless::VariableDeclarationAssignment {
+								name: Cow::Owned(name.to_string() + "::" + field.name),
+								value: val,
+								typ: field.typ.clone(),
+								is_static,
+							},
+						);
+					}
+					structs.insert(name, Cow::Borrowed(struct_type));
+				}
 				LanguageElement::PointerAssignment { ptr, value } => {
 					new_elements.push(LanguageElementStructless::PointerAssignment { ptr, value })
 				}
 				LanguageElement::StructFieldPointerAssignment { name, field, value } => {
-					panic!("struct")
+					let name_borrowed: &str = &name;
+					let struct_type_name =
+						*structs_and_struct_pointers
+							.get(name_borrowed)
+							.ok_or(ParseError(
+								line!(),
+								"Variable wasn't of struct or struct pointer type",
+							))?;
+					let fields = struct_types
+						.get(struct_type_name)
+						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					let idx = fields
+						.iter()
+						.position(|&Variable { typ: _, name }| name == field)
+						.ok_or(ParseError(line!(), "Unknown field name"))?;
+					let new_ptr = if idx == 0 {
+						StatementElement::Var(name)
+					} else {
+						StatementElement::Add {
+							lhs: Box::new(StatementElement::Num(idx as isize)),
+							rhs: Box::new(StatementElement::Var(name)),
+						}
+					};
+					new_elements.push(LanguageElementStructless::PointerAssignment {
+						ptr: new_ptr,
+						value,
+					});
 				}
 				LanguageElement::FunctionDeclaration {
 					typ,
@@ -213,10 +307,14 @@ impl<'a> LanguageElementStructless<'a> {
 					args,
 					block,
 				} => new_elements.push(LanguageElementStructless::FunctionDeclaration {
-					typ: typ.try_into()?,
+					typ: typ.into(),
 					name,
 					args,
-					block: LanguageElementStructless::from_language_elements(block)?,
+					block: LanguageElementStructless::from_language_elements_internal(
+						block,
+						struct_types,
+						structs_and_struct_pointers,
+					)?,
 				}),
 				LanguageElement::IfStatement {
 					condition,
@@ -224,11 +322,17 @@ impl<'a> LanguageElementStructless<'a> {
 					else_then,
 				} => new_elements.push(LanguageElementStructless::IfStatement {
 					condition,
-					then: LanguageElementStructless::from_language_elements(then)?,
+					then: LanguageElementStructless::from_language_elements_internal(
+						then,
+						struct_types,
+						structs_and_struct_pointers,
+					)?,
 					//no, clippy, this can't be replaced with a Option::map
 					else_then: if let Some(else_then) = else_then {
-						Some(LanguageElementStructless::from_language_elements(
+						Some(LanguageElementStructless::from_language_elements_internal(
 							else_then,
+							struct_types,
+							structs_and_struct_pointers,
 						)?)
 					} else {
 						None
@@ -240,15 +344,31 @@ impl<'a> LanguageElementStructless<'a> {
 					post,
 					body,
 				} => new_elements.push(LanguageElementStructless::For {
-					init: LanguageElementStructless::from_language_elements(init)?,
+					init: LanguageElementStructless::from_language_elements_internal(
+						init,
+						struct_types,
+						structs_and_struct_pointers,
+					)?,
 					condition,
-					post: LanguageElementStructless::from_language_elements(post)?,
-					body: LanguageElementStructless::from_language_elements(body)?,
+					post: LanguageElementStructless::from_language_elements_internal(
+						post,
+						struct_types,
+						structs_and_struct_pointers,
+					)?,
+					body: LanguageElementStructless::from_language_elements_internal(
+						body,
+						struct_types,
+						structs_and_struct_pointers,
+					)?,
 				}),
 				LanguageElement::While { condition, body } => {
 					new_elements.push(LanguageElementStructless::While {
 						condition,
-						body: LanguageElementStructless::from_language_elements(body)?,
+						body: LanguageElementStructless::from_language_elements_internal(
+							body,
+							struct_types,
+							structs_and_struct_pointers,
+						)?,
 					})
 				}
 				LanguageElement::Return(ret) => {
@@ -257,7 +377,6 @@ impl<'a> LanguageElementStructless<'a> {
 				LanguageElement::Statement(stat) => {
 					new_elements.push(LanguageElementStructless::Statement(stat))
 				}
-				LanguageElement::StructDefinition { name, members } => {}
 			}
 		}
 		Ok(new_elements)
