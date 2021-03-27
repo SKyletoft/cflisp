@@ -71,6 +71,9 @@ fn main() {
 			eprintln!("Parse Error ({})", e);
 			process::exit(-1);
 		});
+	if flags.tree_structless {
+		dbg!(&struct_filtered);
+	}
 	if flags.type_check {
 		let ok = parser::type_check(&struct_filtered, &[], &[]).unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);

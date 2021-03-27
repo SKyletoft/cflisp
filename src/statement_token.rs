@@ -29,6 +29,8 @@ pub(crate) enum StatementToken<'a> {
 	BitNot,
 	Parentheses(Vec<StatementToken<'a>>),
 	BitAnd,
+	FieldAccess,
+	FieldPointerAccess,
 	ArrayAccess {
 		ptr: &'a str,
 		idx: Vec<StatementToken<'a>>,
@@ -66,6 +68,8 @@ impl<'a> StatementToken<'a> {
 				Token::LessThanEqual => StatementToken::LessThanEqual,
 				Token::Cmp => StatementToken::Cmp,
 				Token::NotCmp => StatementToken::NotCmp,
+				Token::FieldAccess => StatementToken::FieldAccess,
+				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
 				Token::UnparsedParentheses(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
 						res[last] =

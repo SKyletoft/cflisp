@@ -6,6 +6,7 @@ pub(crate) struct Flags {
 	pub(crate) hex: bool,
 	pub(crate) comments: bool,
 	pub(crate) tree: bool,
+	pub(crate) tree_structless: bool,
 	pub(crate) type_check: bool,
 	pub(crate) print_result: bool,
 	pub(crate) assemble: bool,
@@ -21,6 +22,7 @@ impl Default for Flags {
 			hex: false,
 			comments: true,
 			tree: false,
+			tree_structless: false,
 			type_check: true,
 			print_result: false,
 			assemble: false,
@@ -54,6 +56,9 @@ impl<'a> FromIterator<&'a String> for Flags {
 				}
 				if arg.contains('p') {
 					flags.tree = true;
+				}
+				if arg.contains('P') {
+					flags.tree_structless = true;
 				}
 				if arg.contains('t') {
 					flags.type_check = false;

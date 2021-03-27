@@ -594,15 +594,15 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StatementElement::Sub { lhs: rhs, rhs: lhs }
-		| StatementElement::Div { lhs, rhs }
-		| StatementElement::Mod { lhs, rhs }
-		| StatementElement::LShift { lhs: rhs, rhs: lhs }
-		| StatementElement::RShift { lhs: rhs, rhs: lhs }
-		| StatementElement::GreaterThan { lhs, rhs }
-		| StatementElement::LessThanEqual { lhs, rhs }
-		| StatementElement::LessThan { lhs: rhs, rhs: lhs }
-		| StatementElement::GreaterThanEqual { lhs: rhs, rhs: lhs } => {
+		StatementElement::Sub { lhs, rhs }
+		| StatementElement::Div { lhs: rhs, rhs: lhs }
+		| StatementElement::Mod { lhs: rhs, rhs: lhs }
+		| StatementElement::LShift { lhs, rhs }
+		| StatementElement::RShift { lhs, rhs }
+		| StatementElement::GreaterThan { lhs: rhs, rhs: lhs }
+		| StatementElement::LessThanEqual { lhs: rhs, rhs: lhs }
+		| StatementElement::LessThan { lhs, rhs }
+		| StatementElement::GreaterThanEqual { lhs, rhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
@@ -867,6 +867,8 @@ fn compile_statement_inner<'a>(
 			instructions.push((Instruction::COMA, None));
 			instructions
 		}
+
+		_ => todo!(),
 	};
 	Ok(instructions)
 }

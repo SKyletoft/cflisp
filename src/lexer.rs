@@ -166,8 +166,9 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 	']', '{', '}', '`', '´', '?', '=', '@', '£', '#', '$', '¤', '%', '¨', '§', ';', ':',
 ];
 
+//Literal, needs following whitespace, closure to return token
 type TokenFunction = fn() -> Token<'static>;
-const PATTERNS: [(&str, bool, TokenFunction); 48] = [
+const PATTERNS: [(&str, bool, TokenFunction); 49] = [
 	("true", true, || Bool(true)),
 	("false", true, || Bool(false)),
 	("return", true, || Return),
@@ -179,6 +180,7 @@ const PATTERNS: [(&str, bool, TokenFunction); 48] = [
 	("static", true, || Static),
 	("struct", true, || Struct),
 	("typedef", true, || TypeDef),
+	("sizeof", true, || SizeOf),
 	(";", false, || NewLine),
 	("int*", true, || {
 		Decl(NativeType::Ptr(Box::new(NativeType::Int)))
