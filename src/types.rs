@@ -4,6 +4,13 @@ use std::borrow::Cow;
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Variable<'a> {
+	pub(crate) typ: Type<'a>,
+	pub(crate) name: &'a str,
+}
+
+///A type and a name
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NativeVariable<'a> {
 	pub(crate) typ: NativeType,
 	pub(crate) name: &'a str,
 }
@@ -94,5 +101,31 @@ impl<'a> Type<'a> {
 			Type::Struct(n) => Some(n),
 			Type::Ptr(inner) => inner.get_struct_type(),
 		}
+	}
+}
+
+impl<'a> PartialEq<Type<'a>> for NativeType {
+	fn eq(&self, other: &Type<'a>) -> bool {
+		match other {
+			Type::Uint => self == &NativeType::Uint,
+			Type::Int => self == &NativeType::Int,
+			Type::Char => self == &NativeType::Char,
+			Type::Bool => self == &NativeType::Bool,
+			Type::Void => self == &NativeType::Void,
+			Type::Struct(_) => false,
+			Type::Ptr(inner) => {
+				if let NativeType::Ptr(self_inner) = self {
+					*self_inner.as_ref() == *inner.as_ref()
+				} else {
+					false
+				}
+			}
+		}
+	}
+}
+
+impl<'a> PartialEq<NativeType> for Type<'a> {
+	fn eq(&self, other: &NativeType) -> bool {
+		other.eq(self)
 	}
 }

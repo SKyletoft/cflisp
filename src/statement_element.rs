@@ -478,7 +478,7 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Var(name) => variables
 				.iter()
 				.find(|f| f.name == name)
-				.map(|v| v.typ.clone())
+				.map(|v| (&v.typ).into())
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 
 			StatementElement::Array(arr) => NativeType::Ptr(Box::new(
@@ -493,7 +493,7 @@ impl<'a> StatementElement<'a> {
 				variables
 					.iter()
 					.find(|f| f.name == name)
-					.map(|v| v.typ.clone())
+					.map(|v| (&v.typ).into())
 					.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 			)),
 
@@ -659,39 +659,53 @@ fn do_unary_operation<'a>(
 pub(crate) fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
-			LanguageElement::VariableDeclaration {
-				typ: _,
-				name: _,
-				is_static: true,
-			} => 0,
-
-			LanguageElement::VariableDeclarationAssignment {
+			LanguageElement::StructDefinition { .. } => 0,
+			LanguageElement::StructDeclarationAssignment {
 				typ: _,
 				name: _,
 				value: _,
 				is_static: true,
-			} => 0,
-
+			} => 1,
 			LanguageElement::VariableDeclaration {
 				typ: _,
 				name: _,
-				is_static: false,
+				is_static: true,
 			} => 1,
 
 			LanguageElement::VariableDeclarationAssignment {
 				typ: _,
 				name: _,
 				value: _,
+				is_static: true,
+			} => 1,
+
+			LanguageElement::StructDeclarationAssignment {
+				typ: _,
+				name: _,
+				value: _,
 				is_static: false,
 			} => 1,
+
+			LanguageElement::VariableDeclaration {
+				typ: _,
+				name: _,
+				is_static: false,
+			} => 2,
+
+			LanguageElement::VariableDeclarationAssignment {
+				typ: _,
+				name: _,
+				value: _,
+				is_static: false,
+			} => 2,
 
 			LanguageElement::FunctionDeclaration {
 				typ: _,
 				name: _,
 				args: _,
 				block: _,
-			} => 2,
-			_ => 3,
+			} => 3,
+			_ => 4,
 		}
 	};
 	block.sort_by_key(give_value);

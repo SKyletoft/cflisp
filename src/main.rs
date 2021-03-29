@@ -25,7 +25,9 @@ use language_element::{LanguageElement, LanguageElementStructless};
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use token::{Token, Token::*};
-use types::{Block, BlockStructless, Function, NativeType, Statement, Type, Variable};
+use types::{
+	Block, BlockStructless, Function, NativeType, NativeVariable, Statement, Type, Variable,
+};
 
 const PATH: &str = "PATH";
 #[cfg(unix)]
@@ -56,8 +58,6 @@ fn main() {
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
-
-	//let tokens = Token::by_byte(&source);
 
 	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|e| {
 		eprintln!("Parse Error ({})", e);

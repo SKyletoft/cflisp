@@ -299,6 +299,21 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
+				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
+						Token::parse_block_tokens(code).and_then(|code_tokenised| {
+							construct_block(&code_tokenised, move_first).map(|code_parsed| {
+								LanguageElement::FunctionDeclaration {
+									typ: t,
+									name: Cow::Borrowed(n),
+									args: args_parsed,
+									block: code_parsed,
+								}
+							})
+						})
+					});
+					Some(res)
+				}
 				_ => None,
 			}
 		}
@@ -356,6 +371,21 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
+				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
+						Token::parse_block_tokens(code).and_then(|code_tokenised| {
+							construct_block(&code_tokenised, move_first).map(|code_parsed| {
+								LanguageElement::FunctionDeclaration {
+									typ: t,
+									name: Cow::Borrowed(n),
+									args: args_parsed,
+									block: code_parsed,
+								}
+							})
+						})
+					});
+					Some(res)
+				}
 				_ => None,
 			}
 		}
@@ -399,7 +429,7 @@ pub(crate) fn type_check(
 				name,
 				is_static: _,
 			} => variables.push(Variable {
-				typ: typ.clone(),
+				typ: typ.into(),
 				name: name.as_ref(),
 			}),
 
@@ -416,7 +446,7 @@ pub(crate) fn type_check(
 				is_static: _,
 			} => {
 				variables.push(Variable {
-					typ: typ.clone(),
+					typ: typ.into(),
 					name: name.as_ref(),
 				});
 				if !value.type_check(&variables, &functions)? {
@@ -441,7 +471,13 @@ pub(crate) fn type_check(
 				functions.push(Function {
 					return_type: typ.clone(),
 					name: name.as_ref(),
-					parametres: args.clone(),
+					parametres: args
+						.iter()
+						.map(|NativeVariable { typ, name }| Variable {
+							typ: typ.into(),
+							name,
+						})
+						.collect(),
 				});
 
 				if !type_check(block, &variables, &functions)? {
@@ -488,15 +524,19 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElementStructless::Return(_) => {
-				//Is handled by function def instead
-			}
+			//Is handled by function def instead
+			LanguageElementStructless::Return(_) => {}
 
 			LanguageElementStructless::Statement(statement) => {
 				if !statement.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
+
+			LanguageElementStructless::StructDeclaration {
+				name: _,
+				is_static: _,
+			} => {}
 		}
 	}
 

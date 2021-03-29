@@ -12,7 +12,7 @@ type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (NativeType, isize)>;
 type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, NativeType>;
 
 ///Name, Argument list (not named)
-type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [Variable<'a>]>;
+type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [NativeVariable<'a>]>;
 
 #[derive(Debug, PartialEq)]
 struct State<'a, 'b, 'c, 'd, 'e, 'f> {
@@ -75,6 +75,32 @@ fn compile_element<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
+		LanguageElementStructless::StructDeclaration { name, is_static } => {
+			if state.scope_name == "global" || *is_static {
+				if state.scope_name == "global" && !is_static {
+					return Err(CompileError(line!(), "Nonstatic global variable!"));
+				}
+				if state.global_variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(line!(), "Name already exists in scope!"));
+				}
+				state
+					.global_variables
+					.insert(name.clone(), NativeType::Void);
+			} else {
+				if state.variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(
+						line!(),
+						"Name already exists in scope! (No shadowing)",
+					));
+				}
+				state
+					.variables
+					.insert(name.clone(), (NativeType::Void, *state.stack_size));
+			}
+			vec![(Instruction::Label(name.to_string()), None)]
+		}
 		LanguageElementStructless::VariableDeclaration {
 			typ,
 			name,
@@ -246,7 +272,7 @@ fn compile_element<'a>(
 			let mut args_count = args.len() as isize + 1;
 			let args_base = args_count;
 			let mut local_variables = HashMap::new();
-			for (idx, Variable { name, typ }) in args.iter().enumerate() {
+			for (idx, NativeVariable { name, typ }) in args.iter().enumerate() {
 				local_variables.insert(Cow::Borrowed(*name), (typ.clone(), idx as isize));
 			}
 			let mut function_body = compile_elements(
@@ -734,7 +760,7 @@ fn compile_statement_inner<'a>(
 			))?;
 			for (
 				statement,
-				Variable {
+				NativeVariable {
 					name: v_name,
 					typ: _,
 				},

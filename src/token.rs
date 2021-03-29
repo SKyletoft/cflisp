@@ -132,25 +132,26 @@ impl<'a> Token<'a> {
 		}
 		let tokens = Token::by_byte(s)?;
 		if tokens.contains(&NewLine) {
+			dbg!(s, tokens);
 			return Err(ParseError(line!(), "Statement ended early?"));
 		}
-		if tokens.len() % 2 != 0 {
+
+		let mut arguments = Vec::new();
+		let mut remaining_slice = tokens.as_slice();
+
+		while !remaining_slice.is_empty() {
+			let (var, rest) = get_pattern(remaining_slice)?;
+			remaining_slice = rest;
+			arguments.push(var);
+		}
+		if !remaining_slice.is_empty() {
+			dbg!(&tokens, s, arguments, remaining_slice);
 			return Err(ParseError(
 				line!(),
-				"Wrong amount of tokens in function argument declaration",
+				"Argument list wasn't empty when done? Trailing comma?",
 			));
 		}
-		let mut arguments = Vec::new();
-		for slice in tokens.windows(2).step_by(2) {
-			if let [Decl(t), Name(n)] = slice {
-				arguments.push(Variable {
-					typ: t.clone(),
-					name: *n,
-				})
-			} else {
-				return Err(ParseError(line!(), "Couldn't parse argument list"));
-			}
-		}
+
 		Ok(arguments)
 	}
 
@@ -160,17 +161,11 @@ impl<'a> Token<'a> {
 			return Ok(Vec::new());
 		}
 		let tokens = Token::by_byte(s)?;
-		if tokens.len() % 3 != 0 {
-			return Err(ParseError(
-				line!(),
-				"Wrong amount of tokens in struct declaration",
-			));
-		}
 		let mut arguments = Vec::new();
 		for slice in tokens.windows(3).step_by(3) {
 			if let [Decl(t), Name(n), NewLine] = slice {
 				arguments.push(Variable {
-					typ: t.clone(),
+					typ: t.into(),
 					name: *n,
 				})
 			} else {
@@ -179,5 +174,30 @@ impl<'a> Token<'a> {
 			}
 		}
 		Ok(arguments)
+	}
+}
+
+fn get_pattern<'a, 'b>(
+	slice: &'b [Token<'a>],
+) -> Result<(Variable<'a>, &'b [Token<'a>]), ParseError> {
+	match slice {
+		[Decl(t), ptrs @ .., Name(n)] if ptrs.iter().all(|thing| matches!(thing, Mul)) => {
+			let mut t = t.into();
+			for _ in ptrs.iter() {
+				t = Type::Ptr(Box::new(t));
+			}
+			Ok((Variable { typ: t, name: *n }, &slice[ptrs.len() + 2..]))
+		}
+		[Name(t), ptrs @ .., Name(n)] if ptrs.iter().all(|thing| matches!(thing, Mul)) => {
+			let mut t = Type::Struct(t);
+			for _ in ptrs.iter() {
+				t = Type::Ptr(Box::new(t));
+			}
+			Ok((Variable { typ: t, name: *n }, &slice[ptrs.len() + 2..]))
+		}
+		_ => {
+			dbg!(slice);
+			Err(ParseError(line!(), "Couldn't parse argument list"))
+		}
 	}
 }

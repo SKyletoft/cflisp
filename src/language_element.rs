@@ -135,7 +135,7 @@ pub(crate) enum LanguageElementStructless<'a> {
 	FunctionDeclaration {
 		typ: NativeType,
 		name: Cow<'a, str>,
-		args: Vec<Variable<'a>>,
+		args: Vec<NativeVariable<'a>>,
 		block: BlockStructless<'a>,
 	},
 	IfStatement {
@@ -155,6 +155,10 @@ pub(crate) enum LanguageElementStructless<'a> {
 	},
 	Return(Option<StatementElement<'a>>),
 	Statement(StatementElement<'a>),
+	StructDeclaration {
+		name: Cow<'a, str>,
+		is_static: bool,
+	},
 }
 
 impl<'a> LanguageElementStructless<'a> {
@@ -192,6 +196,10 @@ impl<'a> LanguageElementStructless<'a> {
 				} => {
 					if let Some(n) = typ.get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
+						new_elements.push(LanguageElementStructless::StructDeclaration {
+							name: name.clone(),
+							is_static,
+						});
 					}
 					new_elements.push(LanguageElementStructless::VariableDeclaration {
 						typ: typ.into(),
@@ -257,12 +265,16 @@ impl<'a> LanguageElementStructless<'a> {
 						dbg!(struct_types);
 						return Err(ParseError(line!(), "Undefined struct type"));
 					};
+					new_elements.push(LanguageElementStructless::StructDeclaration {
+						name: name.clone(),
+						is_static,
+					});
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(
 							LanguageElementStructless::VariableDeclarationAssignment {
 								name: Cow::Owned(name.to_string() + "::" + field.name),
 								value: val,
-								typ: field.typ.clone(),
+								typ: (&field.typ).into(),
 								is_static,
 							},
 						);
@@ -309,7 +321,13 @@ impl<'a> LanguageElementStructless<'a> {
 				} => new_elements.push(LanguageElementStructless::FunctionDeclaration {
 					typ: typ.into(),
 					name,
-					args,
+					args: args
+						.into_iter()
+						.map(|Variable { typ, name }| NativeVariable {
+							typ: typ.into(),
+							name,
+						})
+						.collect(),
 					block: LanguageElementStructless::from_language_elements_internal(
 						block,
 						struct_types,
