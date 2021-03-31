@@ -12,7 +12,7 @@ int main() {
 		//	printf("i: %d\n", i);
 	}
 
-	printf("x: %X z: %X\n", x, z);
+	// printf("x: %X z: %X\n", x, z);
 	//*0x0 = z;
 	//*0x1 = x;
 }

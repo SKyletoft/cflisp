@@ -6,13 +6,13 @@ use crate::*;
 const ABOVE_STACK_OFFSET: isize = -1;
 
 ///Name (lifetime from source code), (Type, Stack position (from the bottom))
-type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (Type, isize)>;
+type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (NativeType, isize)>;
 
 ///Name (lifetime from source code), Type
-type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, Type>;
+type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, NativeType>;
 
 ///Name, Argument list (not named)
-type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [Variable<'a>]>;
+type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [NativeVariable<'a>]>;
 
 #[derive(Debug, PartialEq)]
 struct State<'a, 'b, 'c, 'd, 'e, 'f> {
@@ -25,7 +25,7 @@ struct State<'a, 'b, 'c, 'd, 'e, 'f> {
 }
 
 pub(crate) fn compile<'a>(
-	program: &'a [LanguageElement],
+	program: &'a [LanguageElementStructless],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	compile_elements(
@@ -44,7 +44,7 @@ pub(crate) fn compile<'a>(
 }
 
 fn compile_elements<'a>(
-	block: &'a [LanguageElement],
+	block: &'a [LanguageElementStructless],
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
@@ -69,13 +69,39 @@ fn compile_elements<'a>(
 }
 
 fn compile_element<'a>(
-	element: &'a LanguageElement,
+	element: &'a LanguageElementStructless,
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElement::VariableDeclaration {
+		LanguageElementStructless::StructDeclaration { name, is_static } => {
+			if state.scope_name == "global" || *is_static {
+				if state.scope_name == "global" && !is_static {
+					return Err(CompileError(line!(), "Nonstatic global variable!"));
+				}
+				if state.global_variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(line!(), "Name already exists in scope!"));
+				}
+				state
+					.global_variables
+					.insert(name.clone(), NativeType::Void);
+			} else {
+				if state.variables.contains_key(name) {
+					dbg!(element);
+					return Err(CompileError(
+						line!(),
+						"Name already exists in scope! (No shadowing)",
+					));
+				}
+				state
+					.variables
+					.insert(name.clone(), (NativeType::Void, *state.stack_size));
+			}
+			vec![(Instruction::Label(name.to_string()), None)]
+		}
+		LanguageElementStructless::VariableDeclaration {
 			typ,
 			name,
 			is_static,
@@ -109,7 +135,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::VariableAssignment { name, value } => {
+		LanguageElementStructless::VariableAssignment { name, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -124,7 +150,7 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElement::VariableDeclarationAssignment {
+		LanguageElementStructless::VariableDeclarationAssignment {
 			typ,
 			name,
 			value,
@@ -205,7 +231,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::PointerAssignment { ptr, value } => {
+		LanguageElementStructless::PointerAssignment { ptr, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -225,7 +251,7 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElement::FunctionDeclaration {
+		LanguageElementStructless::FunctionDeclaration {
 			typ: _,
 			name,
 			args,
@@ -246,8 +272,8 @@ fn compile_element<'a>(
 			let mut args_count = args.len() as isize + 1;
 			let args_base = args_count;
 			let mut local_variables = HashMap::new();
-			for (idx, Variable { name, typ }) in args.iter().enumerate() {
-				local_variables.insert(Cow::Borrowed(*name), (typ.clone(), idx as isize));
+			for (idx, NativeVariable { name, typ }) in args.iter().enumerate() {
+				local_variables.insert(name.clone(), (typ.clone(), idx as isize));
 			}
 			let mut function_body = compile_elements(
 				block,
@@ -273,7 +299,7 @@ fn compile_element<'a>(
 			function_body
 		}
 
-		LanguageElement::IfStatement {
+		LanguageElementStructless::IfStatement {
 			condition,
 			then,
 			else_then,
@@ -336,7 +362,7 @@ fn compile_element<'a>(
 			cond
 		}
 
-		LanguageElement::For {
+		LanguageElementStructless::For {
 			init,
 			condition,
 			post,
@@ -406,7 +432,7 @@ fn compile_element<'a>(
 			instructions
 		}
 
-		LanguageElement::While { condition, body } => {
+		LanguageElementStructless::While { condition, body } => {
 			let cond_str = format!("while_cond_{}_{}", state.scope_name, state.line_id);
 			let body_str = format!("while_body_{}_{}", state.scope_name, state.line_id);
 			let end_str = format!("while_end_{}_{}", state.scope_name, state.line_id);
@@ -437,7 +463,7 @@ fn compile_element<'a>(
 			instructions
 		}
 
-		LanguageElement::Return(ret) => {
+		LanguageElementStructless::Return(ret) => {
 			if let Some(statement) = ret {
 				let mut statement = compile_statement(statement, state)?;
 				statement.push((
@@ -457,7 +483,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElement::Statement(statement) => {
+		LanguageElementStructless::Statement(statement) => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -594,15 +620,15 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StatementElement::Sub { lhs: rhs, rhs: lhs }
-		| StatementElement::Div { lhs, rhs }
-		| StatementElement::Mod { lhs, rhs }
-		| StatementElement::LShift { lhs: rhs, rhs: lhs }
-		| StatementElement::RShift { lhs: rhs, rhs: lhs }
-		| StatementElement::GreaterThan { lhs, rhs }
-		| StatementElement::LessThanEqual { lhs, rhs }
-		| StatementElement::LessThan { lhs: rhs, rhs: lhs }
-		| StatementElement::GreaterThanEqual { lhs: rhs, rhs: lhs } => {
+		StatementElement::Sub { lhs, rhs }
+		| StatementElement::Div { lhs: rhs, rhs: lhs }
+		| StatementElement::Mod { lhs: rhs, rhs: lhs }
+		| StatementElement::LShift { lhs, rhs }
+		| StatementElement::RShift { lhs, rhs }
+		| StatementElement::GreaterThan { lhs: rhs, rhs: lhs }
+		| StatementElement::LessThanEqual { lhs: rhs, rhs: lhs }
+		| StatementElement::LessThan { lhs, rhs }
+		| StatementElement::GreaterThanEqual { lhs, rhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
@@ -734,14 +760,17 @@ fn compile_statement_inner<'a>(
 			))?;
 			for (
 				statement,
-				Variable {
+				NativeVariable {
 					name: v_name,
 					typ: _,
 				},
 			) in parametres.iter().zip(arg_names.iter())
 			{
 				instructions.append(&mut compile_statement(statement, state)?);
-				instructions.push((Instruction::PSHA, Some(Cow::Borrowed(*v_name))));
+				instructions.push((
+					Instruction::PSHA,
+					Some(Cow::Owned(name.to_string() + "::" + v_name)),
+				));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
 			instructions.push((
@@ -867,6 +896,8 @@ fn compile_statement_inner<'a>(
 			instructions.push((Instruction::COMA, None));
 			instructions
 		}
+
+		_ => todo!(),
 	};
 	Ok(instructions)
 }
@@ -874,8 +905,8 @@ fn compile_statement_inner<'a>(
 ///Returns addressing for a name. Stack offset for locals and a Label for globals (and not an absolute address)
 fn adr_for_name<'a>(
 	name: &'a str,
-	variables: &HashMap<Cow<'a, str>, (Type, isize)>,
-	global_variables: &HashMap<Cow<'a, str>, Type>,
+	variables: &HashMap<Cow<'a, str>, (NativeType, isize)>,
+	global_variables: &HashMap<Cow<'a, str>, NativeType>,
 	stack_size: isize,
 ) -> Result<Addressing, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {

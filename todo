@@ -1,1 +1,18 @@
-Change all `'a str`s to `Cow<String>`s
+struct assignment decl	*
+struct assignment
+pointer assignment
+struct decl				*
+
+static assignment decl	*
+static decl				*
+
+member assignment
+member access
+member deref access
+
+
+struct pointers? `myStruct *foo` resolves to `Name(myStruct), Mul, Name(foo)`
+	Exception if it's followed by Assign?
+
+split and/or into boolAnd/bitAnd and boolOr/bitOr for the type checker
+split Num into Signed and Unsigned

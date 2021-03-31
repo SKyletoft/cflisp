@@ -2,7 +2,8 @@
 
 An experimental C compiler for Digiflisp written in Rust.
 
-Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `struct`s, `float`s and `double`s are not supported at all, nor is the preprocessor.
+Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `float`s and `double`s are not supported at all, nor is the preprocessor.
+`struct`s are supported, but cannot be nested or returned from functions.
 
 Basic maths, function calls (even recursive function calls), if-else-statements (even if-else-if-else-statements), for and while (not do-while) loops, arbitrary levels of pointers, comments, hex and decimal printing are all supported and tested features. On Linux you can even call qaflisp to assemble it directly (untested on Windows/Mac)
 
@@ -67,7 +68,6 @@ O|optimise| Enables optimisations. In practice it mostly just fixes bad code gen
 
 ## Todo
 (additional features still under consideration)
-* Structs
 * Line numbers for parse errors
 * Interrupts
 * Inline assembly
@@ -76,5 +76,6 @@ O|optimise| Enables optimisations. In practice it mostly just fixes bad code gen
 * Implement own flisp simulator (16 bit addressing?)
 * Web interface like godbolt
 * Fix the type checker
-* Mutlibyte size variables?
+* New ABI. (Multibyte size variables, return structs from functions)
 * Actual optimisations
+* casts

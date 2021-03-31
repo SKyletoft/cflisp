@@ -1,188 +1,101 @@
 use crate::*;
 
 ///All possible tokens in the source (after comments have been removed)
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Token<'a> {
-	Decl(Type),
-	If,
-	Else,
-	Assign,
 	Add,
-	Sub,
-	Mul,
-	Div,
-	Mod,
+	AdrOf,
+	AlignAs,
+	AlignOf,
+	Assign,
+	Atomic,
+	Auto,
+	BitAnd,
+	BitNot,
+	BitOr,
+	Bool(bool),
+	BoolAnd,
+	BoolNot,
+	BoolOr,
+	Break,
+	Case,
+	Char(char),
 	Cmp,
-	NotCmp,
+	Colon,
+	Comma,
+	Complex,
+	Const,
+	Continue,
+	Decl(NativeType),
+	Default,
+	Deref,
+	Div,
+	Do,
+	Double,
+	Else,
+	Enum,
+	Extern,
+	FieldAccess,
+	FieldPointerAccess,
+	Float,
+	For,
+	Generic,
+	Goto,
 	GreaterThan,
 	GreaterThanEqual,
+	If,
+	Imaginary,
+	Inline,
 	LessThan,
 	LessThanEqual,
-	RShift,
+	Long,
 	LShift,
-	Char(char),
-	Bool(bool),
-	AdrOf(&'a str),
-	Deref(Box<[Token<'a>; 1]>),
+	Mod,
+	Mul,
 	Name(&'a str),
-	And,
-	Or,
-	Return,
+	NewLine,
+	NoReturn,
+	NotCmp,
 	Num(isize),
-	For,
-	While,
-	Break,
-	Continue,
-	Switch,
+	Register,
+	Restrict,
+	Return,
+	RShift,
+	Short,
+	Signed,
+	SizeOf,
 	Static,
+	StaticAssert,
 	Struct,
+	Sub,
+	Switch,
+	ThreadLocal,
 	TypeDef,
-	UnparsedSource(&'a str),
+	Union,
+	UnparsedArrayAccess(&'a str),
 	UnparsedBlock(&'a str),
 	UnparsedParentheses(&'a str),
-	UnparsedArrayAccess(&'a str),
-	NewLine,
+	UnparsedSource(&'a str),
+	Unsigned,
+	Volatile,
+	While,
 	Xor,
-	Not,
 }
 
 impl<'a> Token<'a> {
-	//It was at this point I realised that having clang-format work on all my test cases
-	// sheltered me from realising that I was only splitting at whitespace
-	///Splits a string into a list of tokens, splitting at whitespace and removing trailing commas
-	pub(crate) fn parse_str_to_vec(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
-		helper::split(source)?
-			.into_iter()
-			.map(|s| s.strip_suffix(',').unwrap_or(s))
-			.map(Token::parse)
-			.collect::<Result<_, _>>()
-			.map(Token::fix_deref)
-	}
-
-	//Takes ownership and returns it instead of taking a reference for easier use in a map
-	///Fixes operator misread as multiplication into deref
-	fn fix_deref(mut vec: Vec<Token<'a>>) -> Vec<Token<'a>> {
-		//dbg!(&vec);
-		let mut i = 0;
-		while i < vec.len() {
-			if vec[i] == Token::Mul
-				&& matches!(
-					vec.get(i + 1),
-					Some(UnparsedParentheses(_)) | Some(Num(_)) | Some(Name(_)) | Some(Deref(_))
-				) && vec.get(i.wrapping_sub(1)).map(Token::is_op) != Some(false)
-			{
-				let following = vec.remove(i + 1);
-				vec[i] = Token::Deref(Box::new([following]));
-				i = i.saturating_sub(2);
-			}
-			i += 1;
+	///Splits a string into a list of tokens by matching pattern by pattern instead of
+	/// splitting and then converting into tokens
+	pub(crate) fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
+		let mut src = source.trim_start();
+		let mut vec = Vec::new();
+		while !src.is_empty() {
+			let (token, rest) = lexer::get_token(src)?;
+			vec.push(token);
+			src = rest.trim_start();
 		}
-		if vec[0] == Token::Mul
-			|| vec
-				.windows(2)
-				.any(|win| win[0] == NewLine && win[1] == Token::Mul)
-		{
-			dbg!(vec);
-			panic!();
-		}
-		vec
-	}
-
-	///Maps words to tokens and parses literals
-	pub(crate) fn parse(name: &'a str) -> Result<Self, ParseError> {
-		let token =
-			match name {
-				";" => NewLine,
-				"int" => Decl(Type::Int),
-				"bool" => Decl(Type::Bool),
-				"char" => Decl(Type::Char),
-				"uint" => Decl(Type::Uint),
-				"void" => Decl(Type::Void),
-				"int*" => Decl(Type::Ptr(Box::new(Type::Int))),
-				"bool*" => Decl(Type::Ptr(Box::new(Type::Bool))),
-				"char*" => Decl(Type::Ptr(Box::new(Type::Char))),
-				"uint*" => Decl(Type::Ptr(Box::new(Type::Uint))),
-				"void*" => Decl(Type::Ptr(Box::new(Type::Void))),
-				"if" => If,
-				"else" => Else,
-				"=" => Assign,
-				"+" => Add,
-				"-" => Sub,
-				"*" => Mul,
-				"/" => Div,
-				"%" => Mod,
-				"==" => Cmp,
-				"!=" => NotCmp,
-				">" => GreaterThan,
-				">=" => GreaterThanEqual,
-				"<" => LessThan,
-				"<=" => LessThanEqual,
-				"&&" => And,
-				"&" => And,
-				"|" => Or,
-				"||" => Or,
-				"^" => Xor,
-				"!" => Not,
-				"~" => Not,
-				"true" => Bool(true),
-				"false" => Bool(false),
-				"return" => Return,
-				"<<" => LShift,
-				">>" => RShift,
-				"for" => For,
-				"while" => While,
-				"break" => Break,
-				"continue" => Continue,
-				"switch" => Switch,
-				"static" => Static,
-				"struct" => Struct,
-				"typedef" => TypeDef,
-				n if n.starts_with('&') => AdrOf(&n[1..]),
-				n if n.starts_with('*') => Deref(Box::new([UnparsedBlock(&n[1..])])),
-				n if n.starts_with('(') && n.ends_with(')') && n.len() >= 2 => {
-					UnparsedParentheses(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('{') && n.ends_with('}') && n.len() >= 2 => {
-					UnparsedBlock(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('[') && n.ends_with(']') && n.len() >= 2 => {
-					UnparsedArrayAccess(&n[1..n.len() - 1].trim())
-				}
-				n if n.starts_with('"') && n.ends_with('"') && n.len() >= 2 => {
-					return Err(ParseError(line!(), "Strings are not supported (yet?)"));
-					//StringLit(&n[1..n.len()-1].trim())
-				}
-				n if n.starts_with('\'') && n.len() == 3 && n.ends_with('\'') => {
-					Token::Char(n.as_bytes()[1] as char)
-				}
-				n if n.starts_with(|c: char| c == '-' || c.is_ascii_digit())
-					&& n.chars().skip(1).all(|r| r.is_ascii_digit()) =>
-				{
-					Num(n.parse::<isize>().map_err(|_| {
-						ParseError(line!(), "Number parse error: Is the number too large?")
-					})?)
-				}
-				n if n.starts_with("0x")
-					&& n.len() > 2 && n.chars().skip(2).all(|r| r.is_ascii_hexdigit()) =>
-				{
-					Num(isize::from_str_radix(&n[2..], 16).map_err(|_| {
-						ParseError(
-							line!(),
-							"Number parse error: Is the number too large? (hex)",
-						)
-					})?)
-				}
-				n if n.starts_with('(')
-					|| n.ends_with(')') || n.starts_with('{')
-					|| n.ends_with('}') || n.starts_with('[')
-					|| n.ends_with(']') || n.starts_with('"')
-					|| n.ends_with('"') || n.starts_with(|d: char| d.is_ascii_digit()) =>
-				{
-					UnparsedSource(n)
-				}
-				n => Token::Name(n),
-			};
-		Ok(token)
+		//vec = Token::fix_deref(vec);
+		Ok(vec)
 	}
 
 	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
@@ -190,24 +103,27 @@ impl<'a> Token<'a> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		Token::parse_str_to_vec(s)
+		//Token::parse_str_to_vec(s)
+		Token::by_byte(s)
 	}
 
 	///Converts string from `Token::UnparsedBlock` into `StatementToken`s
 	pub(crate) fn parse_statement_tokens(
 		s: &'a str,
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
-		let res = Token::parse_str_to_vec(s)?;
+		//let res = Token::parse_str_to_vec(s)?;
+		let res = Token::by_byte(s)?;
 		if res.contains(&NewLine) {
 			return Err(ParseError(line!(), "Statement ended early?"));
 		}
 		StatementToken::from_tokens(&res)
 	}
 
-	///Parses `Token::UnparsedBlock` as a list of statements. (Function *call*, not declaration)
+	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
 	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
 		s.split(',')
-			.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
+			//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
+			.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
 			.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
 	}
 
@@ -216,41 +132,76 @@ impl<'a> Token<'a> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		let tokens = Token::parse_str_to_vec(s)?;
+		let tokens = Token::by_byte(s)?;
 		if tokens.contains(&NewLine) {
+			dbg!(s, tokens);
 			return Err(ParseError(line!(), "Statement ended early?"));
 		}
+
 		let mut arguments = Vec::new();
-		for (type_token, name_token) in tokens
-			.iter()
-			.step_by(2)
-			.zip(tokens.iter().skip(1).step_by(2))
-		{
-			if let (Decl(t), Name(n)) = (type_token, name_token) {
+		let mut remaining_slice = tokens.as_slice();
+
+		while !remaining_slice.is_empty() {
+			let (var, rest) = get_pattern(remaining_slice)?;
+			remaining_slice = rest;
+			if remaining_slice.get(0) == Some(&Comma) {
+				remaining_slice = &remaining_slice[1..];
+			}
+			arguments.push(var);
+		}
+		if !remaining_slice.is_empty() {
+			dbg!(&tokens, s, arguments, remaining_slice);
+			return Err(ParseError(
+				line!(),
+				"Argument list wasn't empty when done? Trailing comma?",
+			));
+		}
+
+		Ok(arguments)
+	}
+
+	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
+	pub(crate) fn parse_struct_member_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+		if s.is_empty() {
+			return Ok(Vec::new());
+		}
+		let tokens = Token::by_byte(s)?;
+		let mut arguments = Vec::new();
+		for slice in tokens.windows(3).step_by(3) {
+			if let [Decl(t), Name(n), NewLine] = slice {
 				arguments.push(Variable {
-					typ: t.clone(),
+					typ: t.into(),
 					name: *n,
 				})
 			} else {
-				return Err(ParseError(line!(), "Couldn't parse argument list"));
+				dbg!(s, tokens);
+				return Err(ParseError(line!(), "Couldn't struct members"));
 			}
 		}
 		Ok(arguments)
 	}
+}
 
-	//Should & and * be considered operators?
-	///Is the token an operator? Address of (&) and derefrencing (*) are not considered operators
-	fn is_op(&self) -> bool {
-		matches!(
-			self,
-			Add | Sub
-				| Mul | Div | Mod
-				| Cmp | GreaterThan
-				| LessThan | RShift
-				| LShift | And | Or
-				| Xor | Not | Assign
-				| NewLine | Decl(_)
-				| UnparsedBlock(_)
-		)
+fn get_pattern<'a, 'b>(
+	slice: &'b [Token<'a>],
+) -> Result<(Variable<'a>, &'b [Token<'a>]), ParseError> {
+	let mut typ: Type;
+	let mut reduced = &slice[1..];
+	match slice.get(0) {
+		Some(Decl(t)) => typ = t.into(),
+		Some(Name(t)) => typ = Type::Struct(t),
+		_ => {
+			dbg!(slice);
+			return Err(ParseError(line!(), "Couldn't parse argument list"));
+		}
+	}
+	while reduced.get(0) == Some(&Mul) {
+		typ = Type::ptr(typ);
+		reduced = &reduced[1..];
+	}
+	if let Some(Name(n)) = reduced.get(0) {
+		Ok((Variable { typ, name: *n }, &reduced[1..]))
+	} else {
+		Err(ParseError(line!(), "Couldn't parse argument list"))
 	}
 }

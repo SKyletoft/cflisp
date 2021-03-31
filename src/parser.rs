@@ -1,11 +1,12 @@
 use crate::*;
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Add};
 
 pub(crate) fn parse<'a>(
 	source: &'a str,
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
-	let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
+	//let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
+	let tokens: Vec<Token<'a>> = Token::by_byte(source)?;
 	construct_block(&tokens, move_first)
 }
 
@@ -15,157 +16,139 @@ fn construct_block<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
-	let mut res = Vec::new();
-	for token in split_token_lines(tokens) {
-		res.push(construct_structure_from_tokens(token, move_first)?);
-	}
+	let mut res = split_token_lines(tokens)
+		.into_iter()
+		.map(|token| construct_structure_from_tokens(token, move_first))
+		.collect::<Result<Vec<_>, _>>()?;
 	if move_first {
 		statement_element::move_declarations_first(&mut res);
 	}
 	Ok(res)
 }
 
-///Matches a line of `Token`s into a `LanguageElement`, defaulting to a statement if no match can be made.
-/// Does recursively parse all contained parts so a returned LanguageElement can be trusted as valid, apart
-/// from type checking.
 fn construct_structure_from_tokens<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<LanguageElement<'a>, ParseError> {
+	construct_structure_with_pointers_from_tokens(tokens, move_first)
+		.unwrap_or_else(|| construct_structure_from_tokens_via_pattern(tokens, move_first))
+}
+
+///Matches a line of `Token`s into a `LanguageElement`, defaulting to a statement if no match can be made.
+/// Does recursively parse all contained parts so a returned LanguageElement can be trusted as valid, apart
+/// from type checking. (Struct types and fields count as type checking).
+/// Struct and pointer patterns are not in this function.
+fn construct_structure_from_tokens_via_pattern<'a>(
+	tokens: &[Token<'a>],
+	move_first: bool,
+) -> Result<LanguageElement<'a>, ParseError> {
+	//Todo patterns might be invalidated by the pointer versions
 	let element = {
 		match tokens {
 			//Function declaration
 			[Decl(t), Token::Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+				todo!("Investigate if this is still a valid code path");
 				let args_parsed = Token::parse_argument_list_tokens(args)?;
 				let code_tokenised = Token::parse_block_tokens(code)?;
 				let code_parsed = construct_block(&code_tokenised, move_first)?;
 				LanguageElement::FunctionDeclaration {
-					typ: t.clone(),
+					typ: t.into(),
 					name: Cow::Borrowed(n),
 					args: args_parsed,
 					block: code_parsed,
 				}
 			}
 
-			//Pointer variable declaration
-			[Decl(t), Deref(d), Assign, ..] => {
-				let mut typ = Type::Ptr(Box::new(t.clone()));
-				let mut r = d.as_ref();
-				let name;
-				while let [Deref(b)] = r.as_ref() {
-					typ = Type::Ptr(Box::new(typ));
-					r = b;
-				}
-				if let [Token::Name(n)] = r {
-					name = *n;
-				} else {
-					dbg!(tokens);
-					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
-				}
-				let rhs = &tokens[3..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ,
-					name: Cow::Borrowed(name),
-					value: rhs_parsed,
-					is_static: false,
-				}
-			}
-
-			//Static pointer variable declaration
-			[Static, Decl(t), Deref(d), Assign, ..] => {
-				let mut typ = Type::Ptr(Box::new(t.clone()));
-				let mut r = d.as_ref();
-				let name;
-				while let [Deref(b)] = r.as_ref() {
-					typ = Type::Ptr(Box::new(typ));
-					r = b;
-				}
-				if let [Token::Name(n)] = r {
-					name = *n;
-				} else {
-					dbg!(tokens);
-					return Err(ParseError(line!(), "Couldn't parse name/pointer type"));
-				}
-				let rhs = &tokens[4..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ,
-					name: Cow::Borrowed(name),
-					value: rhs_parsed,
-					is_static: true,
-				}
-			}
-
 			//Variable declaration
 			[Decl(t), Token::Name(n), Assign, ..] => {
-				let rhs = &tokens[3..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				todo!("Investigate if this is still a valid code path");
+				let rhs = StatementElement::from_tokens(&tokens[3..])?;
 				LanguageElement::VariableDeclarationAssignment {
-					typ: t.clone(),
+					typ: t.into(),
 					name: Cow::Borrowed(n),
-					value: rhs_parsed,
+					value: rhs,
 					is_static: false,
 				}
 			}
 
 			//Static variable declaration
 			[Static, Decl(t), Token::Name(n), Assign, ..] => {
-				let rhs = &tokens[4..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				todo!("Investigate if this is still a valid code path");
+				let rhs = StatementElement::from_tokens(&tokens[4..])?;
 				LanguageElement::VariableDeclarationAssignment {
-					typ: t.clone(),
+					typ: t.into(),
 					name: Cow::Borrowed(n),
-					value: rhs_parsed,
+					value: rhs,
 					is_static: true,
+				}
+			}
+
+			//Struct assignment
+			[Token::Name(n), Assign, UnparsedBlock(members)] => {
+				todo!("Investigate if this is still a valid code path");
+				let field_tokens = Token::parse_arguments_tokens(members)?;
+				let fields = field_tokens
+					.into_iter()
+					.map(StatementElement::from_statement_tokens)
+					.collect::<Result<Vec<_>, _>>()?;
+				LanguageElement::StructAssignment {
+					name: Cow::Borrowed(n),
+					value: fields,
+				}
+			}
+
+			//Struct member assignment
+			[Token::Name(n), FieldAccess, Token::Name(field), Assign, ..] => {
+				let name = n.to_string().add("::").add(field);
+				let rhs = StatementElement::from_tokens(&tokens[4..])?;
+				LanguageElement::VariableAssignment {
+					name: Cow::Owned(name),
+					value: rhs,
+				}
+			}
+
+			//Struct member assignment through pointer
+			[Token::Name(n), FieldPointerAccess, Token::Name(field), Assign, ..] => {
+				let rhs = StatementElement::from_tokens(&tokens[4..])?;
+				LanguageElement::StructFieldPointerAssignment {
+					name: Cow::Borrowed(n),
+					field: Cow::Borrowed(field),
+					value: rhs,
 				}
 			}
 
 			//Variable assignment
 			[Token::Name(n), Assign, ..] => {
-				let rhs = &tokens[2..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
+				let rhs = StatementElement::from_tokens(&tokens[2..])?;
 				LanguageElement::VariableAssignment {
 					name: Cow::Borrowed(n),
-					value: rhs_parsed,
-				}
-			}
-
-			//Pointer assignment
-			[Deref(d), Assign, ..] => {
-				let ptr = StatementElement::from_tokens(StatementToken::from_tokens(d.as_ref())?)?;
-				let rhs = &tokens[2..];
-				let rhs_verified = StatementToken::from_tokens(rhs)?;
-				let rhs_parsed = StatementElement::from_tokens(rhs_verified)?;
-				LanguageElement::PointerAssignment {
-					ptr,
-					value: rhs_parsed,
+					value: rhs,
 				}
 			}
 
 			//Variable declaration (without init)
-			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
-				typ: t.clone(),
-				name: Cow::Borrowed(n),
-				is_static: false,
-			},
+			[Decl(t), Token::Name(n)] => {
+				todo!("Investigate if this is still a valid code path");
+				LanguageElement::VariableDeclaration {
+					typ: t.into(),
+					name: Cow::Borrowed(n),
+					is_static: false,
+				}
+			}
 
 			//Static variable declaration (without init)
-			[Static, Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
-				typ: t.clone(),
-				name: Cow::Borrowed(n),
-				is_static: true,
-			},
+			[Static, Decl(t), Token::Name(n)] => {
+				todo!("Investigate if this is still a valid code path");
+				LanguageElement::VariableDeclaration {
+					typ: t.into(),
+					name: Cow::Borrowed(n),
+					is_static: true,
+				}
+			}
 
 			//If else if
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
-				let condition = Token::parse_statement_tokens(cond)?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let condition_parsed = StatementElement::from_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
 				let else_if_tokens = &tokens[4..];
 				let else_if_parsed = construct_structure_from_tokens(else_if_tokens, move_first)?;
@@ -179,8 +162,7 @@ fn construct_structure_from_tokens<'a>(
 			//If else
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] =>
 			{
-				let condition = Token::parse_statement_tokens(cond)?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let condition_parsed = StatementElement::from_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
 				let else_parsed = parse(else_code, move_first)?;
 				LanguageElement::IfStatement {
@@ -192,8 +174,7 @@ fn construct_structure_from_tokens<'a>(
 
 			//If
 			[If, UnparsedParentheses(cond), UnparsedBlock(code)] => {
-				let condition = Token::parse_statement_tokens(cond)?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let condition_parsed = StatementElement::from_str(cond)?;
 				let then_parsed = parse(code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
@@ -212,9 +193,8 @@ fn construct_structure_from_tokens<'a>(
 					));
 				}
 
-				let condition_tokens = Token::parse_str_to_vec(split[1])?;
-				let condition_statement_tokens = StatementToken::from_tokens(&condition_tokens)?;
-				let condition = StatementElement::from_tokens(condition_statement_tokens)?;
+				//let condition_tokens = Token::parse_str_to_vec(split[1])?;
+				let condition = StatementElement::from_str(split[1])?;
 
 				let init = parse(split[0], move_first)?;
 				let post = parse(split[2], move_first)?;
@@ -230,8 +210,7 @@ fn construct_structure_from_tokens<'a>(
 
 			//While
 			[While, UnparsedParentheses(cond), UnparsedBlock(code)] => {
-				let condition = Token::parse_statement_tokens(cond)?;
-				let condition_parsed = StatementElement::from_tokens(condition)?;
+				let condition_parsed = StatementElement::from_str(cond)?;
 				let body_parsed = parse(code, move_first)?;
 				LanguageElement::While {
 					condition: condition_parsed,
@@ -242,8 +221,7 @@ fn construct_structure_from_tokens<'a>(
 			[Return] => LanguageElement::Return(None),
 
 			[Return, ..] => {
-				let return_value = StatementToken::from_tokens(&tokens[1..])?;
-				let return_statement = StatementElement::from_tokens(return_value)?;
+				let return_statement = StatementElement::from_tokens(&tokens[1..])?;
 				LanguageElement::Return(Some(return_statement))
 			}
 
@@ -254,15 +232,23 @@ fn construct_structure_from_tokens<'a>(
 						"Struct doesn't have the same name as its typedef",
 					));
 				}
-				return Err(ParseError(line!(), "structs are not yet supported"));
+				//Reuse second definition
+				construct_structure_from_tokens(
+					&[Struct, Name(name), UnparsedBlock(members)],
+					move_first,
+				)?
 			}
+
 			[Struct, Name(name), UnparsedBlock(members)] => {
-				return Err(ParseError(line!(), "structs are not yet supported"))
+				let members_parsed = Token::parse_struct_member_tokens(members)?;
+				LanguageElement::StructDefinition {
+					name: Cow::Borrowed(*name),
+					members: members_parsed,
+				}
 			}
 
 			_ => {
-				let tokenised = StatementToken::from_tokens(tokens)?;
-				let element = StatementElement::from_tokens(tokenised)?;
+				let element = StatementElement::from_tokens(tokens)?;
 				LanguageElement::Statement(element)
 			}
 		}
@@ -270,9 +256,163 @@ fn construct_structure_from_tokens<'a>(
 	Ok(element)
 }
 
+///Tries to construct pointer variables, pointer structs or pointer assignments
+fn construct_structure_with_pointers_from_tokens<'a>(
+	tokens: &[Token<'a>],
+	move_first: bool,
+) -> Option<Result<LanguageElement<'a>, ParseError>> {
+	if tokens.is_empty() {
+		return None;
+	}
+	/*
+	 *		type* name;
+	 *		type* name =
+	 *
+	 *		*(expr) =
+	 *
+	 *		struct_name* name =
+	 *		struct_name* name;
+	 *		struct struct_name* name =
+	 *		struct struct_name* name;
+	 *
+	 *		static type* name =
+	 *		static type* name;
+	 *		static struct struct_name* name =
+	 *		static struct struct_name* name;
+	 *		static struct_name* name =
+	 *		static struct_name* name;
+	 */
+	match &tokens[0] {
+		Static => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+			.map(|res| res.and_then(LanguageElement::make_static)),
+		//	`type* name` and `type* name` =
+		Decl(t) => {
+			let mut tokens_slice = &tokens[1..];
+			let mut t = t.into();
+			while let Some(Mul) = tokens_slice.get(0) {
+				tokens_slice = &tokens_slice[1..];
+				t = Type::ptr(t);
+			}
+			match tokens_slice {
+				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
+					typ: t,
+					name: Cow::Borrowed(n),
+					is_static: false,
+				})),
+				[Name(n), Assign, ..] => {
+					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|statement| {
+						LanguageElement::VariableDeclarationAssignment {
+							typ: t,
+							name: Cow::Borrowed(n),
+							value: statement,
+							is_static: false,
+						}
+					});
+					Some(res)
+				}
+				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
+						Token::parse_block_tokens(code).and_then(|code_tokenised| {
+							construct_block(&code_tokenised, move_first).map(|code_parsed| {
+								LanguageElement::FunctionDeclaration {
+									typ: t,
+									name: Cow::Borrowed(n),
+									args: args_parsed,
+									block: code_parsed,
+								}
+							})
+						})
+					});
+					Some(res)
+				}
+				_ => None,
+			}
+		}
+		//Struct type name
+		Name(n) => {
+			let mut tokens_slice = &tokens[1..];
+			let mut t = Type::Struct(n);
+			while let Some(Mul) = tokens_slice.get(0) {
+				tokens_slice = &tokens_slice[1..];
+				t = Type::ptr(t);
+			}
+			match tokens_slice {
+				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
+					typ: t,
+					name: Cow::Borrowed(n),
+					is_static: false,
+				})),
+				[Name(n), Assign, UnparsedBlock(s)] => {
+					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
+						tokens
+							.into_iter()
+							.map(StatementElement::from_statement_tokens)
+							.collect::<Result<Vec<_>, _>>()
+							.map(|members| LanguageElement::StructDeclarationAssignment {
+								typ: t,
+								name: Cow::Borrowed(n),
+								value: members,
+								is_static: false,
+							})
+					});
+					Some(res)
+				}
+				[Name(n), Assign, ..] => {
+					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|rhs| {
+						LanguageElement::VariableDeclarationAssignment {
+							typ: t,
+							name: Cow::Borrowed(n),
+							value: rhs,
+							is_static: false,
+						}
+					});
+					Some(res)
+				}
+				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
+						Token::parse_block_tokens(code).and_then(|code_tokenised| {
+							construct_block(&code_tokenised, move_first).map(|code_parsed| {
+								LanguageElement::FunctionDeclaration {
+									typ: t,
+									name: Cow::Borrowed(n),
+									args: args_parsed,
+									block: code_parsed,
+								}
+							})
+						})
+					});
+					Some(res)
+				}
+				_ => None,
+			}
+		}
+		Mul => {
+			let assign_idx = tokens.iter().position(|t| t == &Assign);
+			assign_idx.map(|assign_idx| {
+				//Skip the first deref as the LanaguageElement::PointerAssignment::ptr already expects a pointer
+				let lhs = StatementElement::from_tokens(&tokens[1..assign_idx]);
+				let rhs = StatementElement::from_tokens(&tokens[assign_idx + 1..]);
+				lhs.and_then(|lhs| {
+					rhs.map(|rhs| LanguageElement::PointerAssignment {
+						ptr: lhs,
+						value: rhs,
+					})
+				})
+			})
+		}
+		Struct => {
+			if !matches!(tokens.get(1), Some(Name(_))) {
+				return None;
+			}
+			construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+		}
+		_ => None,
+	}
+}
+
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub(crate) fn type_check(
-	block: &[LanguageElement],
+	block: &[LanguageElementStructless],
 	upper_variables: &[Variable],
 	outer_functions: &[Function],
 ) -> Result<bool, ParseError> {
@@ -281,29 +421,29 @@ pub(crate) fn type_check(
 
 	for line in block {
 		match line {
-			LanguageElement::VariableDeclaration {
+			LanguageElementStructless::VariableDeclaration {
 				typ,
 				name,
 				is_static: _,
 			} => variables.push(Variable {
-				typ: typ.clone(),
+				typ: typ.into(),
 				name: name.as_ref(),
 			}),
 
-			LanguageElement::VariableAssignment { name: _, value } => {
+			LanguageElementStructless::VariableAssignment { name: _, value } => {
 				if !value.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
 
-			LanguageElement::VariableDeclarationAssignment {
+			LanguageElementStructless::VariableDeclarationAssignment {
 				typ,
 				name,
 				value,
 				is_static: _,
 			} => {
 				variables.push(Variable {
-					typ: typ.clone(),
+					typ: typ.into(),
 					name: name.as_ref(),
 				});
 				if !value.type_check(&variables, &functions)? {
@@ -311,7 +451,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::PointerAssignment { ptr, value } => {
+			LanguageElementStructless::PointerAssignment { ptr, value } => {
 				if !ptr.type_check(&variables, &functions)?
 					|| !value.type_check(&variables, &functions)?
 				{
@@ -319,7 +459,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::FunctionDeclaration {
+			LanguageElementStructless::FunctionDeclaration {
 				typ,
 				name,
 				args,
@@ -328,7 +468,13 @@ pub(crate) fn type_check(
 				functions.push(Function {
 					return_type: typ.clone(),
 					name: name.as_ref(),
-					parametres: args.clone(),
+					parametres: args
+						.iter()
+						.map(|NativeVariable { typ, name }| Variable {
+							typ: typ.into(),
+							name,
+						})
+						.collect(),
 				});
 
 				if !type_check(block, &variables, &functions)? {
@@ -336,7 +482,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::IfStatement {
+			LanguageElementStructless::IfStatement {
 				condition,
 				then,
 				else_then,
@@ -352,7 +498,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::For {
+			LanguageElementStructless::For {
 				init,
 				condition,
 				post,
@@ -367,7 +513,7 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::While { condition, body } => {
+			LanguageElementStructless::While { condition, body } => {
 				if !condition.type_check(&variables, &functions)?
 					|| !type_check(body, &variables, &functions)?
 				{
@@ -375,15 +521,19 @@ pub(crate) fn type_check(
 				}
 			}
 
-			LanguageElement::Return(_) => {
-				//Is handled by function def instead
-			}
+			//Is handled by function def instead
+			LanguageElementStructless::Return(_) => {}
 
-			LanguageElement::Statement(statement) => {
+			LanguageElementStructless::Statement(statement) => {
 				if !statement.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
+
+			LanguageElementStructless::StructDeclaration {
+				name: _,
+				is_static: _,
+			} => {}
 		}
 	}
 

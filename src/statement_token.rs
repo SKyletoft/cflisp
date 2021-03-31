@@ -13,8 +13,9 @@ pub(crate) enum StatementToken<'a> {
 	Mul,
 	Div,
 	Mod,
-	And,
-	Or,
+	BoolAnd,
+	BoolOr,
+	BitOr,
 	Xor,
 	RShift,
 	LShift,
@@ -24,10 +25,12 @@ pub(crate) enum StatementToken<'a> {
 	LessThanEqual,
 	Cmp,
 	NotCmp,
-	Not,
+	BoolNot,
+	BitNot,
 	Parentheses(Vec<StatementToken<'a>>),
-	AdrOf(&'a str),
-	Deref(Vec<StatementToken<'a>>),
+	BitAnd,
+	FieldAccess,
+	FieldPointerAccess,
 	ArrayAccess {
 		ptr: &'a str,
 		idx: Vec<StatementToken<'a>>,
@@ -50,10 +53,13 @@ impl<'a> StatementToken<'a> {
 				Token::Mul => StatementToken::Mul,
 				Token::Div => StatementToken::Div,
 				Token::Mod => StatementToken::Mod,
-				Token::And => StatementToken::And,
-				Token::Or => StatementToken::Or,
+				Token::BitAnd => StatementToken::BitAnd,
+				Token::BitOr => StatementToken::BitOr,
+				Token::BoolAnd => StatementToken::BoolAnd,
+				Token::BoolOr => StatementToken::BoolOr,
 				Token::Xor => StatementToken::Xor,
-				Token::Not => StatementToken::Not,
+				Token::BoolNot => StatementToken::BoolNot,
+				Token::BitNot => StatementToken::BitNot,
 				Token::LShift => StatementToken::LShift,
 				Token::RShift => StatementToken::RShift,
 				Token::GreaterThan => StatementToken::GreaterThan,
@@ -62,22 +68,22 @@ impl<'a> StatementToken<'a> {
 				Token::LessThanEqual => StatementToken::LessThanEqual,
 				Token::Cmp => StatementToken::Cmp,
 				Token::NotCmp => StatementToken::NotCmp,
-				Token::AdrOf(n) => StatementToken::AdrOf(n),
-				Token::Deref(b) => StatementToken::Deref(StatementToken::from_tokens(b.as_ref())?),
+				Token::FieldAccess => StatementToken::FieldAccess,
+				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
 				Token::UnparsedParentheses(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
 						res[last] =
 							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
 						continue;
 					} else {
-						let tokenised = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+						let tokenised = Token::by_byte(lexer::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
 				}
 				Token::UnparsedArrayAccess(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
+						let idx = Token::by_byte(lexer::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
 							ptr: n,
@@ -92,20 +98,22 @@ impl<'a> StatementToken<'a> {
 					}
 				}
 				Token::UnparsedBlock(b) => {
-					let items = helper::remove_parentheses(b)
+					let items = lexer::remove_parentheses(b)
 						.split(',')
 						.map(|s| s.trim())
 						.collect::<Vec<_>>();
 					let mut v = Vec::new();
 					for item in items {
-						v.push(StatementToken::from_tokens(&Token::parse_str_to_vec(
-							item,
-						)?)?);
+						let tokens = Token::by_byte(item)?;
+						v.push(StatementToken::from_tokens(&tokens)?);
 					}
 					StatementToken::Array(v)
 				}
 				Token::UnparsedSource(b) => {
-					StatementToken::Parentheses(StatementToken::from_tokens(&[Token::parse(b)?])?)
+					let (token, rest) = lexer::get_token(b)?;
+					eprintln!("Should be empty?");
+					dbg!(rest);
+					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
 				}
 				_ => {
 					dbg!(tokens);
@@ -116,5 +124,31 @@ impl<'a> StatementToken<'a> {
 			res.push(new);
 		}
 		Ok(res)
+	}
+
+	pub(crate) fn is_op(&self) -> bool {
+		matches!(
+			self,
+			StatementToken::Add
+				| StatementToken::Sub
+				| StatementToken::Mul
+				| StatementToken::Div
+				| StatementToken::Mod
+				| StatementToken::BitAnd
+				| StatementToken::BitOr
+				| StatementToken::BoolAnd
+				| StatementToken::BoolOr
+				| StatementToken::Xor
+				| StatementToken::RShift
+				| StatementToken::LShift
+				| StatementToken::GreaterThan
+				| StatementToken::GreaterThanEqual
+				| StatementToken::LessThan
+				| StatementToken::LessThanEqual
+				| StatementToken::Cmp
+				| StatementToken::NotCmp
+				| StatementToken::BitNot
+				| StatementToken::BoolNot
+		)
 	}
 }
