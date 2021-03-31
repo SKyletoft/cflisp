@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use crate::*;
 
@@ -6,14 +6,14 @@ use crate::*;
 ///`(Instruction, Option<Cow<'a, str>>)`
 ///
 /// The comment should have the same lifetime as the input source code (or `&'static`)
-pub(crate) type CommentedInstruction<'a> = (Instruction, Option<Cow<'a, str>>);
+pub type CommentedInstruction<'a> = (Instruction, Option<Cow<'a, str>>);
 
 ///A flisp instruction. Usually appears as the first half of a `CommentedInstruction` tuple.
 /// Can also be a label or FCB assembler directive.
 /// Naming scheme follows flisp rather than Rust naming conventions
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Instruction {
+pub enum Instruction {
 	LDA(Addressing),
 	STA(Addressing),
 	LDX(Addressing),
@@ -142,7 +142,7 @@ impl fmt::UpperHex for Instruction {
 
 impl Instruction {
 	///The size in bytes that it will take up in the final compiled binary
-	pub(crate) fn size(&self) -> usize {
+	pub fn size(&self) -> usize {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -182,7 +182,7 @@ impl Instruction {
 	}
 
 	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
-	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
+	pub fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -222,7 +222,7 @@ impl Instruction {
 	}
 
 	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
-	pub(crate) fn get_adr(&self) -> Option<&Addressing> {
+	pub fn get_adr(&self) -> Option<&Addressing> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -267,7 +267,7 @@ impl Instruction {
 /// stop you from misusing this.
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Addressing {
+pub enum Addressing {
 	Data(isize),
 	Adr(isize),
 	SP(isize),

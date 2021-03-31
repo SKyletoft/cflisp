@@ -3,13 +3,13 @@ use std::{borrow::Cow, collections::HashMap};
 
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Variable<'a> {
-	pub(crate) typ: Type<'a>,
-	pub(crate) name: &'a str,
+pub struct Variable<'a> {
+	pub typ: Type<'a>,
+	pub name: &'a str,
 }
 
 impl<'a> Variable<'a> {
-	pub(crate) fn split_into_native(
+	pub fn split_into_native(
 		self,
 		struct_defs: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
@@ -45,37 +45,37 @@ impl<'a> Variable<'a> {
 
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NativeVariable<'a> {
-	pub(crate) typ: NativeType,
-	pub(crate) name: Cow<'a, str>,
+pub struct NativeVariable<'a> {
+	pub typ: NativeType,
+	pub name: Cow<'a, str>,
 }
 
 ///Return type, name and argument list
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Function<'a> {
-	pub(crate) return_type: NativeType,
-	pub(crate) name: &'a str,
-	pub(crate) parametres: Vec<Variable<'a>>,
+pub struct Function<'a> {
+	pub return_type: NativeType,
+	pub name: &'a str,
+	pub parametres: Vec<Variable<'a>>,
 }
 
 ///A struct definition is a name for the type and a list of member variables
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Struct<'a> {
-	pub(crate) name: Cow<'a, str>,
-	pub(crate) members: Vec<Variable<'a>>,
+pub struct Struct<'a> {
+	pub name: Cow<'a, str>,
+	pub members: Vec<Variable<'a>>,
 }
 
 ///A statement is a list of tokens. It must evaluate to a value when processed
-pub(crate) type Statement<'a> = Vec<StatementToken<'a>>;
+pub type Statement<'a> = Vec<StatementToken<'a>>;
 ///A block is a list of valid LanguageElements
-pub(crate) type Block<'a> = Vec<LanguageElement<'a>>;
+pub type Block<'a> = Vec<LanguageElement<'a>>;
 ///A block is a list of valid LanguageElementsStructless
-pub(crate) type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
+pub type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// Can also hold the name of a struct
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Type<'a> {
+pub enum Type<'a> {
 	Uint,
 	Int,
 	Char,
@@ -86,7 +86,7 @@ pub(crate) enum Type<'a> {
 }
 
 impl<'a> Type<'a> {
-	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
+	pub fn ptr(target: Type<'a>) -> Type<'a> {
 		Type::Ptr(Box::new(target))
 	}
 }
@@ -94,7 +94,7 @@ impl<'a> Type<'a> {
 ///The types that are currently supported by the compiler and their pointer types.
 /// No structs
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum NativeType {
+pub enum NativeType {
 	Uint,
 	Int,
 	Char,
@@ -104,7 +104,7 @@ pub(crate) enum NativeType {
 }
 
 impl NativeType {
-	pub(crate) fn ptr(target: NativeType) -> NativeType {
+	pub fn ptr(target: NativeType) -> NativeType {
 		NativeType::Ptr(Box::new(target))
 	}
 }
@@ -143,7 +143,7 @@ impl<'a> From<&NativeType> for Type<'a> {
 }
 
 impl<'a> Type<'a> {
-	pub(crate) fn get_struct_type(&self) -> Option<&'a str> {
+	pub fn get_struct_type(&self) -> Option<&'a str> {
 		match self {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
 			Type::Struct(n) => Some(n),

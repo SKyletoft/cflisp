@@ -2,7 +2,7 @@ use crate::*;
 
 ///A reduced set of tokens for use in statements
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum StatementToken<'a> {
+pub enum StatementToken<'a> {
 	Num(isize),
 	Bool(bool),
 	Char(char),
@@ -39,7 +39,7 @@ pub(crate) enum StatementToken<'a> {
 }
 
 impl<'a> StatementToken<'a> {
-	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
+	pub fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
 		let mut res = Vec::new();
 		for token in tokens {
 			let last = res.len().wrapping_sub(1);
@@ -122,7 +122,7 @@ impl<'a> StatementToken<'a> {
 		Ok(res)
 	}
 
-	pub(crate) fn is_op(&self) -> bool {
+	pub fn is_op(&self) -> bool {
 		matches!(
 			self,
 			StatementToken::Add

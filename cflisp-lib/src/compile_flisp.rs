@@ -24,7 +24,7 @@ struct State<'a, 'b, 'c, 'd, 'e, 'f> {
 	line_id: usize,
 }
 
-pub(crate) fn compile<'a>(
+pub fn compile<'a>(
 	program: &'a [LanguageElementStructless],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {

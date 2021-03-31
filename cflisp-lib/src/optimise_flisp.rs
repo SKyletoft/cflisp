@@ -4,7 +4,7 @@ use std::{cmp::Ordering, collections::HashSet};
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
-pub(crate) fn all_optimisations(
+pub fn all_optimisations(
 	instructions: &mut Vec<CommentedInstruction>,
 ) -> Result<(), CompileError> {
 	remove_post_early_return_code(instructions);
@@ -99,7 +99,7 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 ///Removes repeat RTS that can occur after unused labels have been eliminated
-pub(crate) fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
+pub fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx < instructions.len() - 2 {
 		if matches!(
@@ -637,7 +637,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 }
 
 ///Removes labels that are never used. Includes everything, even function names
-pub(crate) fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
+pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let mut jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst {

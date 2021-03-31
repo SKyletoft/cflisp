@@ -1,7 +1,7 @@
 use crate::*;
 use std::{borrow::Cow, ops::Add};
 
-pub(crate) fn parse<'a>(
+pub fn parse<'a>(
 	source: &'a str,
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
@@ -415,7 +415,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 }
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
-pub(crate) fn type_check(
+pub fn type_check(
 	block: &[LanguageElementStructless],
 	upper_variables: &[Variable],
 	outer_functions: &[Function],
@@ -579,7 +579,7 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 
 ///Takes the entire source code and removes the rest of the line for each line with a `//`.
 /// Does *not* handle multiline comments
-pub(crate) fn remove_comments(s: &str) -> String {
+pub fn remove_comments(s: &str) -> String {
 	let mut out = String::new();
 	for line in s.lines() {
 		let comment_start = line.find("//").unwrap_or_else(|| line.len());

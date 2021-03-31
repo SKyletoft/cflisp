@@ -2,18 +2,18 @@ use std::iter::FromIterator;
 
 ///Container for all the compiler flags passed in from Args
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Flags {
-	pub(crate) hex: bool,
-	pub(crate) comments: bool,
-	pub(crate) tree: bool,
-	pub(crate) tree_structless: bool,
-	pub(crate) type_check: bool,
-	pub(crate) print_result: bool,
-	pub(crate) assemble: bool,
-	pub(crate) out: String,
-	pub(crate) debug: bool,
-	pub(crate) optimise: bool,
-	pub(crate) inline: bool,
+pub struct Flags {
+	pub hex: bool,
+	pub comments: bool,
+	pub tree: bool,
+	pub tree_structless: bool,
+	pub type_check: bool,
+	pub print_result: bool,
+	pub assemble: bool,
+	pub out: String,
+	pub debug: bool,
+	pub optimise: bool,
+	pub inline: bool,
 }
 
 impl Default for Flags {

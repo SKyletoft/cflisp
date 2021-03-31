@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashMap};
 /// (language patterns are complete lines. Right hand side
 /// statements are `StatementElement`s)
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum LanguageElement<'a> {
+pub enum LanguageElement<'a> {
 	VariableDeclaration {
 		typ: Type<'a>,
 		name: Cow<'a, str>,
@@ -71,7 +71,7 @@ pub(crate) enum LanguageElement<'a> {
 }
 
 impl<'a> LanguageElement<'a> {
-	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
+	pub fn make_static(mut self) -> Result<Self, ParseError> {
 		match &mut self {
 			LanguageElement::VariableDeclaration {
 				typ: _,
@@ -112,7 +112,7 @@ impl<'a> LanguageElement<'a> {
 /// (language patterns are complete lines. Right hand side
 /// statements are `StatementElement`s)
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum LanguageElementStructless<'a> {
+pub enum LanguageElementStructless<'a> {
 	VariableDeclaration {
 		typ: NativeType,
 		name: Cow<'a, str>,
@@ -165,7 +165,7 @@ impl<'a> LanguageElementStructless<'a> {
 	//refactor into doing it one by one to an option and then map over/collect?
 	// but not until StatementElements have been unstructified
 	///Destructures structs into normal language elements
-	pub(crate) fn from_language_elements(
+	pub fn from_language_elements(
 		elements: Vec<LanguageElement<'a>>,
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
 		let mut struct_types = HashMap::new();

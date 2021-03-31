@@ -2,7 +2,7 @@ use crate::*;
 
 const DIGIFLISP_PROGRAM_LIMIT: usize = 172;
 
-pub(crate) fn instructions_to_text(
+pub fn instructions_to_text(
 	instructions: &[CommentedInstruction],
 	flags: &Flags,
 ) -> Result<String, CompileError> {
@@ -52,7 +52,7 @@ pub(crate) fn instructions_to_text(
 
 ///Imports all functions for non native operations that are used by the program.
 /// Also adds init if no init function is written
-pub(crate) fn automatic_imports(instructions: &mut String, debug: bool) {
+pub fn automatic_imports(instructions: &mut String, debug: bool) {
 	if instructions.contains("__mul__") {
 		instructions.push_str(include_str!("asm_deps/mul.sflisp"));
 	}

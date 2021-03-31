@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum StatementElement<'a> {
+pub enum StatementElement<'a> {
 	Add {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -115,10 +115,7 @@ impl<'a> MaybeParsed<'a> {
 
 impl<'a> StatementElement<'a> {
 	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
-	pub(crate) fn as_flisp_instruction(
-		&self,
-		adr: Addressing,
-	) -> Result<Instruction, CompileError> {
+	pub fn as_flisp_instruction(&self, adr: Addressing) -> Result<Instruction, CompileError> {
 		let res = match self {
 			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
 			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
@@ -164,7 +161,7 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	pub(crate) fn depth(&self) -> usize {
+	pub fn depth(&self) -> usize {
 		let rest = match self {
 			StatementElement::Add { lhs, rhs }
 			| StatementElement::Sub { lhs, rhs }
@@ -237,17 +234,17 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	pub(crate) fn from_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
+	pub fn from_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
 		let tokens = Token::parse_statement_tokens(s)?;
 		StatementElement::from_statement_tokens(tokens)
 	}
 
-	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<StatementElement<'a>, ParseError> {
+	pub fn from_tokens(tokens: &[Token<'a>]) -> Result<StatementElement<'a>, ParseError> {
 		let statement_tokens = StatementToken::from_tokens(tokens)?;
 		StatementElement::from_statement_tokens(statement_tokens)
 	}
 
-	pub(crate) fn from_statement_tokens(
+	pub fn from_statement_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
 		let mut working_tokens: Vec<MaybeParsed<'a>> = tokens
@@ -439,7 +436,7 @@ impl<'a> StatementElement<'a> {
 		}
 	}
 
-	pub(crate) fn type_of(
+	pub fn type_of(
 		&self,
 		functions: &'a [Function<'a>],
 		variables: &'a [Variable<'a>],
@@ -502,7 +499,7 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	pub(crate) fn type_check(
+	pub fn type_check(
 		&self,
 		variables: &[Variable],
 		functions: &[Function],
@@ -554,7 +551,7 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	pub(crate) fn internal_ref(&self) -> Option<(&StatementElement, &StatementElement)> {
+	pub fn internal_ref(&self) -> Option<(&StatementElement, &StatementElement)> {
 		match self {
 			StatementElement::Add { lhs, rhs }
 			| StatementElement::Sub { lhs, rhs }
@@ -656,7 +653,7 @@ fn do_unary_operation<'a>(
 	Ok(())
 }
 
-pub(crate) fn move_declarations_first(block: &mut Block) {
+pub fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::StructDefinition { .. } => 0,
