@@ -1,5 +1,5 @@
 use crate::*;
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,11 +8,46 @@ pub(crate) struct Variable<'a> {
 	pub(crate) name: &'a str,
 }
 
+impl<'a> Variable<'a> {
+	pub(crate) fn split_into_native(
+		self,
+		struct_defs: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
+	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
+		let res = if let Type::Struct(struct_type) = self.typ {
+			let mut vec = vec![NativeVariable {
+				name: Cow::Borrowed(self.name),
+				typ: NativeType::Void,
+			}];
+			struct_defs
+				.get(struct_type)
+				.ok_or(ParseError(line!(), "Undefined struct type"))?
+				.iter()
+				.map(
+					|Variable {
+					     typ: var_typ,
+					     name: var_name,
+					 }| NativeVariable {
+						typ: var_typ.into(),
+						name: Cow::Owned(self.name.to_string() + "::" + var_name),
+					},
+				)
+				.for_each(|field| vec.push(field));
+			vec
+		} else {
+			vec![NativeVariable {
+				typ: self.typ.into(),
+				name: Cow::Borrowed(self.name),
+			}]
+		};
+		Ok(res)
+	}
+}
+
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NativeVariable<'a> {
 	pub(crate) typ: NativeType,
-	pub(crate) name: &'a str,
+	pub(crate) name: Cow<'a, str>,
 }
 
 ///Return type, name and argument list
@@ -50,6 +85,12 @@ pub(crate) enum Type<'a> {
 	Ptr(Box<Type<'a>>),
 }
 
+impl<'a> Type<'a> {
+	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
+		Type::Ptr(Box::new(target))
+	}
+}
+
 ///The types that are currently supported by the compiler and their pointer types.
 /// No structs
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +102,13 @@ pub(crate) enum NativeType {
 	Void,
 	Ptr(Box<NativeType>),
 }
+
+impl NativeType {
+	pub(crate) fn ptr(target: NativeType) -> NativeType {
+		NativeType::Ptr(Box::new(target))
+	}
+}
+
 impl<'a> From<Type<'a>> for NativeType {
 	fn from(other: Type) -> Self {
 		(&other).into()
@@ -76,7 +124,7 @@ impl<'a> From<&Type<'a>> for NativeType {
 			Type::Bool => NativeType::Bool,
 			Type::Void => NativeType::Void,
 			Type::Struct(_) => NativeType::Void,
-			Type::Ptr(target) => NativeType::Ptr(Box::new(target.as_ref().into())),
+			Type::Ptr(target) => NativeType::ptr(target.as_ref().into()),
 		}
 	}
 }
@@ -89,7 +137,7 @@ impl<'a> From<&NativeType> for Type<'a> {
 			NativeType::Char => Type::Char,
 			NativeType::Bool => Type::Bool,
 			NativeType::Void => Type::Void,
-			NativeType::Ptr(target) => Type::Ptr(Box::new((target.as_ref()).into())),
+			NativeType::Ptr(target) => Type::ptr((target.as_ref()).into()),
 		}
 	}
 }

@@ -72,6 +72,9 @@ fn main() {
 			process::exit(-1);
 		});
 	if flags.tree_structless {
+		if flags.tree {
+			eprintln!();
+		}
 		dbg!(&struct_filtered);
 	}
 	if flags.type_check {

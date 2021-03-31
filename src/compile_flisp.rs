@@ -273,7 +273,7 @@ fn compile_element<'a>(
 			let args_base = args_count;
 			let mut local_variables = HashMap::new();
 			for (idx, NativeVariable { name, typ }) in args.iter().enumerate() {
-				local_variables.insert(Cow::Borrowed(*name), (typ.clone(), idx as isize));
+				local_variables.insert(name.clone(), (typ.clone(), idx as isize));
 			}
 			let mut function_body = compile_elements(
 				block,
@@ -767,7 +767,10 @@ fn compile_statement_inner<'a>(
 			) in parametres.iter().zip(arg_names.iter())
 			{
 				instructions.append(&mut compile_statement(statement, state)?);
-				instructions.push((Instruction::PSHA, Some(Cow::Borrowed(*v_name))));
+				instructions.push((
+					Instruction::PSHA,
+					Some(Cow::Owned(name.to_string() + "::" + v_name)),
+				));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
 			instructions.push((

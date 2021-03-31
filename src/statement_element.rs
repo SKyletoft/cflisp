@@ -481,21 +481,21 @@ impl<'a> StatementElement<'a> {
 				.map(|v| (&v.typ).into())
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 
-			StatementElement::Array(arr) => NativeType::Ptr(Box::new(
+			StatementElement::Array(arr) => NativeType::ptr(
 				arr.get(0)
 					.map(|s| s.type_of(functions, variables))
 					.unwrap_or(Ok(NativeType::Void))?,
-			)),
+			),
 
 			StatementElement::Deref(t) => t.as_ref().type_of(functions, variables)?,
 
-			StatementElement::AdrOf(name) => NativeType::Ptr(Box::new(
+			StatementElement::AdrOf(name) => NativeType::ptr(
 				variables
 					.iter()
 					.find(|f| f.name == name)
 					.map(|v| (&v.typ).into())
 					.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
-			)),
+			),
 
 			_ => todo!(),
 		};

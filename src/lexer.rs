@@ -6,9 +6,9 @@ pub(crate) fn remove_parentheses(s: &str) -> &str {
 	s[1..s.len() - 1].trim()
 }
 
-fn get_number(s: &str) -> Option<(Token, &str)> {
+fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 	if s.starts_with("0x") && s.as_bytes().get(2).map(|d| d.is_ascii_hexdigit()) == Some(true) {
-		let mut len = 0;
+		let mut len = 2;
 		let num = s
 			.bytes()
 			.skip(2)
@@ -18,8 +18,14 @@ fn get_number(s: &str) -> Option<(Token, &str)> {
 				acc * 16 + (curr - b'0') as isize
 			});
 		Some((Token::Num(num), &s[len..]))
-	} else if s.starts_with('-') && s.as_bytes().get(1).map(|d| d.is_ascii_digit()) == Some(true) {
-		let mut len = 0;
+	} else {
+		None
+	}
+}
+
+fn get_negative_number(s: &str) -> Option<(Token, &str)> {
+	if s.starts_with('-') && s.as_bytes().get(1).map(|d| d.is_ascii_digit()) == Some(true) {
+		let mut len = 1;
 		let num = s
 			.bytes()
 			.skip(1)
@@ -29,7 +35,13 @@ fn get_number(s: &str) -> Option<(Token, &str)> {
 				acc * 10 + (curr - b'0') as isize
 			});
 		Some((Token::Num(-num), &s[len..]))
-	} else if s.as_bytes().get(0).map(|d| d.is_ascii_digit()) == Some(true) {
+	} else {
+		None
+	}
+}
+
+fn get_positive_number(s: &str) -> Option<(Token, &str)> {
+	if s.as_bytes().get(0).map(|d| d.is_ascii_digit()) == Some(true) {
 		let mut len = 0;
 		let num = s
 			.bytes()
@@ -42,6 +54,12 @@ fn get_number(s: &str) -> Option<(Token, &str)> {
 	} else {
 		None
 	}
+}
+
+fn get_number(s: &str) -> Option<(Token, &str)> {
+	None.or_else(|| get_hex_number(s))
+		.or_else(|| get_negative_number(s))
+		.or_else(|| get_positive_number(s))
 }
 
 fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
@@ -141,11 +159,8 @@ fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 		.iter()
 		.find(|(pat, whitespace, _)| {
 			s.starts_with(pat)
-				&& if *whitespace {
-					s.as_bytes().get(pat.len()).map(u8::is_ascii_whitespace) != Some(false)
-				} else {
-					true
-				}
+				&& (!*whitespace //Trust the shortcircuit
+					|| s.as_bytes().get(pat.len()).map(u8::is_ascii_whitespace) != Some(false))
 		})
 		.map(|(pat, _, t)| (t(), s[pat.len()..].trim()))
 }
@@ -167,6 +182,7 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 ];
 
 //Literal, needs following whitespace, closure to return token
+//Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
 const PATTERNS: [(&str, bool, TokenFunction); 84] = [
 	("_Alignas", true, || AlignAs),
@@ -217,21 +233,11 @@ const PATTERNS: [(&str, bool, TokenFunction); 84] = [
 	("unsigned", true, || Unsigned),
 	("volatile", true, || Volatile),
 	("while", false, || While),
-	("int*", true, || {
-		Decl(NativeType::Ptr(Box::new(NativeType::Int)))
-	}),
-	("bool*", true, || {
-		Decl(NativeType::Ptr(Box::new(NativeType::Bool)))
-	}),
-	("char*", true, || {
-		Decl(NativeType::Ptr(Box::new(NativeType::Char)))
-	}),
-	("uint*", true, || {
-		Decl(NativeType::Ptr(Box::new(NativeType::Uint)))
-	}),
-	("void*", true, || {
-		Decl(NativeType::Ptr(Box::new(NativeType::Void)))
-	}),
+	("int*", true, || Decl(NativeType::ptr(NativeType::Int))),
+	("bool*", true, || Decl(NativeType::ptr(NativeType::Bool))),
+	("char*", true, || Decl(NativeType::ptr(NativeType::Char))),
+	("uint*", true, || Decl(NativeType::ptr(NativeType::Uint))),
+	("void*", true, || Decl(NativeType::ptr(NativeType::Void))),
 	("int", true, || Decl(NativeType::Int)),
 	("bool", true, || Decl(NativeType::Bool)),
 	("char", true, || Decl(NativeType::Char)),

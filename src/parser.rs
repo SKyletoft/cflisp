@@ -42,10 +42,12 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<LanguageElement<'a>, ParseError> {
+	//Todo patterns might be invalidated by the pointer versions
 	let element = {
 		match tokens {
 			//Function declaration
 			[Decl(t), Token::Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+				todo!("Investigate if this is still a valid code path");
 				let args_parsed = Token::parse_argument_list_tokens(args)?;
 				let code_tokenised = Token::parse_block_tokens(code)?;
 				let code_parsed = construct_block(&code_tokenised, move_first)?;
@@ -59,6 +61,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//Variable declaration
 			[Decl(t), Token::Name(n), Assign, ..] => {
+				todo!("Investigate if this is still a valid code path");
 				let rhs = StatementElement::from_tokens(&tokens[3..])?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ: t.into(),
@@ -70,6 +73,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//Static variable declaration
 			[Static, Decl(t), Token::Name(n), Assign, ..] => {
+				todo!("Investigate if this is still a valid code path");
 				let rhs = StatementElement::from_tokens(&tokens[4..])?;
 				LanguageElement::VariableDeclarationAssignment {
 					typ: t.into(),
@@ -81,6 +85,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//Struct assignment
 			[Token::Name(n), Assign, UnparsedBlock(members)] => {
+				todo!("Investigate if this is still a valid code path");
 				let field_tokens = Token::parse_arguments_tokens(members)?;
 				let fields = field_tokens
 					.into_iter()
@@ -122,18 +127,24 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Variable declaration (without init)
-			[Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
-				typ: t.into(),
-				name: Cow::Borrowed(n),
-				is_static: false,
-			},
+			[Decl(t), Token::Name(n)] => {
+				todo!("Investigate if this is still a valid code path");
+				LanguageElement::VariableDeclaration {
+					typ: t.into(),
+					name: Cow::Borrowed(n),
+					is_static: false,
+				}
+			}
 
 			//Static variable declaration (without init)
-			[Static, Decl(t), Token::Name(n)] => LanguageElement::VariableDeclaration {
-				typ: t.into(),
-				name: Cow::Borrowed(n),
-				is_static: true,
-			},
+			[Static, Decl(t), Token::Name(n)] => {
+				todo!("Investigate if this is still a valid code path");
+				LanguageElement::VariableDeclaration {
+					typ: t.into(),
+					name: Cow::Borrowed(n),
+					is_static: true,
+				}
+			}
 
 			//If else if
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
@@ -280,7 +291,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 			let mut t = t.into();
 			while let Some(Mul) = tokens_slice.get(0) {
 				tokens_slice = &tokens_slice[1..];
-				t = Type::Ptr(Box::new(t));
+				t = Type::ptr(t);
 			}
 			match tokens_slice {
 				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
@@ -323,7 +334,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 			let mut t = Type::Struct(n);
 			while let Some(Mul) = tokens_slice.get(0) {
 				tokens_slice = &tokens_slice[1..];
-				t = Type::Ptr(Box::new(t));
+				t = Type::ptr(t);
 			}
 			match tokens_slice {
 				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
@@ -332,13 +343,6 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_static: false,
 				})),
 				[Name(n), Assign, UnparsedBlock(s)] => {
-					if !matches!(t, Type::Struct(_)) {
-						dbg!(tokens);
-						return Some(Err(ParseError(
-							line!(),
-							"Tried to initialise struct literal as pointer value",
-						)));
-					}
 					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
 						tokens
 							.into_iter()
@@ -354,13 +358,6 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					Some(res)
 				}
 				[Name(n), Assign, ..] => {
-					if matches!(t, Type::Struct(_)) {
-						dbg!(tokens);
-						return Some(Err(ParseError(
-							line!(),
-							"Tried to initialise struct pointer as struct literal",
-						)));
-					}
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|rhs| {
 						LanguageElement::VariableDeclarationAssignment {
 							typ: t,

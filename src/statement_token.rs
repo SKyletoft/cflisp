@@ -83,7 +83,6 @@ impl<'a> StatementToken<'a> {
 				}
 				Token::UnparsedArrayAccess(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						//let idx = Token::parse_str_to_vec(helper::remove_parentheses(b))?;
 						let idx = Token::by_byte(lexer::remove_parentheses(b))?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
@@ -105,7 +104,6 @@ impl<'a> StatementToken<'a> {
 						.collect::<Vec<_>>();
 					let mut v = Vec::new();
 					for item in items {
-						//let tokens = Token::parse_str_to_vec(item)?;
 						let tokens = Token::by_byte(item)?;
 						v.push(StatementToken::from_tokens(&tokens)?);
 					}

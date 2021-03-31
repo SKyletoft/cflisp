@@ -170,10 +170,12 @@ impl<'a> LanguageElementStructless<'a> {
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
+		let mut functions = HashMap::new();
 		LanguageElementStructless::from_language_elements_internal(
 			elements,
 			&mut struct_types,
 			&mut structs_and_struct_pointers,
+			&mut functions,
 		)
 	}
 
@@ -181,6 +183,7 @@ impl<'a> LanguageElementStructless<'a> {
 		elements: Vec<LanguageElement<'a>>,
 		struct_types: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		structs_and_struct_pointers: &mut HashMap<Cow<'a, str>, &'a str>,
+		functions: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
 		let mut new_elements = Vec::new();
 		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
@@ -195,17 +198,28 @@ impl<'a> LanguageElementStructless<'a> {
 					is_static,
 				} => {
 					if let Some(n) = typ.get_struct_type() {
+						let fields = struct_types
+							.get(n)
+							.ok_or(ParseError(line!(), "Undefined struct type"))?;
 						structs_and_struct_pointers.insert(name.clone(), n);
 						new_elements.push(LanguageElementStructless::StructDeclaration {
 							name: name.clone(),
 							is_static,
 						});
+						for field in fields {
+							new_elements.push(LanguageElementStructless::VariableDeclaration {
+								name: Cow::Owned(name.to_string() + "::" + field.name),
+								typ: (&field.typ).into(), //This is also such a hack
+								is_static,
+							});
+						}
+					} else {
+						new_elements.push(LanguageElementStructless::VariableDeclaration {
+							typ: typ.into(),
+							name,
+							is_static,
+						})
 					}
-					new_elements.push(LanguageElementStructless::VariableDeclaration {
-						typ: typ.into(),
-						name,
-						is_static,
-					})
 				}
 				LanguageElement::VariableAssignment { name, value } => {
 					new_elements.push(LanguageElementStructless::VariableAssignment { name, value })
@@ -274,7 +288,7 @@ impl<'a> LanguageElementStructless<'a> {
 							LanguageElementStructless::VariableDeclarationAssignment {
 								name: Cow::Owned(name.to_string() + "::" + field.name),
 								value: val,
-								typ: (&field.typ).into(),
+								typ: (&field.typ).into(), //Such a hack
 								is_static,
 							},
 						);
@@ -318,22 +332,33 @@ impl<'a> LanguageElementStructless<'a> {
 					name,
 					args,
 					block,
-				} => new_elements.push(LanguageElementStructless::FunctionDeclaration {
-					typ: typ.into(),
-					name,
-					args: args
+				} => {
+					if matches!(typ, Type::Struct(_)) {
+						return Err(ParseError(
+							line!(),
+							"Cannot return struct from function due to ABI limitation. \
+							Maybe try having an out pointer parametre instead? (Sorry)",
+						));
+					}
+					let new_args = args
 						.into_iter()
-						.map(|Variable { typ, name }| NativeVariable {
-							typ: typ.into(),
-							name,
-						})
-						.collect(),
-					block: LanguageElementStructless::from_language_elements_internal(
-						block,
-						struct_types,
-						structs_and_struct_pointers,
-					)?,
-				}),
+						.map(|v| v.split_into_native(struct_types))
+						.collect::<Result<Vec<_>, _>>()? //There must be a better way
+						.into_iter()
+						.flat_map(|vec| vec.into_iter())
+						.collect();
+					new_elements.push(LanguageElementStructless::FunctionDeclaration {
+						typ: typ.into(),
+						name,
+						args: new_args,
+						block: LanguageElementStructless::from_language_elements_internal(
+							block,
+							struct_types,
+							structs_and_struct_pointers,
+							functions,
+						)?,
+					})
+				}
 				LanguageElement::IfStatement {
 					condition,
 					then,
@@ -344,6 +369,7 @@ impl<'a> LanguageElementStructless<'a> {
 						then,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 					//no, clippy, this can't be replaced with a Option::map
 					else_then: if let Some(else_then) = else_then {
@@ -351,6 +377,7 @@ impl<'a> LanguageElementStructless<'a> {
 							else_then,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?)
 					} else {
 						None
@@ -366,17 +393,20 @@ impl<'a> LanguageElementStructless<'a> {
 						init,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 					condition,
 					post: LanguageElementStructless::from_language_elements_internal(
 						post,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 					body: LanguageElementStructless::from_language_elements_internal(
 						body,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 				}),
 				LanguageElement::While { condition, body } => {
@@ -386,6 +416,7 @@ impl<'a> LanguageElementStructless<'a> {
 							body,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 					})
 				}

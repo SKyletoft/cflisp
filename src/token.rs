@@ -144,6 +144,9 @@ impl<'a> Token<'a> {
 		while !remaining_slice.is_empty() {
 			let (var, rest) = get_pattern(remaining_slice)?;
 			remaining_slice = rest;
+			if remaining_slice.get(0) == Some(&Comma) {
+				remaining_slice = &remaining_slice[1..];
+			}
 			arguments.push(var);
 		}
 		if !remaining_slice.is_empty() {
@@ -182,24 +185,23 @@ impl<'a> Token<'a> {
 fn get_pattern<'a, 'b>(
 	slice: &'b [Token<'a>],
 ) -> Result<(Variable<'a>, &'b [Token<'a>]), ParseError> {
-	match slice {
-		[Decl(t), ptrs @ .., Name(n)] if ptrs.iter().all(|thing| matches!(thing, Mul)) => {
-			let mut t = t.into();
-			for _ in ptrs.iter() {
-				t = Type::Ptr(Box::new(t));
-			}
-			Ok((Variable { typ: t, name: *n }, &slice[ptrs.len() + 2..]))
-		}
-		[Name(t), ptrs @ .., Name(n)] if ptrs.iter().all(|thing| matches!(thing, Mul)) => {
-			let mut t = Type::Struct(t);
-			for _ in ptrs.iter() {
-				t = Type::Ptr(Box::new(t));
-			}
-			Ok((Variable { typ: t, name: *n }, &slice[ptrs.len() + 2..]))
-		}
+	let mut typ: Type;
+	let mut reduced = &slice[1..];
+	match slice.get(0) {
+		Some(Decl(t)) => typ = t.into(),
+		Some(Name(t)) => typ = Type::Struct(t),
 		_ => {
 			dbg!(slice);
-			Err(ParseError(line!(), "Couldn't parse argument list"))
+			return Err(ParseError(line!(), "Couldn't parse argument list"));
 		}
+	}
+	while reduced.get(0) == Some(&Mul) {
+		typ = Type::ptr(typ);
+		reduced = &reduced[1..];
+	}
+	if let Some(Name(n)) = reduced.get(0) {
+		Ok((Variable { typ, name: *n }, &reduced[1..]))
+	} else {
+		Err(ParseError(line!(), "Couldn't parse argument list"))
 	}
 }

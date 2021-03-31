@@ -15,3 +15,4 @@ struct pointers? `myStruct *foo` resolves to `Name(myStruct), Mul, Name(foo)`
 	Exception if it's followed by Assign?
 
 split and/or into boolAnd/bitAnd and boolOr/bitOr for the type checker
+split Num into Signed and Unsigned
