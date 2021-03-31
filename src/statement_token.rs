@@ -76,14 +76,14 @@ impl<'a> StatementToken<'a> {
 							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
 						continue;
 					} else {
-						let tokenised = Token::by_byte(lexer::remove_parentheses(b))?;
+						let tokenised = Token::by_byte(b)?;
 						let as_statement = StatementToken::from_tokens(&tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
 				}
 				Token::UnparsedArrayAccess(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						let idx = Token::by_byte(lexer::remove_parentheses(b))?;
+						let idx = Token::by_byte(b)?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
 							ptr: n,
@@ -98,10 +98,7 @@ impl<'a> StatementToken<'a> {
 					}
 				}
 				Token::UnparsedBlock(b) => {
-					let items = lexer::remove_parentheses(b)
-						.split(',')
-						.map(|s| s.trim())
-						.collect::<Vec<_>>();
+					let items = b.split(',').map(|s| s.trim()).collect::<Vec<_>>();
 					let mut v = Vec::new();
 					for item in items {
 						let tokens = Token::by_byte(item)?;
@@ -116,8 +113,7 @@ impl<'a> StatementToken<'a> {
 					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
 				}
 				_ => {
-					dbg!(tokens);
-					dbg!(token);
+					dbg!(tokens, token);
 					return Err(ParseError(line!(), "Token is not valid in this context"));
 				}
 			};

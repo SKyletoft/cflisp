@@ -121,10 +121,14 @@ impl<'a> Token<'a> {
 
 	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
 	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
-		s.split(',')
-			//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
-			.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
-			.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
+		if s.is_empty() {
+			Ok(vec![])
+		} else {
+			s.split(',')
+				//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
+				.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
+				.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
+		}
 	}
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Function *declaration*, not call)

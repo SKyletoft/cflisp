@@ -264,6 +264,7 @@ impl<'a> LanguageElementStructless<'a> {
 					let struct_type = if let Type::Struct(struct_type) = typ {
 						Ok(struct_type)
 					} else {
+						dbg!(&typ);
 						Err(ParseError(line!(), "Internal error: Type is not struct"))
 					}?;
 					structs_and_struct_pointers.insert(name.clone(), struct_type);

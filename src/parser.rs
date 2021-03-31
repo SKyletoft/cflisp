@@ -5,7 +5,6 @@ pub(crate) fn parse<'a>(
 	source: &'a str,
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
-	//let tokens: Vec<Token<'a>> = Token::parse_str_to_vec(source)?;
 	let tokens: Vec<Token<'a>> = Token::by_byte(source)?;
 	construct_block(&tokens, move_first)
 }
@@ -247,9 +246,14 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 			}
 
-			_ => {
+			_ if !tokens.contains(&Assign) => {
 				let element = StatementElement::from_tokens(tokens)?;
 				LanguageElement::Statement(element)
+			}
+
+			_ => {
+				dbg!(tokens);
+				return Err(ParseError(line!(), "Couldn't match language pattern"));
 			}
 		}
 	};

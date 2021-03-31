@@ -375,21 +375,17 @@ fn compile_element<'a>(
 			let end_str = format!("for_end_{}_{}", state.scope_name, state.line_id);
 			let mut inner_variables = state.variables.clone();
 			let mut inner_stack = *state.stack_size;
-			let mut instructions = compile_elements(
-				init,
-				&mut State {
-					variables: &mut inner_variables,
-					global_variables: state.global_variables,
-					functions: state.functions,
-					scope_name: &init_str,
-					stack_size: &mut inner_stack,
-					line_id: state.line_id,
-				},
-				stack_base,
-				optimise,
-			)?;
+			let mut inner_state = State {
+				variables: &mut inner_variables,
+				global_variables: state.global_variables,
+				functions: state.functions,
+				scope_name: &init_str,
+				stack_size: &mut inner_stack,
+				line_id: state.line_id,
+			};
+			let mut instructions = compile_elements(init, &mut inner_state, stack_base, optimise)?;
 			instructions.push((Instruction::Label(cond_str.clone()), None));
-			instructions.append(&mut compile_statement(condition, state)?);
+			instructions.append(&mut compile_statement(condition, &mut inner_state)?);
 			instructions.push((Instruction::TSTA, None));
 			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
 			let mut inner_inner_stack = inner_stack;
@@ -754,10 +750,13 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
-			let arg_names = state.functions.get(name).ok_or(CompileError(
-				line!(),
-				"Name resolution failed? Shouldn't it've been checked by now?",
-			))?;
+			let arg_names = state.functions.get(name).ok_or_else(|| {
+				dbg!(name);
+				CompileError(
+					line!(),
+					"Name resolution failed? Shouldn't it've been checked by now?",
+				)
+			})?;
 			for (
 				statement,
 				NativeVariable {

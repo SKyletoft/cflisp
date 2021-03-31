@@ -627,7 +627,7 @@ fn do_unary_operation<'a>(
 	op_from: &MaybeParsed,
 	op_to: fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>, ParseError>,
 ) -> Result<(), ParseError> {
-	let mut idx = tokens.len() - 1;
+	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		if !matches!(tokens.get(idx), Some(token) if token == op_from) {
 			idx = idx.wrapping_sub(1);
