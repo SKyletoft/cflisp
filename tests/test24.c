@@ -4,6 +4,13 @@ typedef struct myStruct {
 	int c;
 } myStruct;
 
+// No nested structs yet
+
+// typedef struct innerStruct {
+//	myStruct abc;
+//	myStruct def;
+//} innerStruct;
+
 void bar(myStruct ms, int x, int y, int z, myStruct *out) {
 	ms.a = x;
 	ms.b = y;
