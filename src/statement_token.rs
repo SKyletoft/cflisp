@@ -71,19 +71,22 @@ impl<'a> StatementToken<'a> {
 				Token::FieldAccess => StatementToken::FieldAccess,
 				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
 				Token::UnparsedParentheses(b) => {
+					dbg!(b);
 					if let Some(StatementToken::Var(n)) = res.get(last) {
 						res[last] =
 							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
 						continue;
 					} else {
-						let tokenised = Token::by_byte(lexer::remove_parentheses(b))?;
+						let tokenised = Token::by_byte(b)?;
 						let as_statement = StatementToken::from_tokens(&tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
 				}
 				Token::UnparsedArrayAccess(b) => {
+					eprintln!("Expecting no brackets:");
+					dbg!(b);
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						let idx = Token::by_byte(lexer::remove_parentheses(b))?;
+						let idx = Token::by_byte(b)?;
 						let as_statement = StatementToken::from_tokens(&idx)?;
 						res[last] = StatementToken::ArrayAccess {
 							ptr: n,

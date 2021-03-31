@@ -754,10 +754,13 @@ fn compile_statement_inner<'a>(
 
 		StatementElement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
-			let arg_names = state.functions.get(name).ok_or(CompileError(
-				line!(),
-				"Name resolution failed? Shouldn't it've been checked by now?",
-			))?;
+			let arg_names = state.functions.get(name).ok_or_else(|| {
+				dbg!(name);
+				CompileError(
+					line!(),
+					"Name resolution failed? Shouldn't it've been checked by now?",
+				)
+			})?;
 			for (
 				statement,
 				NativeVariable {
