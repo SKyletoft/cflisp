@@ -14,6 +14,7 @@ pub mod optimise_flisp;
 pub mod parser;
 pub mod statement_element;
 pub mod statement_token;
+pub mod tests;
 pub mod text;
 pub mod token;
 pub mod types;
