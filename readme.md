@@ -1,5 +1,6 @@
 # CFLISP
 
+
 An experimental C compiler for Digiflisp written in Rust.
 
 Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `float`s and `double`s are not supported at all, nor is the preprocessor.
@@ -7,8 +8,14 @@ Parses and compiles a subset of C to flisp assembly. All supported types are one
 
 Basic maths, function calls (even recursive function calls), if-else-statements (even if-else-if-else-statements), for and while (not do-while) loops, arbitrary levels of pointers, comments, hex and decimal printing are all supported and tested features. On Linux you can even call qaflisp to assemble it directly (untested on Windows/Mac)
 
+## How do I run it?
+Install the rust toolchain from rust-lang.org, clone this repo and then just run `cargo run --release` from the cflisp-cli folder. Alternatively there is a WIP web interface like Godbolt's Compiler Explorer.
+
+## Why rust?
+Rust is known for its correctness and safety guarantees without sacrificing performance. Here, however, rust was just chosen because the type system is really nice and idiomatic rust allows for some very functional style code without being fully functional. And performance doesn't hurt.
+
 ```c
-//  tests/test1.c
+//  legacy_tests/test1.c
 
 int main() {
     int *ptr = 0;
@@ -22,8 +29,8 @@ int main() {
 
 into this:
 
-```flisp
-; tests/expected1.sflisp
+```asm
+; legacy_tests/expected1.sflisp
         ORG     $20
 main    LDA     #$00
         PSHA            ; ptr
