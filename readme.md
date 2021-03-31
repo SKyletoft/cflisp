@@ -59,6 +59,7 @@ Flag | Name | Description
 x | hex | Prints numbers as hex instead
 c | comments | Disables comments (variable names mostly)
 p|tree|Prints the parsed tree structure of the program
+P|tree_structless|Prints the parsed tree after structs have been simplified down to native types
 t|type_check| Disables type checking
 s|print_result|Prints the compiled code to stdout instead of a file
 a|assemble|Calls qaflisp directly. Requires qaflisp to be on $PATH. Probably doesn't work on Windows
