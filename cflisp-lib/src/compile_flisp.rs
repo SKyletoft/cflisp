@@ -156,10 +156,10 @@ fn compile_element<'a>(
 			value,
 			is_static,
 		} => {
-			let global_def = |val: &StatementElement| match val {
-				StatementElement::Num(n) => Ok(*n),
-				StatementElement::Char(c) => Ok(*c as isize),
-				StatementElement::Bool(b) => Ok(*b as isize),
+			let global_def = |val: &StatementElementStructless| match val {
+				StatementElementStructless::Num(n) => Ok(*n),
+				StatementElementStructless::Char(c) => Ok(*c as isize),
+				StatementElementStructless::Bool(b) => Ok(*b as isize),
 				_ => Err(CompileError(
 					line!(),
 					"Non constant in array initialisation",
@@ -173,7 +173,7 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				if let StatementElement::Array(elements) = value {
+				if let StatementElementStructless::Array(elements) = value {
 					state
 						.global_variables
 						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
@@ -202,7 +202,7 @@ fn compile_element<'a>(
 						"Name already exists in scope! (No shadowing)",
 					));
 				}
-				if let StatementElement::Array(elements) = value {
+				if let StatementElementStructless::Array(elements) = value {
 					let mut statement = Vec::new();
 					for element in elements {
 						let stack_copy = *state.stack_size;
@@ -490,7 +490,7 @@ fn compile_element<'a>(
 }
 
 fn compile_statement<'a>(
-	statement: &'a StatementElement,
+	statement: &'a StatementElementStructless,
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
@@ -524,19 +524,19 @@ fn compile_statement<'a>(
 }
 
 fn compile_statement_inner<'a>(
-	statement: &'a StatementElement,
+	statement: &'a StatementElementStructless,
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		//Commutative operations
-		StatementElement::Add { lhs, rhs }
-		| StatementElement::Mul { lhs, rhs }
-		| StatementElement::And { lhs, rhs }
-		| StatementElement::Or { lhs, rhs }
-		| StatementElement::Xor { lhs, rhs }
-		| StatementElement::NotCmp { lhs, rhs }
-		| StatementElement::Cmp { lhs, rhs } => {
+		StatementElementStructless::Add { lhs, rhs }
+		| StatementElementStructless::Mul { lhs, rhs }
+		| StatementElementStructless::And { lhs, rhs }
+		| StatementElementStructless::Or { lhs, rhs }
+		| StatementElementStructless::Xor { lhs, rhs }
+		| StatementElementStructless::NotCmp { lhs, rhs }
+		| StatementElementStructless::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right) = if left_depth > right_depth {
@@ -563,7 +563,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElement::Mul { rhs: _, lhs: _ } => {
+				StatementElementStructless::Mul { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -572,7 +572,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::Cmp { rhs: _, lhs: _ } => {
+				StatementElementStructless::Cmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -581,7 +581,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::NotCmp { rhs: _, lhs: _ } => {
+				StatementElementStructless::NotCmp { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -616,15 +616,15 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StatementElement::Sub { lhs, rhs }
-		| StatementElement::Div { lhs: rhs, rhs: lhs }
-		| StatementElement::Mod { lhs: rhs, rhs: lhs }
-		| StatementElement::LShift { lhs, rhs }
-		| StatementElement::RShift { lhs, rhs }
-		| StatementElement::GreaterThan { lhs: rhs, rhs: lhs }
-		| StatementElement::LessThanEqual { lhs: rhs, rhs: lhs }
-		| StatementElement::LessThan { lhs, rhs }
-		| StatementElement::GreaterThanEqual { lhs, rhs } => {
+		StatementElementStructless::Sub { lhs, rhs }
+		| StatementElementStructless::Div { lhs: rhs, rhs: lhs }
+		| StatementElementStructless::Mod { lhs: rhs, rhs: lhs }
+		| StatementElementStructless::LShift { lhs, rhs }
+		| StatementElementStructless::RShift { lhs, rhs }
+		| StatementElementStructless::GreaterThan { lhs: rhs, rhs: lhs }
+		| StatementElementStructless::LessThanEqual { lhs: rhs, rhs: lhs }
+		| StatementElementStructless::LessThan { lhs, rhs }
+		| StatementElementStructless::GreaterThanEqual { lhs, rhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
@@ -645,7 +645,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElement::Div { rhs: _, lhs: _ } => {
+				StatementElementStructless::Div { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("div rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -654,7 +654,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::Mod { rhs: _, lhs: _ } => {
+				StatementElementStructless::Mod { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("mod rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -663,8 +663,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::GreaterThan { rhs: _, lhs: _ }
-				| StatementElement::LessThan { rhs: _, lhs: _ } => {
+				StatementElementStructless::GreaterThan { rhs: _, lhs: _ }
+				| StatementElementStructless::LessThan { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -673,8 +673,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElement::LessThanEqual { rhs: _, lhs: _ }
-				| StatementElement::GreaterThanEqual { rhs: _, lhs: _ } => {
+				StatementElementStructless::LessThanEqual { rhs: _, lhs: _ }
+				| StatementElementStructless::GreaterThanEqual { rhs: _, lhs: _ } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -684,19 +684,21 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
-				StatementElement::RShift { lhs: _, rhs: _ }
-				| StatementElement::LShift { lhs: _, rhs: _ } => {
+				StatementElementStructless::RShift { lhs: _, rhs: _ }
+				| StatementElementStructless::LShift { lhs: _, rhs: _ } => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
-					if let StatementElement::Num(n) = rhs.as_ref() {
+					if let StatementElementStructless::Num(n) = rhs.as_ref() {
 						if *n < 0 {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
 						}
-						let inst =
-							if matches!(statement, StatementElement::RShift { lhs: _, rhs: _ }) {
-								Instruction::LSRA
-							} else {
-								Instruction::LSLA
-							};
+						let inst = if matches!(
+							statement,
+							StatementElementStructless::RShift { lhs: _, rhs: _ }
+						) {
+							Instruction::LSRA
+						} else {
+							Instruction::LSLA
+						};
 						instructions.append(&mut vec![(inst, None); *n as usize]);
 					} else {
 						//The byte to be shifted is in SP(tmps_used) as it's the left hand side
@@ -705,12 +707,14 @@ fn compile_statement_inner<'a>(
 							format!("bit_shift_start_{}_{}", state.scope_name, state.line_id);
 						let end_str =
 							format!("bit_shift_end_{}_{}", state.scope_name, state.line_id);
-						let inst =
-							if matches!(statement, StatementElement::RShift { lhs: _, rhs: _ }) {
-								Instruction::LSR(Addressing::SP(*tmps_used))
-							} else {
-								Instruction::LSL(Addressing::SP(*tmps_used))
-							};
+						let inst = if matches!(
+							statement,
+							StatementElementStructless::RShift { lhs: _, rhs: _ }
+						) {
+							Instruction::LSR(Addressing::SP(*tmps_used))
+						} else {
+							Instruction::LSL(Addressing::SP(*tmps_used))
+						};
 						let mut shift_loop = vec![
 							(Instruction::Label(start_str.clone()), None),
 							(Instruction::TSTA, None),
@@ -748,7 +752,7 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
-		StatementElement::FunctionCall { name, parametres } => {
+		StatementElementStructless::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
 			let arg_names = state.functions.get(name).ok_or_else(|| {
 				dbg!(name);
@@ -779,7 +783,7 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
-		StatementElement::Var(name) => {
+		StatementElementStructless::Var(name) => {
 			let adr = adr_for_name(
 				name,
 				state.variables,
@@ -789,26 +793,29 @@ fn compile_statement_inner<'a>(
 			vec![(Instruction::LDA(adr), Some(Cow::Borrowed(name.as_ref())))]
 		}
 
-		StatementElement::Num(n) => {
+		StatementElementStructless::Num(n) => {
 			vec![(Instruction::LDA(Addressing::Data(*n)), None)]
 		}
 
-		StatementElement::Char(c) => {
+		StatementElementStructless::Char(c) => {
 			vec![(Instruction::LDA(Addressing::Data(*c as isize)), None)]
 		}
 
-		StatementElement::Bool(b) => {
+		StatementElementStructless::Bool(b) => {
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
 
-		StatementElement::Array(_) => return Err(CompileError(line!(), "Illegal array")),
+		StatementElementStructless::Array(_) => return Err(CompileError(line!(), "Illegal array")),
 
-		StatementElement::Deref(adr) => {
+		StatementElementStructless::Deref(adr) => {
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
-					&StatementElement::Add { lhs: _, rhs: _ },
-					Some((StatementElement::Var(name), &StatementElement::Num(offset))),
+					&StatementElementStructless::Add { lhs: _, rhs: _ },
+					Some((
+						StatementElementStructless::Var(name),
+						&StatementElementStructless::Num(offset),
+					)),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -823,8 +830,8 @@ fn compile_statement_inner<'a>(
 				}
 				//General opt
 				(
-					&StatementElement::Add { lhs: _, rhs: _ },
-					Some((StatementElement::Var(name), rhs)),
+					&StatementElementStructless::Add { lhs: _, rhs: _ },
+					Some((StatementElementStructless::Var(name), rhs)),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -856,7 +863,7 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElement::AdrOf(name) => {
+		StatementElementStructless::AdrOf(name) => {
 			//use adr_for_name and calculate the address -> A
 			let adr = adr_for_name(
 				name,
@@ -890,13 +897,11 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElement::Not { lhs } => {
+		StatementElementStructless::Not { lhs } => {
 			let mut instructions = compile_statement_inner(lhs, state, tmps_used)?;
 			instructions.push((Instruction::COMA, None));
 			instructions
 		}
-
-		_ => todo!(),
 	};
 	Ok(instructions)
 }

@@ -147,7 +147,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//If else if
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
-				let condition_parsed = StatementElement::from_str(cond)?;
+				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
 				let else_if_tokens = &tokens[4..];
 				let else_if_parsed = construct_structure_from_tokens(else_if_tokens, move_first)?;
@@ -161,7 +161,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			//If else
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] =>
 			{
-				let condition_parsed = StatementElement::from_str(cond)?;
+				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
 				let else_parsed = parse(else_code, move_first)?;
 				LanguageElement::IfStatement {
@@ -173,7 +173,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//If
 			[If, UnparsedParentheses(cond), UnparsedBlock(code)] => {
-				let condition_parsed = StatementElement::from_str(cond)?;
+				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
@@ -193,7 +193,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 
 				//let condition_tokens = Token::parse_str_to_vec(split[1])?;
-				let condition = StatementElement::from_str(split[1])?;
+				let condition = StatementElement::from_source_str(split[1])?;
 
 				let init = parse(split[0], move_first)?;
 				let post = parse(split[2], move_first)?;
@@ -209,7 +209,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			//While
 			[While, UnparsedParentheses(cond), UnparsedBlock(code)] => {
-				let condition_parsed = StatementElement::from_str(cond)?;
+				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let body_parsed = parse(code, move_first)?;
 				LanguageElement::While {
 					condition: condition_parsed,
@@ -416,7 +416,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub fn type_check(
-	block: &[LanguageElementStructless],
+	block: &[LanguageElement],
 	upper_variables: &[Variable],
 	outer_functions: &[Function],
 ) -> Result<bool, ParseError> {
@@ -425,29 +425,29 @@ pub fn type_check(
 
 	for line in block {
 		match line {
-			LanguageElementStructless::VariableDeclaration {
+			LanguageElement::VariableDeclaration {
 				typ,
 				name,
 				is_static: _,
 			} => variables.push(Variable {
-				typ: typ.into(),
+				typ: typ.clone(),
 				name: name.as_ref(),
 			}),
 
-			LanguageElementStructless::VariableAssignment { name: _, value } => {
+			LanguageElement::VariableAssignment { name: _, value } => {
 				if !value.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
 
-			LanguageElementStructless::VariableDeclarationAssignment {
+			LanguageElement::VariableDeclarationAssignment {
 				typ,
 				name,
 				value,
 				is_static: _,
 			} => {
 				variables.push(Variable {
-					typ: typ.into(),
+					typ: typ.clone(),
 					name: name.as_ref(),
 				});
 				if !value.type_check(&variables, &functions)? {
@@ -455,7 +455,7 @@ pub fn type_check(
 				}
 			}
 
-			LanguageElementStructless::PointerAssignment { ptr, value } => {
+			LanguageElement::PointerAssignment { ptr, value } => {
 				if !ptr.type_check(&variables, &functions)?
 					|| !value.type_check(&variables, &functions)?
 				{
@@ -463,22 +463,16 @@ pub fn type_check(
 				}
 			}
 
-			LanguageElementStructless::FunctionDeclaration {
+			LanguageElement::FunctionDeclaration {
 				typ,
 				name,
 				args,
 				block,
 			} => {
 				functions.push(Function {
-					return_type: typ.clone(),
+					return_type: typ.into(),
 					name: name.as_ref(),
-					parametres: args
-						.iter()
-						.map(|NativeVariable { typ, name }| Variable {
-							typ: typ.into(),
-							name,
-						})
-						.collect(),
+					parametres: args.to_vec(),
 				});
 
 				if !type_check(block, &variables, &functions)? {
@@ -486,7 +480,7 @@ pub fn type_check(
 				}
 			}
 
-			LanguageElementStructless::IfStatement {
+			LanguageElement::IfStatement {
 				condition,
 				then,
 				else_then,
@@ -502,7 +496,7 @@ pub fn type_check(
 				}
 			}
 
-			LanguageElementStructless::For {
+			LanguageElement::For {
 				init,
 				condition,
 				post,
@@ -517,7 +511,7 @@ pub fn type_check(
 				}
 			}
 
-			LanguageElementStructless::While { condition, body } => {
+			LanguageElement::While { condition, body } => {
 				if !condition.type_check(&variables, &functions)?
 					|| !type_check(body, &variables, &functions)?
 				{
@@ -526,18 +520,23 @@ pub fn type_check(
 			}
 
 			//Is handled by function def instead
-			LanguageElementStructless::Return(_) => {}
+			LanguageElement::Return(_) => {}
 
-			LanguageElementStructless::Statement(statement) => {
+			LanguageElement::Statement(statement) => {
 				if !statement.type_check(&variables, &functions)? {
 					return Ok(false);
 				}
 			}
 
-			LanguageElementStructless::StructDeclaration {
-				name: _,
-				is_static: _,
-			} => {}
+			LanguageElement::StructAssignment { name, value } => todo!(),
+			LanguageElement::StructDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+			} => todo!(),
+			LanguageElement::StructFieldPointerAssignment { name, field, value } => todo!(),
+			LanguageElement::StructDefinition { name, members } => todo!(),
 		}
 	}
 

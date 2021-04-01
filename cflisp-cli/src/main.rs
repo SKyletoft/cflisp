@@ -5,8 +5,8 @@ use std::{
 };
 
 use cflisp_lib::{
-	compile_flisp, flags::Flags, language_element::LanguageElementStructless, optimise_flisp,
-	parser, text,
+	compile_flisp, flags::Flags, optimise_flisp, parser, structless::LanguageElementStructless,
+	text,
 };
 
 const PATH: &str = "PATH";
@@ -46,6 +46,16 @@ fn main() {
 	if flags.tree {
 		dbg!(&parsed);
 	}
+	if flags.type_check {
+		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|e| {
+			eprintln!("Name error ({})", e);
+			process::exit(-1);
+		});
+		if !ok {
+			eprintln!("Error: type check or name resolution error");
+			process::exit(-1);
+		}
+	}
 	let struct_filtered =
 		LanguageElementStructless::from_language_elements(parsed).unwrap_or_else(|e| {
 			eprintln!("Parse Error ({})", e);
@@ -56,16 +66,6 @@ fn main() {
 			eprintln!();
 		}
 		dbg!(&struct_filtered);
-	}
-	if flags.type_check {
-		let ok = parser::type_check(&struct_filtered, &[], &[]).unwrap_or_else(|e| {
-			eprintln!("Name error ({})", e);
-			process::exit(-1);
-		});
-		if !ok {
-			eprintln!("Error: type check or name resolution error");
-			process::exit(-1);
-		}
 	}
 	let mut instr = compile_flisp::compile(&struct_filtered, &flags).unwrap_or_else(|e| {
 		eprintln!("Compilation error ({})", e);

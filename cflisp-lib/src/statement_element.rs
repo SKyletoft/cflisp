@@ -234,7 +234,8 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	pub fn from_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
+	//Cannot be implemented as the FromStr trait as that trait doesn't allow a lifetime on the string
+	pub fn from_source_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
 		let tokens = Token::parse_statement_tokens(s)?;
 		StatementElement::from_statement_tokens(tokens)
 	}

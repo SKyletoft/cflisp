@@ -1,3 +1,5 @@
+//Clippy is broken. These are not unused imports. 1/4-21
+#![allow(unused_imports)]
 use super::super::*;
 use std::borrow::Cow;
 

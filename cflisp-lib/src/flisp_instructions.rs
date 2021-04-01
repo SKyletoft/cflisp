@@ -1,7 +1,5 @@
 use std::{borrow::Cow, fmt};
 
-use crate::*;
-
 // Replace Cow<'a, str> with a Cow<String>?
 ///`(Instruction, Option<Cow<'a, str>>)`
 ///
