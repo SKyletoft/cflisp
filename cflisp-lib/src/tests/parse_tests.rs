@@ -19,6 +19,49 @@ fn init_native_variables() {
 }
 
 */
+
+//This test only makes sure that it doesn't crash, not that the output is correct
+#[test]
+fn legacy_dont_crash() {
+	let run = |file| {
+		let flags = Flags::default();
+		let no_comments = parser::remove_comments(file);
+		let parsed = parser::parse(&no_comments, false).unwrap();
+		let no_structs = LanguageElementStructless::from_language_elements(parsed).unwrap();
+		let asm = compile_flisp::compile(&no_structs, &flags).unwrap();
+		let text = text::instructions_to_text(&asm, &flags).unwrap();
+		assert!(!text.is_empty());
+	};
+	let files = [
+		include_str!("../../../cflisp-cli/legacy_tests/test1.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test2.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test4.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test5.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test7.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test8.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test9.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test10.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test11.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test12.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test13.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test15.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test16.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test17.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test18.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test19.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test20.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test21.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test22.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test24.c"),
+		include_str!("../../../cflisp-cli/legacy_tests/test27.c"),
+	];
+
+	for file in files.iter() {
+		eprintln!("{}", file);
+		run(file);
+	}
+}
+
 #[test]
 fn create_main() {
 	let source = include_str!("create_main.c");

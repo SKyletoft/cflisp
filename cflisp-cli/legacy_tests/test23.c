@@ -1,3 +1,5 @@
+// Expected failure
+
 static int foo = 54;
 
 int main() {
