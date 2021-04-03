@@ -4,9 +4,7 @@ use std::{cmp::Ordering, collections::HashSet};
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
-pub fn all_optimisations(
-	instructions: &mut Vec<CommentedInstruction>,
-) -> Result<(), CompileError> {
+pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
 	remove_post_early_return_code(instructions);
 	load_xy(instructions);
 	repeat_xy(instructions);
