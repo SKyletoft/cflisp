@@ -64,4 +64,15 @@ fn const_eval() {
 	let expected_2 = StatementElementStructless::Num(0);
 	optimise_statement::const_eval(&mut case_2);
 	assert_eq!(case_2, expected_2);
+
+	let mut case_3 = StatementElementStructless::Mul {
+		lhs: Box::new(StatementElementStructless::Add {
+			lhs: Box::new(StatementElementStructless::Num(5)),
+			rhs: Box::new(StatementElementStructless::Num(3)),
+		}),
+		rhs: Box::new(StatementElementStructless::Num(2)),
+	};
+	let expected_3 = StatementElementStructless::Num((5 + 3) * 2);
+	optimise_statement::const_eval(&mut case_3);
+	assert_eq!(case_3, expected_3);
 }

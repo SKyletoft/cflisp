@@ -9,15 +9,15 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	load_xy(instructions);
 	repeat_xy(instructions);
 	repeat_load(instructions);
+	cmp_eq_jmp(instructions);
+	cmp_neq_jmp(instructions);
+	cmp_gt_jmp(instructions);
+	cmp_gte_jmp(instructions);
 	load_a(instructions);
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
 	reduce_reserves(instructions)?;
 	nop(instructions); //Should go AFTER reduce reserves
-	cmp_eq_jmp(instructions);
-	cmp_neq_jmp(instructions);
-	cmp_gt_jmp(instructions);
-	cmp_gte_jmp(instructions);
 	inc(instructions);
 	inca(instructions);
 	dec(instructions);
