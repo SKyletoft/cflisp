@@ -61,17 +61,17 @@ fn main() {
 			eprintln!("Parse Error ({})", e);
 			process::exit(-1);
 		});
-	if flags.tree_structless {
-		if flags.tree {
-			eprintln!();
-		}
-		dbg!(&struct_filtered);
-	}
 	if flags.optimise >= 2 {
 		optimise_language::all_optimisations(&mut struct_filtered).unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);
 			process::exit(-1);
 		});
+	}
+	if flags.tree_structless {
+		if flags.tree {
+			eprintln!();
+		}
+		dbg!(&struct_filtered);
 	}
 	let mut instr = compile_flisp::compile(&struct_filtered, &flags).unwrap_or_else(|e| {
 		eprintln!("Compilation error ({})", e);

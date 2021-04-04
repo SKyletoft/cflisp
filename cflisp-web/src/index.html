@@ -10,14 +10,14 @@
 
 <body>
 	<center>
-		<textarea id="source" class="text_editor"></textarea>
-		<textarea id="result" class="text_editor"></textarea>
+		<textarea id="source" class="text_editor" autofocus></textarea>
+		<textarea id="result" class="text_editor" readonly></textarea>
 		<br>
 		<label>Optimisation: </label><input type="number" min="0" max="2" id="opt" value="1" /><br>
 		<label>Type checking: </label><input type="checkbox" id="type_check"><br>
-		<label>Debug info: </label><input type="checkbox" id="debug" checked="true"><br>
-		<label>Hex: </label><input type="checkbox" id="hex" checked="true"><br>
-		<label>Comments: </label><input type="checkbox" id="comments" checked="true"><br>
+		<label>Debug info: </label><input type="checkbox" id="debug" checked><br>
+		<label>Hex: </label><input type="checkbox" id="hex" checked><br>
+		<label>Comments: </label><input type="checkbox" id="comments" checked><br>
 		<label>Imports: </label><input type="checkbox" id="imports"><br>
 		<button id="run_btn">Compile!</button>
 	</center>
