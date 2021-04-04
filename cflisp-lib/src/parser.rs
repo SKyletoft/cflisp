@@ -44,58 +44,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	//Todo patterns might be invalidated by the pointer versions
 	let element = {
 		match tokens {
-			//Function declaration
-			[Decl(t), Token::Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
-				todo!("Investigate if this is still a valid code path");
-				let args_parsed = Token::parse_argument_list_tokens(args)?;
-				let code_tokenised = Token::parse_block_tokens(code)?;
-				let code_parsed = construct_block(&code_tokenised, move_first)?;
-				LanguageElement::FunctionDeclaration {
-					typ: t.into(),
-					name: Cow::Borrowed(n),
-					args: args_parsed,
-					block: code_parsed,
-				}
-			}
-
-			//Variable declaration
-			[Decl(t), Token::Name(n), Assign, ..] => {
-				todo!("Investigate if this is still a valid code path");
-				let rhs = StatementElement::from_tokens(&tokens[3..])?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ: t.into(),
-					name: Cow::Borrowed(n),
-					value: rhs,
-					is_static: false,
-				}
-			}
-
-			//Static variable declaration
-			[Static, Decl(t), Token::Name(n), Assign, ..] => {
-				todo!("Investigate if this is still a valid code path");
-				let rhs = StatementElement::from_tokens(&tokens[4..])?;
-				LanguageElement::VariableDeclarationAssignment {
-					typ: t.into(),
-					name: Cow::Borrowed(n),
-					value: rhs,
-					is_static: true,
-				}
-			}
-
-			//Struct assignment
-			[Token::Name(n), Assign, UnparsedBlock(members)] => {
-				todo!("Investigate if this is still a valid code path");
-				let field_tokens = Token::parse_arguments_tokens(members)?;
-				let fields = field_tokens
-					.into_iter()
-					.map(StatementElement::from_statement_tokens)
-					.collect::<Result<Vec<_>, _>>()?;
-				LanguageElement::StructAssignment {
-					name: Cow::Borrowed(n),
-					value: fields,
-				}
-			}
-
 			//Struct member assignment
 			[Token::Name(n), FieldAccess, Token::Name(field), Assign, ..] => {
 				let name = n.to_string().add("::").add(field);
@@ -122,26 +70,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				LanguageElement::VariableAssignment {
 					name: Cow::Borrowed(n),
 					value: rhs,
-				}
-			}
-
-			//Variable declaration (without init)
-			[Decl(t), Token::Name(n)] => {
-				todo!("Investigate if this is still a valid code path");
-				LanguageElement::VariableDeclaration {
-					typ: t.into(),
-					name: Cow::Borrowed(n),
-					is_static: false,
-				}
-			}
-
-			//Static variable declaration (without init)
-			[Static, Decl(t), Token::Name(n)] => {
-				todo!("Investigate if this is still a valid code path");
-				LanguageElement::VariableDeclaration {
-					typ: t.into(),
-					name: Cow::Borrowed(n),
-					is_static: true,
 				}
 			}
 
