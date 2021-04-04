@@ -6,7 +6,7 @@ use std::{
 
 use cflisp_lib::{
 	compile_flisp, flags::Flags, optimise_flisp, optimise_language, parser,
-	structless::LanguageElementStructless, text,
+	structless::LanguageElementStructless, text, type_checker,
 };
 
 const PATH: &str = "PATH";
@@ -47,7 +47,7 @@ fn main() {
 		dbg!(&parsed);
 	}
 	if flags.type_check {
-		let ok = parser::type_check(&parsed, &[], &[]).unwrap_or_else(|e| {
+		let ok = type_checker::language_element(&parsed, &[], &[]).unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);
 			process::exit(-1);
 		});
