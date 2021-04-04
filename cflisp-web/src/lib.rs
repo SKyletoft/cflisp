@@ -6,7 +6,12 @@ use cflisp_lib::{
 };
 
 #[wasm_bindgen]
-pub fn run(
+pub fn add(a: i32, b: i32) -> i32 {
+	a + b
+}
+
+#[wasm_bindgen]
+pub fn run_cc(
 	source: &str,
 	optimise: u8,
 	type_check: bool,
@@ -68,6 +73,9 @@ fn compile_to_text(
 	let mut text = text::instructions_to_text(&inst, &flags).map_err(|err| format!("{:?}", err))?;
 	if show_imports {
 		text::automatic_imports(&mut text, debug);
+	}
+	if flags.debug {
+		text.insert_str(0, "\tORG\t$20\n");
 	}
 	Ok(text)
 }
