@@ -148,7 +148,7 @@ fn get_array_access(s: &str) -> Option<(Token, &str)> {
 	Some((token, rest))
 }
 
-///Gets char in apostrophes. returns None on unmatched apostrophes. Todo-panics on escape sequences
+///Gets char in apostrophes. returns None on unmatched apostrophes
 fn get_char(s: &str) -> Option<(Token, &str)> {
 	if s.len() < 3 {
 		return None;
@@ -157,7 +157,25 @@ fn get_char(s: &str) -> Option<(Token, &str)> {
 		return Some((Token::Char(c as char), &s[3..]));
 	}
 	if let Some(&[b'\'', b'\\', c, b'\'']) = s.as_bytes().get(0..4) {
-		todo!("Escape sequences are not yet supported") //Update docs above
+		//from: https://en.wikipedia.org/wiki/Escape_sequences_in_C
+		let res = match c {
+			b'a' => 0x07 as char,
+			b'b' => 0x08 as char,
+			b'e' => 0x1B as char,
+			b'f' => 0x0C as char,
+			b'n' => 0x0A as char,
+			b'r' => 0x0D as char,
+			b't' => 0x09 as char,
+			b'v' => 0x0B as char,
+			b'\\' => 0x5C as char,
+			b'\'' => 0x27 as char,
+			b'"' => 0x22 as char,
+			b'?' => 0x3F as char,
+			_ => {
+				return None;
+			}
+		};
+		return Some((Token::Char(res), &s[4..]));
 	}
 	None
 }
