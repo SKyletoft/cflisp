@@ -188,6 +188,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	Ok(element)
 }
 
+//Non pointer types are also handled here ~~by accident~~ and are treated as 0-deep pointers. Whoops
 ///Tries to construct pointer variables, pointer structs or pointer assignments
 fn construct_structure_with_pointers_from_tokens<'a>(
 	tokens: &[Token<'a>],

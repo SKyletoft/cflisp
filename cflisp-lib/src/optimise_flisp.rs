@@ -110,7 +110,7 @@ pub fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-//Removes repeat loads to A if the value in A wasn't used
+///Removes repeat loads to A if the value in A wasn't used
 fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 	let mut last_load = usize::MAX;
 	let mut idx = 0;
@@ -142,7 +142,7 @@ fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-//Removes repeat loads to X/Y if the value in X/Y wasn't used
+///Removes repeat loads to X/Y if the value in X/Y wasn't used
 fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut last_x = isize::MIN;
 	let mut last_y = isize::MIN;
@@ -208,7 +208,7 @@ fn repeat_xy(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-//Removes instructions that are equivalent with a NOP
+///Removes instructions that are equivalent with a NOP
 fn nop(instructions: &mut Vec<CommentedInstruction>) {
 	instructions.retain(|(i, _)| {
 		!matches!(
@@ -222,9 +222,11 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 	});
 }
 
+///Simpifies some sequences of loading to A
 fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+		//Load to A the address of A
 		if let (
 			(Instruction::STA(Addressing::SP(-1)), _),
 			(Instruction::LDX(Addressing::SP(-1)), _),
@@ -238,11 +240,13 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 			instructions[idx + 2].0 = Instruction::LDA(Addressing::AX); //To keep the existing comment on the third instruction
 			instructions.remove(idx + 1);
 		}
+		//Remove immediate load from pushed value
 		if let ((Instruction::PSHA, _), (Instruction::LDA(Addressing::SP(0)), _)) =
 			(&instructions[idx], &instructions[idx + 1])
 		{
 			instructions.remove(idx + 1);
 		}
+		//Remove some unused loads
 		if let ((Instruction::LDA(_), _), (Instruction::LDA(adr), _)) =
 			(&instructions[idx], &instructions[idx + 1])
 		{

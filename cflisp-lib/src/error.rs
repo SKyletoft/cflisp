@@ -1,6 +1,6 @@
 use std::{error, fmt};
 
-///Error type for parsing and type checking
+///Error type for parsing, type checking and IR optimisation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ParseError(pub u32, pub &'static str);
 

@@ -6,6 +6,7 @@ pub fn remove_parentheses(s: &str) -> &str {
 	s[1..s.len() - 1].trim()
 }
 
+///Gets a hex number from the source and returns the remaining source and a number token. Unsigned only
 fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 	if s.starts_with("0x") && s.as_bytes().get(2).map(|d| d.is_ascii_hexdigit()) == Some(true) {
 		let mut len = 2;
@@ -23,6 +24,8 @@ fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 	}
 }
 
+//Get rid of and rely on optimisation and negate operation?
+///Gets a hex number from the source and returns the remaining source and a number token. Negative only
 fn get_negative_number(s: &str) -> Option<(Token, &str)> {
 	if s.starts_with('-') && s.as_bytes().get(1).map(|d| d.is_ascii_digit()) == Some(true) {
 		let mut len = 1;
@@ -40,6 +43,7 @@ fn get_negative_number(s: &str) -> Option<(Token, &str)> {
 	}
 }
 
+///Gets a hex number from the source and returns the remaining source and a number token. Unsigned only
 fn get_positive_number(s: &str) -> Option<(Token, &str)> {
 	if s.as_bytes().get(0).map(|d| d.is_ascii_digit()) == Some(true) {
 		let mut len = 0;
@@ -56,12 +60,15 @@ fn get_positive_number(s: &str) -> Option<(Token, &str)> {
 	}
 }
 
+///Wrapper around get_hex_number, get_negative_number and get_positive_number
 fn get_number(s: &str) -> Option<(Token, &str)> {
 	None.or_else(|| get_hex_number(s))
 		.or_else(|| get_negative_number(s))
 		.or_else(|| get_positive_number(s))
 }
 
+///Gets a complete statement in parenthesis. Returns None on unmatched parentheses.
+/// The parentheses are not in the string in the UnparsedParentheses token
 fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
 	if !s.starts_with('(') {
 		return None;
@@ -79,11 +86,16 @@ fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
 			break;
 		}
 	}
+	if parentheses != 0 {
+		return None;
+	}
 	let token = Token::UnparsedParentheses(&s[1..len - 1]);
 	let rest = &s[len..];
 	Some((token, rest))
 }
 
+///Gets a complete statement in curly brackets. Returns None on unmatched brackets.
+/// The brackets are not in the string in the UnparsedBlock token
 fn get_block(s: &str) -> Option<(Token, &str)> {
 	if !s.starts_with('{') {
 		return None;
@@ -101,11 +113,16 @@ fn get_block(s: &str) -> Option<(Token, &str)> {
 			break;
 		}
 	}
+	if parentheses != 0 {
+		return None;
+	}
 	let token = Token::UnparsedBlock(&s[1..len - 1]);
 	let rest = &s[len..];
 	Some((token, rest))
 }
 
+///Gets a complete statement in square brackets. Returns None on unmatched brackets.
+/// The brackets are not in the string in the UnparsedArrayAccess token
 fn get_array_access(s: &str) -> Option<(Token, &str)> {
 	if !s.starts_with('[') {
 		return None;
@@ -123,17 +140,24 @@ fn get_array_access(s: &str) -> Option<(Token, &str)> {
 			break;
 		}
 	}
+	if parentheses != 0 {
+		return None;
+	}
 	let token = Token::UnparsedArrayAccess(&s[1..len - 1]);
 	let rest = &s[len..];
 	Some((token, rest))
 }
 
+///Gets char in apostrophes. returns None on unmatched apostrophes. Todo-panics on escape sequences
 fn get_char(s: &str) -> Option<(Token, &str)> {
 	if s.len() < 3 {
 		return None;
 	}
 	if let Some(&[b'\'', c, b'\'']) = s.as_bytes().get(0..3) {
 		return Some((Token::Char(c as char), &s[3..]));
+	}
+	if let Some(&[b'\'', b'\\', c, b'\'']) = s.as_bytes().get(0..4) {
+		todo!("Escape sequences are not yet supported") //Update docs above
 	}
 	None
 }
@@ -154,6 +178,7 @@ fn get_name(s: &str) -> Option<(Token, &str)> {
 	Some((token, rest))
 }
 
+///Matches against a single pattern in the list of keywords and its potential followed whitespace
 fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 	PATTERNS
 		.iter()

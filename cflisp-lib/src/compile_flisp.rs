@@ -68,6 +68,8 @@ fn compile_elements<'a>(
 	Ok(instructions)
 }
 
+//Any error returned from here is an internal error or a naming issue that should've already been caught
+// by the (potentially disabled) type checker
 fn compile_element<'a>(
 	element: &'a LanguageElementStructless,
 	state: &mut State<'a, '_, '_, '_, '_, '_>,
@@ -921,7 +923,7 @@ fn adr_for_name<'a>(
 		eprintln!("Error: {}", name);
 		Err(CompileError(
 			line!(),
-			"Name resolution failed? Shouldn't be checked by now?",
+			"Name resolution failed? Shouldn't that have be checked by now?",
 		))
 	}
 }
