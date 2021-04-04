@@ -5,8 +5,8 @@ use std::{
 };
 
 use cflisp_lib::{
-	compile_flisp, flags::Flags, optimise_flisp, parser, structless::LanguageElementStructless,
-	text,
+	compile_flisp, flags::Flags, optimise_flisp, optimise_language, parser,
+	structless::LanguageElementStructless, text,
 };
 
 const PATH: &str = "PATH";
@@ -56,8 +56,8 @@ fn main() {
 			process::exit(-1);
 		}
 	}
-	let struct_filtered =
-		LanguageElementStructless::from_language_elements(parsed).unwrap_or_else(|e| {
+	let mut struct_filtered = LanguageElementStructless::from_language_elements(parsed)
+		.unwrap_or_else(|e| {
 			eprintln!("Parse Error ({})", e);
 			process::exit(-1);
 		});
@@ -66,6 +66,12 @@ fn main() {
 			eprintln!();
 		}
 		dbg!(&struct_filtered);
+	}
+	if flags.optimise >= 2 {
+		optimise_language::all_optimisations(&mut struct_filtered).unwrap_or_else(|e| {
+			eprintln!("Name error ({})", e);
+			process::exit(-1);
+		});
 	}
 	let mut instr = compile_flisp::compile(&struct_filtered, &flags).unwrap_or_else(|e| {
 		eprintln!("Compilation error ({})", e);

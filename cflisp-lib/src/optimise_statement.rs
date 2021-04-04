@@ -1,31 +1,29 @@
 use crate::*;
 
-pub fn all_optimisations(elements: &mut Vec<StatementElement>) -> Result<(), ParseError> {
-	elements.iter_mut().for_each(fast_mul);
-	for element in elements.iter_mut() {
-		const_eval(element);
-	}
+pub fn all_optimisations(element: &mut StatementElementStructless) -> Result<(), ParseError> {
+	fast_mul(element);
+	const_eval(element);
 	Ok(())
 }
 
-pub(crate) fn fast_mul(elem: &mut StatementElement) {
-	if let StatementElement::Mul { lhs, rhs } = elem {
+pub(crate) fn fast_mul(elem: &mut StatementElementStructless) {
+	if let StatementElementStructless::Mul { lhs, rhs } = elem {
 		match (lhs.as_ref(), rhs.as_ref()) {
-			(StatementElement::Num(a), StatementElement::Num(b)) => {
-				*elem = StatementElement::Num(*a * *b);
+			(StatementElementStructless::Num(a), StatementElementStructless::Num(b)) => {
+				*elem = StatementElementStructless::Num(*a * *b);
 			}
-			(StatementElement::Num(a), b) | (b, StatementElement::Num(a)) => {
+			(StatementElementStructless::Num(a), b) | (b, StatementElementStructless::Num(a)) => {
 				let a = *a as usize;
 				let mut inner = b.clone();
 				let compiler_word_size = std::usize::MAX.count_ones();
 				for bit in 1..compiler_word_size {
 					let set_bit = 1 << bit;
 					if a & set_bit == set_bit {
-						inner = StatementElement::Add {
+						inner = StatementElementStructless::Add {
 							lhs: Box::new(inner),
-							rhs: Box::new(StatementElement::LShift {
+							rhs: Box::new(StatementElementStructless::LShift {
 								lhs: Box::new(b.clone()),
-								rhs: Box::new(StatementElement::Num(bit as isize)),
+								rhs: Box::new(StatementElementStructless::Num(bit as isize)),
 							}),
 						};
 					}
@@ -37,24 +35,34 @@ pub(crate) fn fast_mul(elem: &mut StatementElement) {
 	}
 }
 
-pub(crate) fn const_eval<'a>(elem: &mut StatementElement<'a>) -> Option<StatementElement<'a>> {
-	let maybe_get_nums = |lhs: &mut Box<StatementElement<'a>>,
-	                      rhs: &mut Box<StatementElement<'a>>|
+pub(crate) fn const_eval<'a>(
+	elem: &mut StatementElementStructless<'a>,
+) -> Option<StatementElementStructless<'a>> {
+	let maybe_get_nums = |lhs: &mut Box<StatementElementStructless<'a>>,
+	                      rhs: &mut Box<StatementElementStructless<'a>>|
 	 -> Option<(isize, isize)> {
 		let lhs = const_eval(lhs.as_mut());
 		let rhs = const_eval(rhs.as_mut());
-		if let (Some(StatementElement::Num(a)), Some(StatementElement::Num(b))) = (lhs, rhs) {
+		if let (
+			Some(StatementElementStructless::Num(a)),
+			Some(StatementElementStructless::Num(b)),
+		) = (lhs, rhs)
+		{
 			Some((a, b))
 		} else {
 			None
 		}
 	};
-	let maybe_get_bools = |lhs: &mut Box<StatementElement<'a>>,
-	                       rhs: &mut Box<StatementElement<'a>>|
+	let maybe_get_bools = |lhs: &mut Box<StatementElementStructless<'a>>,
+	                       rhs: &mut Box<StatementElementStructless<'a>>|
 	 -> Option<(bool, bool)> {
 		let lhs = const_eval(lhs.as_mut());
 		let rhs = const_eval(rhs.as_mut());
-		if let (Some(StatementElement::Bool(a)), Some(StatementElement::Bool(b))) = (lhs, rhs) {
+		if let (
+			Some(StatementElementStructless::Bool(a)),
+			Some(StatementElementStructless::Bool(b)),
+		) = (lhs, rhs)
+		{
 			Some((a, b))
 		} else {
 			None
@@ -62,71 +70,80 @@ pub(crate) fn const_eval<'a>(elem: &mut StatementElement<'a>) -> Option<Statemen
 	};
 
 	let this = match elem {
-		StatementElement::Add { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a + b))
+		StatementElementStructless::Add { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a + b))
 		}
-		StatementElement::Sub { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a - b))
+		StatementElementStructless::Sub { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a - b))
 		}
-		StatementElement::Mul { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a * b))
+		StatementElementStructless::Mul { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a * b))
 		}
-		StatementElement::Div { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a / b))
+		StatementElementStructless::Div { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a / b))
 		}
-		StatementElement::Mod { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a % b))
+		StatementElementStructless::Mod { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a % b))
 		}
-		StatementElement::LShift { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a << b))
+		StatementElementStructless::LShift { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a << b))
 		}
-		StatementElement::RShift { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Num(a >> b))
+		StatementElementStructless::RShift { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Num(a >> b))
 		}
-		StatementElement::GreaterThan { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Bool(a > b))
+		StatementElementStructless::GreaterThan { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a > b))
 		}
-		StatementElement::LessThan { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Bool(a < b))
+		StatementElementStructless::LessThan { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a < b))
 		}
-		StatementElement::GreaterThanEqual { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Bool(a >= b))
+		StatementElementStructless::GreaterThanEqual { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a >= b))
 		}
-		StatementElement::LessThanEqual { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElement::Bool(a <= b))
+		StatementElementStructless::LessThanEqual { lhs, rhs } => {
+			maybe_get_nums(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a <= b))
 		}
-		StatementElement::And { lhs, rhs } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StatementElement::Num(a & b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElement::Bool(a && b))),
-		StatementElement::Or { lhs, rhs } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StatementElement::Num(a | b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElement::Bool(a || b))),
-		StatementElement::Cmp { lhs, rhs } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StatementElement::Bool(a == b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElement::Bool(a == b))),
-		StatementElement::NotCmp { lhs, rhs } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StatementElement::Bool(a != b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElement::Bool(a != b))),
-		StatementElement::Xor { lhs, rhs } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StatementElement::Num(a ^ b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElement::Bool(a ^ b))),
-		StatementElement::Not { lhs } => match const_eval(lhs.as_mut()) {
-			Some(StatementElement::Num(a)) => Some(StatementElement::Num(!a)),
-			Some(StatementElement::Bool(a)) => Some(StatementElement::Bool(!a)),
+		StatementElementStructless::And { lhs, rhs } => maybe_get_nums(lhs, rhs)
+			.map(|(a, b)| StatementElementStructless::Num(a & b))
+			.or_else(|| {
+				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a && b))
+			}),
+		StatementElementStructless::Or { lhs, rhs } => maybe_get_nums(lhs, rhs)
+			.map(|(a, b)| StatementElementStructless::Num(a | b))
+			.or_else(|| {
+				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a || b))
+			}),
+		StatementElementStructless::Cmp { lhs, rhs } => maybe_get_nums(lhs, rhs)
+			.map(|(a, b)| StatementElementStructless::Bool(a == b))
+			.or_else(|| {
+				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a == b))
+			}),
+		StatementElementStructless::NotCmp { lhs, rhs } => maybe_get_nums(lhs, rhs)
+			.map(|(a, b)| StatementElementStructless::Bool(a != b))
+			.or_else(|| {
+				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a != b))
+			}),
+		StatementElementStructless::Xor { lhs, rhs } => maybe_get_nums(lhs, rhs)
+			.map(|(a, b)| StatementElementStructless::Num(a ^ b))
+			.or_else(|| {
+				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a ^ b))
+			}),
+		StatementElementStructless::Not { lhs } => match const_eval(lhs.as_mut()) {
+			Some(StatementElementStructless::Num(a)) => Some(StatementElementStructless::Num(!a)),
+			Some(StatementElementStructless::Bool(a)) => Some(StatementElementStructless::Bool(!a)),
 			_ => None,
 		},
 		// ^ todo! Implement these when they've been split into bit and bool versions
-		StatementElement::FunctionCall { .. }
-		| StatementElement::Var(_)
-		| StatementElement::Char(_)
-		| StatementElement::Array(_)
-		| StatementElement::Deref(_)
-		| StatementElement::AdrOf(_)
-		| StatementElement::FieldPointerAccess(_, _) => {
+		StatementElementStructless::FunctionCall { .. }
+		| StatementElementStructless::Var(_)
+		| StatementElementStructless::Char(_)
+		| StatementElementStructless::Array(_)
+		| StatementElementStructless::Deref(_)
+		| StatementElementStructless::AdrOf(_) => {
 			return None;
 		}
 
-		StatementElement::Num(_) | StatementElement::Bool(_) => {
+		StatementElementStructless::Num(_) | StatementElementStructless::Bool(_) => {
 			return Some(elem.clone());
 		}
 	};

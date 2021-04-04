@@ -39,7 +39,7 @@ pub fn compile<'a>(
 			line_id: 0,
 		},
 		0,
-		flags.optimise,
+		flags.optimise >= 1,
 	)
 }
 

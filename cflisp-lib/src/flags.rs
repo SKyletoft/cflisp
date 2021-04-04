@@ -12,7 +12,7 @@ pub struct Flags {
 	pub assemble: bool,
 	pub out: String,
 	pub debug: bool,
-	pub optimise: bool,
+	pub optimise: u8,
 	pub inline: bool,
 }
 
@@ -27,7 +27,7 @@ impl Default for Flags {
 			print_result: false,
 			assemble: false,
 			debug: false,
-			optimise: false,
+			optimise: 0,
 			inline: false,
 			out: "out.sflisp".to_string(),
 		}
@@ -72,15 +72,18 @@ impl<'a> FromIterator<&'a String> for Flags {
 				if arg.contains('g') {
 					flags.debug = true;
 				}
-				if arg.contains('O') {
-					flags.optimise = true;
-				}
 				if arg.contains('i') {
 					flags.inline = true;
 				}
 			}
 			if arg == "-o" {
 				is_name = true;
+			}
+			if arg == "-O" || arg == "-O2" {
+				flags.optimise = 2;
+			}
+			if arg == "-O1" {
+				flags.optimise = 1;
 			}
 		}
 		flags
