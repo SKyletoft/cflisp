@@ -2,6 +2,7 @@ use crate::*;
 
 pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
 	statement_optimisation(elements)?;
+	dead_code_elimination(elements);
 	Ok(())
 }
 
@@ -59,7 +60,65 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 			LanguageElementStructless::Return(_)
 			| LanguageElementStructless::Statement(_)
 			| LanguageElementStructless::StructDeclaration { .. } => {}
+			LanguageElementStructless::Block(block) => {
+				all_optimisations(block)?;
+			}
 		}
 	}
 	Ok(())
+}
+
+pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless>) {
+	let mut idx = 0;
+	while idx < elements.len() {
+		match &elements[idx] {
+			LanguageElementStructless::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => match condition {
+				StatementElementStructless::Bool(true) => {
+					elements[idx] = LanguageElementStructless::Block(then.clone());
+				}
+				StatementElementStructless::Bool(false) => {
+					if let Some(else_then) = else_then {
+						elements[idx] = LanguageElementStructless::Block(else_then.clone());
+					} else {
+						elements.remove(idx);
+						continue;
+					}
+				}
+				_ => {}
+			},
+			LanguageElementStructless::For {
+				init,
+				condition,
+				post: _,
+				body: _,
+			} => {
+				if condition == &StatementElementStructless::Bool(false) {
+					elements[idx] = LanguageElementStructless::Block(init.clone());
+					continue;
+				}
+			}
+			LanguageElementStructless::While { condition, body: _ } => {
+				if condition == &StatementElementStructless::Bool(false) {
+					elements.remove(idx);
+					continue;
+				}
+			}
+			LanguageElementStructless::Return(_) => {
+				while elements.len() != idx {
+					elements.pop();
+				}
+			}
+			LanguageElementStructless::Statement(_) => {
+				elements.remove(idx);
+				continue;
+			}
+
+			_ => {}
+		}
+		idx += 1;
+	}
 }

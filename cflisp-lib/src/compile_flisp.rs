@@ -487,6 +487,26 @@ fn compile_element<'a>(
 			}
 			compile_statement(statement, state)?
 		}
+
+		LanguageElementStructless::Block(block) => {
+			let mut inner_variables = state.variables.clone();
+			let mut inner_stack = *state.stack_size;
+			let scope_name = state.scope_name.to_string() + "_scoped";
+			let mut inner_state = State {
+				variables: &mut inner_variables,
+				global_variables: state.global_variables,
+				functions: state.functions,
+				scope_name: &scope_name,
+				stack_size: &mut inner_stack,
+				line_id: state.line_id,
+			};
+			let mut instructions = compile_elements(block, &mut inner_state, stack_base, optimise)?;
+			instructions.push((
+				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
+				None,
+			));
+			instructions
+		}
 	};
 	Ok(res)
 }
