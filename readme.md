@@ -66,13 +66,22 @@ Flag | Name | Description
 x | hex | Prints numbers as hex instead
 c | comments | Disables comments (variable names mostly)
 p|tree|Prints the parsed tree structure of the program
-P|tree_structless|Prints the parsed tree after structs have been simplified down to native types
+P|tree_structless|Prints the parsed tree after structs have been simplified down to native types and after -O2 IR optimisations have been performed
 t|type_check| Disables type checking
 s|print_result|Prints the compiled code to stdout instead of a file
 a|assemble|Calls qaflisp directly. Requires qaflisp to be on $PATH. Probably doesn't work on Windows
 o|out|Sets the name of the output file (following argument)
 g|debug|Adds debug info. Disables removal of unused names and adds `ORG $20` to the top for easier digiflisp debugging
-O|optimise| Enables optimisations. In practice it mostly just fixes bad code generation rather than actually optimising the code. (Capital o, not zero)
+O (/O1/O2)|optimise| Enables optimisations. In practice it mostly just fixes bad code generation rather than actually optimising the code. Needs to be its own flag and cannot be grouped with the others (Capital o, not zero)
+
+## Dependencies
+### Cflisp-lib
+* [Build] Rust/Cargo: https://www.rust-lang.org/tools/install
+### Cflisp-cli
+* [Runtime] Digiflisp (qaflisp): http://www.gbgmv.se/studies.html#compeng
+### Cflisp-web
+* [Build] WASM-Pack: https://rustwasm.github.io/wasm-pack/
+* [Runtime] Any recent browser with proper WASM support
 
 ## Todo
 (additional features still under consideration)
