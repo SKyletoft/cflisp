@@ -263,8 +263,8 @@ impl<'a> StatementElement<'a> {
 		let ptr_ops: [(MaybeParsed, OpFnPtr); 2] = [
 			(Unparsed(StatementToken::FieldAccess), |l, r| {
 				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (l, r) {
-					Ok(StatementElement::Var(Cow::Owned(
-						lhs.to_string() + "::" + &rhs,
+					Ok(StatementElement::Var(helper::merge_name_and_field(
+						&lhs, &rhs,
 					)))
 				} else {
 					Err(ParseError(line!(), "Field access between non-names"))

@@ -789,12 +789,15 @@ fn compile_statement_inner<'a>(
 					name: v_name,
 					typ: _,
 				},
-			) in parametres.iter().zip(arg_names.iter())
-			{
+			) in parametres.iter().zip(
+				arg_names
+					.iter()
+					.filter(|NativeVariable { typ, name: _ }| !matches!(typ, NativeType::Void)),
+			) {
 				instructions.append(&mut compile_statement(statement, state)?);
 				instructions.push((
 					Instruction::PSHA,
-					Some(Cow::Owned(name.to_string() + "::" + v_name)),
+					Some(helper::merge_name_and_field(name, v_name)),
 				));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));

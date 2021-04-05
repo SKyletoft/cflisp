@@ -2,6 +2,7 @@ pub mod compile_flisp;
 pub mod error;
 pub mod flags;
 pub mod flisp_instructions;
+mod helper;
 pub mod language_element;
 pub mod lexer;
 pub mod optimise_flisp;

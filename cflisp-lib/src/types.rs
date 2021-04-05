@@ -28,7 +28,7 @@ impl<'a> Variable<'a> {
 					     name: var_name,
 					 }| NativeVariable {
 						typ: var_typ.into(),
-						name: Cow::Owned(self.name.to_string() + "::" + var_name),
+						name: helper::merge_name_and_field(self.name, var_name),
 					},
 				)
 				.for_each(|field| vec.push(field));

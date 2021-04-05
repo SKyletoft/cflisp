@@ -103,7 +103,7 @@ impl<'a> LanguageElementStructless<'a> {
 						});
 						for field in fields {
 							new_elements.push(LanguageElementStructless::VariableDeclaration {
-								name: Cow::Owned(name.to_string() + "::" + field.name),
+								name: helper::merge_name_and_field(&name, field.name),
 								typ: (&field.typ).into(), //This is also such a hack
 								is_static,
 							});
@@ -123,6 +123,7 @@ impl<'a> LanguageElementStructless<'a> {
 							&value,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 					})
 				}
@@ -136,11 +137,12 @@ impl<'a> LanguageElementStructless<'a> {
 						.ok_or(ParseError(line!(), "Undefined struct type"))?;
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(LanguageElementStructless::VariableAssignment {
-							name: Cow::Owned(name.to_string() + "::" + field.name),
+							name: helper::merge_name_and_field(name, field.name),
 							value: StatementElementStructless::from(
 								&val,
 								struct_types,
 								structs_and_struct_pointers,
+								functions,
 							)?,
 						});
 					}
@@ -161,6 +163,7 @@ impl<'a> LanguageElementStructless<'a> {
 							&value,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 						is_static,
 					})
@@ -197,11 +200,12 @@ impl<'a> LanguageElementStructless<'a> {
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(
 							LanguageElementStructless::VariableDeclarationAssignment {
-								name: Cow::Owned(name.to_string() + "::" + field.name),
+								name: helper::merge_name_and_field(&name, field.name),
 								value: StatementElementStructless::from(
 									&val,
 									struct_types,
 									structs_and_struct_pointers,
+									functions,
 								)?,
 								typ: (&field.typ).into(), //Such a hack
 								is_static,
@@ -216,11 +220,13 @@ impl<'a> LanguageElementStructless<'a> {
 							&ptr,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 						value: StatementElementStructless::from(
 							&value,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 					})
 				}
@@ -254,6 +260,7 @@ impl<'a> LanguageElementStructless<'a> {
 							&value,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 					});
 				}
@@ -270,6 +277,7 @@ impl<'a> LanguageElementStructless<'a> {
 							Maybe try having an out pointer parametre instead? (Sorry)",
 						));
 					}
+					functions.insert(name.clone(), args.clone());
 					let new_args = args
 						.into_iter()
 						.map(|v| v.split_into_native(struct_types))
@@ -298,6 +306,7 @@ impl<'a> LanguageElementStructless<'a> {
 						&condition,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 					then: LanguageElementStructless::from_language_elements_internal(
 						then,
@@ -333,6 +342,7 @@ impl<'a> LanguageElementStructless<'a> {
 						&condition,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?,
 					post: LanguageElementStructless::from_language_elements_internal(
 						post,
@@ -353,6 +363,7 @@ impl<'a> LanguageElementStructless<'a> {
 							&condition,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?,
 						body: LanguageElementStructless::from_language_elements_internal(
 							body,
@@ -368,6 +379,7 @@ impl<'a> LanguageElementStructless<'a> {
 							&value,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)?)
 					} else {
 						None
@@ -379,6 +391,7 @@ impl<'a> LanguageElementStructless<'a> {
 						&stat,
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?),
 				),
 			}
@@ -475,6 +488,7 @@ impl<'a> StatementElementStructless<'a> {
 		other: &StatementElement<'a>,
 		struct_types: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		structs_and_struct_pointers: &HashMap<Cow<'a, str>, &'a str>,
+		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Self, ParseError> {
 		//Todo! Figure out macro_rules for this repetition nonsense
 		let res = match other {
@@ -483,11 +497,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Sub { lhs, rhs } => StatementElementStructless::Sub {
@@ -495,11 +511,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Mul { lhs, rhs } => StatementElementStructless::Mul {
@@ -507,11 +525,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Div { lhs, rhs } => StatementElementStructless::Div {
@@ -519,11 +539,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Mod { lhs, rhs } => StatementElementStructless::Mod {
@@ -531,11 +553,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::LShift { lhs, rhs } => StatementElementStructless::LShift {
@@ -543,11 +567,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::RShift { lhs, rhs } => StatementElementStructless::RShift {
@@ -555,11 +581,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::And { lhs, rhs } => StatementElementStructless::And {
@@ -567,11 +595,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Or { lhs, rhs } => StatementElementStructless::Or {
@@ -579,11 +609,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::Xor { lhs, rhs } => StatementElementStructless::Xor {
@@ -591,11 +623,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::GreaterThan { lhs, rhs } => StatementElementStructless::GreaterThan {
@@ -603,11 +637,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::LessThan { lhs, rhs } => StatementElementStructless::LessThan {
@@ -615,11 +651,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::GreaterThanEqual { lhs, rhs } => {
@@ -628,11 +666,13 @@ impl<'a> StatementElementStructless<'a> {
 						lhs.as_ref(),
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?),
 					rhs: Box::new(StatementElementStructless::from(
 						rhs.as_ref(),
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?),
 				}
 			}
@@ -642,11 +682,13 @@ impl<'a> StatementElementStructless<'a> {
 						lhs.as_ref(),
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?),
 					rhs: Box::new(StatementElementStructless::from(
 						rhs.as_ref(),
 						struct_types,
 						structs_and_struct_pointers,
+						functions,
 					)?),
 				}
 			}
@@ -655,11 +697,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 			StatementElement::NotCmp { lhs, rhs } => StatementElementStructless::NotCmp {
@@ -667,11 +711,13 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 				rhs: Box::new(StatementElementStructless::from(
 					rhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 
@@ -680,22 +726,41 @@ impl<'a> StatementElementStructless<'a> {
 					lhs.as_ref(),
 					struct_types,
 					structs_and_struct_pointers,
+					functions,
 				)?),
 			},
 
 			StatementElement::FunctionCall { name, parametres } => {
+				let mut new_parametres = Vec::new();
+				let arguments = functions
+					.get(name)
+					.ok_or(ParseError(line!(), "Undefined function"))?;
+				for (arg, param) in arguments.iter().zip(parametres.iter()) {
+					if let Type::Struct(struct_type) = arg.typ {
+						let fields = struct_types
+							.get(struct_type)
+							.ok_or(ParseError(line!(), "Undefined struct type"))?;
+						let var_name = if let StatementElement::Var(var_name) = param {
+							Ok(var_name)
+						} else {
+							Err(ParseError(line!(), "Only struct variables can be passed into functions with struct arguments (not literals)"))
+						}?;
+						for field in fields.iter() {
+							let param_name = helper::merge_name_and_field(var_name, field.name);
+							new_parametres.push(StatementElementStructless::Var(param_name))
+						}
+					} else {
+						new_parametres.push(StatementElementStructless::from(
+							param,
+							struct_types,
+							structs_and_struct_pointers,
+							functions,
+						)?);
+					}
+				}
 				StatementElementStructless::FunctionCall {
 					name: name.clone(),
-					parametres: parametres
-						.iter()
-						.map(|parametre| {
-							StatementElementStructless::from(
-								parametre,
-								struct_types,
-								structs_and_struct_pointers,
-							)
-						})
-						.collect::<Result<_, _>>()?,
+					parametres: new_parametres,
 				}
 			}
 			StatementElement::Var(v) => StatementElementStructless::Var(v.clone()),
@@ -709,13 +774,19 @@ impl<'a> StatementElementStructless<'a> {
 							parametre,
 							struct_types,
 							structs_and_struct_pointers,
+							functions,
 						)
 					})
 					.collect::<Result<_, _>>()?,
 			),
-			StatementElement::Deref(n) => StatementElementStructless::Deref(Box::new(
-				StatementElementStructless::from(n, struct_types, structs_and_struct_pointers)?,
-			)),
+			StatementElement::Deref(n) => {
+				StatementElementStructless::Deref(Box::new(StatementElementStructless::from(
+					n,
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+				)?))
+			}
 			StatementElement::AdrOf(n) => StatementElementStructless::AdrOf(n.clone()),
 
 			StatementElement::FieldPointerAccess(name, field) => {

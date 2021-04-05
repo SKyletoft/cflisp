@@ -1,5 +1,5 @@
-Investigate structs in arrays and arrays in structs
-Also why first and last elements of array go missing in test4
-
 split and/or into boolAnd/bitAnd and boolOr/bitOr for the type checker
 split Num into Signed and Unsigned
+
+Rewrite typechecker
+Typechecker: Refuse void arguments
