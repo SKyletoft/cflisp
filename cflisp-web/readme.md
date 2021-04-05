@@ -3,4 +3,5 @@ Godbolt-like webwrapper for cflisp. Runs locally through wasm instead of sending
 
 ## Build
 Requires rust wasm pack. (Link in top level readme)
-`wasm-pack build --target=web` or else the generated .wasm file won't be accepted by the webbrowser
+
+`wasm-pack build --target=web` or else the generated .wasm file won't be accepted by the web browser
