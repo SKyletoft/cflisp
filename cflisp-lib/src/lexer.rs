@@ -6,19 +6,31 @@ pub fn remove_parentheses(s: &str) -> &str {
 	s[1..s.len() - 1].trim()
 }
 
+//Correctness says return a Result. Ergonomics say trust the user to read the docs
+///Returns 0 on invalid
+fn hex_digit_value(digit: u8) -> isize {
+	match digit {
+		b'0'..=b'9' => (digit - b'0') as isize,
+		b'A'..=b'F' => (digit - b'A' + 10) as isize,
+		b'a'..=b'f' => (digit - b'a' + 10) as isize,
+		_ => 0,
+	}
+}
+
 ///Gets a hex number from the source and returns the remaining source and a number token. Unsigned only
 fn get_hex_number(s: &str) -> Option<(Token, &str)> {
-	if s.starts_with("0x") && s.as_bytes().get(2).map(|d| d.is_ascii_hexdigit()) == Some(true) {
-		let mut len = 2;
-		let num = s
+	if (s.starts_with("0x") || s.starts_with("0X"))
+		&& s.as_bytes().get(2).map(|d| d.is_ascii_hexdigit()) == Some(true)
+	{
+		let (len, num) = s
 			.bytes()
+			.enumerate()
 			.skip(2)
-			.take_while(|d| d.is_ascii_hexdigit())
-			.fold(0, |acc, curr| {
-				len += 1;
-				acc * 16 + (curr - b'0') as isize
+			.take_while(|(_, d)| d.is_ascii_hexdigit())
+			.fold((0, 0), |(_, acc), (len, curr)| {
+				(len, acc * 16 + hex_digit_value(curr))
 			});
-		Some((Token::Num(num), &s[len..]))
+		Some((Token::Num(num), &s[(len + 1)..]))
 	} else {
 		None
 	}
@@ -209,8 +221,8 @@ fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 }
 
 pub fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
-	None.or_else(|| get_single_token_match(s))
-		.or_else(|| get_number(s))
+	None.or_else(|| get_number(s))
+		.or_else(|| get_single_token_match(s))
 		.or_else(|| get_parenthesis(s))
 		.or_else(|| get_block(s))
 		.or_else(|| get_array_access(s))

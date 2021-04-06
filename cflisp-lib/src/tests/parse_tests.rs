@@ -119,3 +119,37 @@ fn init_native_variables() {
 	}];
 	assert_eq!(expected, parsed);
 }
+
+#[test]
+fn parse_numbers() {
+	for expected in (i8::MIN as isize)..=(u8::MAX as isize) {
+		let as_string = format!("{}", expected);
+		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed {
+			assert_eq!(expected as i8, n as i8);
+			assert!(rest.is_empty());
+		} else {
+			panic!();
+		}
+	}
+	for expected in (i8::MIN as isize)..=(u8::MAX as isize) {
+		let expected = expected as i8;
+		let as_string = format!("0x{:x}", expected);
+		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed {
+			assert_eq!(expected, n as i8);
+			assert!(rest.is_empty());
+		} else {
+			panic!();
+		}
+
+		let as_string = format!("0x{:X}", expected);
+		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed {
+			assert_eq!(expected, n as i8);
+			assert!(rest.is_empty());
+		} else {
+			panic!();
+		}
+	}
+}
