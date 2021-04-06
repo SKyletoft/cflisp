@@ -70,6 +70,10 @@ fn compile_to_text(
 	if optimise >= 1 {
 		optimise_flisp::all_optimisations(&mut inst).map_err(|err| format!("{:?}", err))?;
 	}
+	if !debug {
+		optimise_flisp::remove_unused_labels(&mut inst);
+		optimise_flisp::repeat_rts(&mut inst);
+	}
 	let mut text = text::instructions_to_text(&inst, &flags).map_err(|err| format!("{:?}", err))?;
 	if show_imports {
 		text::automatic_imports(&mut text, debug);
