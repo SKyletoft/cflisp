@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>
+		CFLISP WEB
+	</title>
+	<link rel="stylesheet" href="style.css" />
+	<link rel="preconnect" href="https://fonts.gstatic.com">
+	<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+</head>
+
+<body>
+	<div class="page-wrapper">
+		<div id="source"></div>
+		<section class="output">
+			<a href="../ace/LICENSE.html" id="license_link">Editor license</a>
+			<div class="settings">
+				<label>Optimisation: </label><input type="number" min="0" max="2" id="opt" value="1" />
+				<br />
+				<label>Type checking: </label><input type="checkbox" id="type_check">
+				<label>Debug info: </label><input type="checkbox" id="debug" checked>
+				<label>Hex: </label><input type="checkbox" id="hex" checked>
+				<label>Comments: </label><input type="checkbox" id="comments" checked>
+				<label>Imports: </label><input type="checkbox" id="imports">
+			</div>
+			<textarea id="result" readonly></textarea>
+		</section>
+	</div>
+</body>
+
+</html>
+<script src="../ace/ace.js" type="text/javascript" charset="utf-8"></script>
+<script type="module" src="script.js"></script>
