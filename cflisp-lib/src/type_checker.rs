@@ -1,10 +1,15 @@
 use crate::*;
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub fn language_element(
 	block: &[LanguageElement],
-	upper_variables: &[Variable],
-	outer_functions: &[Function],
+	upper_variables: &HashSet<Variable>,
+	outer_functions: &HashSet<Function>,
+	structs: &HashMap<Cow<str>, Variable>,
 ) -> Result<bool, ParseError> {
 	let mut variables = upper_variables.to_owned();
 	let mut functions = outer_functions.to_owned();
@@ -15,13 +20,15 @@ pub fn language_element(
 				typ,
 				name,
 				is_static: _,
-			} => variables.push(Variable {
-				typ: typ.clone(),
-				name: name.as_ref(),
-			}),
+			} => {
+				variables.insert(Variable {
+					typ: typ.clone(),
+					name: name.as_ref(),
+				});
+			}
 
 			LanguageElement::VariableAssignment { name: _, value } => {
-				if !statement_element(value, &variables, &functions)? {
+				if !statement_element(value, &variables, &functions, structs)? {
 					return Ok(false);
 				}
 			}
@@ -32,18 +39,18 @@ pub fn language_element(
 				value,
 				is_static: _,
 			} => {
-				variables.push(Variable {
+				variables.insert(Variable {
 					typ: typ.clone(),
 					name: name.as_ref(),
 				});
-				if !statement_element(value, &variables, &functions)? {
+				if !statement_element(value, &variables, &functions, structs)? {
 					return Ok(false);
 				}
 			}
 
 			LanguageElement::PointerAssignment { ptr, value } => {
-				if !statement_element(ptr, &variables, &functions)?
-					|| !statement_element(value, &variables, &functions)?
+				if !statement_element(ptr, &variables, &functions, structs)?
+					|| !statement_element(value, &variables, &functions, structs)?
 				{
 					return Ok(false);
 				}
@@ -55,13 +62,13 @@ pub fn language_element(
 				args,
 				block,
 			} => {
-				functions.push(Function {
+				functions.insert(Function {
 					return_type: typ.into(),
 					name: name.as_ref(),
 					parametres: args.to_vec(),
 				});
 
-				if !language_element(block, &variables, &functions)? {
+				if !language_element(block, &variables, &functions, structs)? {
 					return Ok(false);
 				}
 			}
@@ -71,11 +78,11 @@ pub fn language_element(
 				then,
 				else_then,
 			} => {
-				if !statement_element(condition, &variables, &functions)?
-					|| !language_element(then, &variables, &functions)?
+				if !statement_element(condition, &variables, &functions, structs)?
+					|| !language_element(then, &variables, &functions, structs)?
 					|| !else_then
 						.as_deref()
-						.map(|v| language_element(v, &variables, &functions))
+						.map(|v| language_element(v, &variables, &functions, structs))
 						.unwrap_or(Ok(true))?
 				{
 					return Ok(false);
@@ -88,18 +95,18 @@ pub fn language_element(
 				post,
 				body,
 			} => {
-				if !statement_element(condition, &variables, &functions)?
-					|| !language_element(init, &variables, &functions)?
-					|| !language_element(post, &variables, &functions)?
-					|| !language_element(body, &variables, &functions)?
+				if !statement_element(condition, &variables, &functions, structs)?
+					|| !language_element(init, &variables, &functions, structs)?
+					|| !language_element(post, &variables, &functions, structs)?
+					|| !language_element(body, &variables, &functions, structs)?
 				{
 					return Ok(false);
 				}
 			}
 
 			LanguageElement::While { condition, body } => {
-				if !statement_element(condition, &variables, &functions)?
-					|| !language_element(body, &variables, &functions)?
+				if !statement_element(condition, &variables, &functions, structs)?
+					|| !language_element(body, &variables, &functions, structs)?
 				{
 					return Ok(false);
 				}
@@ -109,7 +116,7 @@ pub fn language_element(
 			LanguageElement::Return(_) => {}
 
 			LanguageElement::Statement(statement) => {
-				if !statement_element(statement, &variables, &functions)? {
+				if !statement_element(statement, &variables, &functions, structs)? {
 					return Ok(false);
 				}
 			}
@@ -129,10 +136,11 @@ pub fn language_element(
 	Ok(true)
 }
 
-pub fn type_of<'a>(
-	elem: &StatementElement<'a>,
-	functions: &'a [Function<'a>],
-	variables: &'a [Variable<'a>],
+pub fn type_of(
+	elem: &StatementElement,
+	functions: &HashSet<Function>,
+	variables: &HashSet<Variable>,
+	structs: &HashMap<Cow<str>, Variable>,
 ) -> Result<NativeType, ParseError> {
 	let res = match elem {
 		StatementElement::Num(_) => NativeType::Int,
@@ -173,11 +181,11 @@ pub fn type_of<'a>(
 
 		StatementElement::Array(arr) => NativeType::ptr(
 			arr.get(0)
-				.map(|s| type_of(s, functions, variables))
+				.map(|s| type_of(s, functions, variables, structs))
 				.unwrap_or(Ok(NativeType::Void))?,
 		),
 
-		StatementElement::Deref(t) => type_of(t.as_ref(), functions, variables)?,
+		StatementElement::Deref(t) => type_of(t.as_ref(), functions, variables, structs)?,
 
 		StatementElement::AdrOf(name) => NativeType::ptr(
 			variables
@@ -194,20 +202,20 @@ pub fn type_of<'a>(
 
 pub fn statement_element(
 	elem: &StatementElement,
-	variables: &[Variable],
-	functions: &[Function],
+	variables: &HashSet<Variable>,
+	functions: &HashSet<Function>,
+	structs: &HashMap<Cow<str>, Variable>,
 ) -> Result<bool, ParseError> {
 	let res = match elem {
 		StatementElement::FunctionCall { name, parametres } => {
 			if let Some(f) = functions.iter().find(|f| f.name == name) {
 				let len_eq = f.parametres.len() == parametres.len();
 				let types_are_eq = {
-					for (l, r) in f
-						.parametres
-						.iter()
-						.map(|v| &v.typ)
-						.zip(parametres.iter().map(|p| type_of(p, functions, variables)))
-					{
+					for (l, r) in f.parametres.iter().map(|v| &v.typ).zip(
+						parametres
+							.iter()
+							.map(|p| type_of(p, functions, variables, structs)),
+					) {
 						if l != &r? {
 							return Ok(false);
 						}
@@ -233,11 +241,13 @@ pub fn statement_element(
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
-			statement_element(lhs.as_ref(), variables, functions)?
-				&& statement_element(rhs.as_ref(), variables, functions)?
+			statement_element(lhs.as_ref(), variables, functions, structs)?
+				&& statement_element(rhs.as_ref(), variables, functions, structs)?
 		}
 
-		StatementElement::Not { lhs } => statement_element(lhs.as_ref(), variables, functions)?,
+		StatementElement::Not { lhs } => {
+			statement_element(lhs.as_ref(), variables, functions, structs)?
+		}
 
 		_ => true,
 	};

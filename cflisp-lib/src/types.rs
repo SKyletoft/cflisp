@@ -2,7 +2,7 @@ use crate::*;
 use std::{borrow::Cow, collections::HashMap};
 
 ///A type and a name
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Variable<'a> {
 	pub typ: Type<'a>,
 	pub name: &'a str,
@@ -44,14 +44,14 @@ impl<'a> Variable<'a> {
 }
 
 ///A type and a name
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NativeVariable<'a> {
 	pub typ: NativeType,
 	pub name: Cow<'a, str>,
 }
 
 ///Return type, name and argument list
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Function<'a> {
 	pub return_type: NativeType,
 	pub name: &'a str,
@@ -59,7 +59,7 @@ pub struct Function<'a> {
 }
 
 ///A struct definition is a name for the type and a list of member variables
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct<'a> {
 	pub name: Cow<'a, str>,
 	pub members: Vec<Variable<'a>>,
@@ -74,7 +74,7 @@ pub type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// Can also hold the name of a struct
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type<'a> {
 	Uint,
 	Int,
@@ -93,7 +93,7 @@ impl<'a> Type<'a> {
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// No structs
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NativeType {
 	Uint,
 	Int,

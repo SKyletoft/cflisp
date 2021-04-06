@@ -1,4 +1,5 @@
 use std::{
+	collections::{HashMap, HashSet},
 	env, fs,
 	path::PathBuf,
 	{process, process::Command},
@@ -47,7 +48,13 @@ fn main() {
 		dbg!(&parsed);
 	}
 	if flags.type_check {
-		let ok = type_checker::language_element(&parsed, &[], &[]).unwrap_or_else(|e| {
+		let ok = type_checker::language_element(
+			&parsed,
+			&HashSet::new(),
+			&HashSet::new(),
+			&HashMap::new(),
+		)
+		.unwrap_or_else(|e| {
 			eprintln!("Name error ({})", e);
 			process::exit(-1);
 		});

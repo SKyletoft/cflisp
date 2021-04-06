@@ -8,5 +8,5 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-"cflisp-lib" = {path = "../cflisp-lib"}
+cflisp-lib = {path = "../cflisp-lib"}
 wasm-bindgen = "0.2.70"
