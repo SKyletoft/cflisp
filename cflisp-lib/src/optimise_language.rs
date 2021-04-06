@@ -108,7 +108,7 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				}
 			}
 			LanguageElementStructless::Return(_) => {
-				while elements.len() != idx {
+				while elements.len() != idx + 1 {
 					elements.pop();
 				}
 			}

@@ -5,14 +5,6 @@ const resultWindow = document.getElementById("result");
 const editor = ace.edit("source");
 editor.session.setMode("ace/mode/c_cpp");
 
-const default_c = "int main() {\n\tint x = (5 + 3) * 2;\n}";
-const default_res =
-    "	ORG	$20\nmain	LDA	#$03\n	ADDA	#$05\n	PSHA		; mul rhs\n	LDA	#$02\n	JSR	__mul__\n	LEASP	$FF,SP\n	PSHA		; x\n	LEASP	$01,SP	; Clearing variables\n	RTS	\n\n";
-
-editor.setValue(default_c);
-editor.clearSelection();
-resultWindow.value = default_res;
-
 let last_state;
 
 async function run() {
@@ -48,3 +40,8 @@ async function run() {
 }
 
 run();
+
+const default_c =
+    "//Try changing the compiler settings!\nint main() {\n\tint x = (5 + 3) * 2;\n\tif (x == 2) {\n\t\treturn 0;\n\t} else {\n\t\treturn -1;\n\t}\n}";
+editor.setValue(default_c);
+editor.clearSelection();
