@@ -71,6 +71,7 @@ pub enum Token<'a> {
 	Sub,
 	Switch,
 	ThreadLocal,
+	Ternary,
 	TypeDef,
 	Union,
 	UnparsedArrayAccess(&'a str),
