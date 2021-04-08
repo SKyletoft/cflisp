@@ -41,7 +41,17 @@ async function run() {
 
 run();
 
-const default_c =
-    "//Try changing the compiler settings!\nint main() {\n\tint x = (5 + 3) * 2;\n\tif (x == 2) {\n\t\treturn 0;\n\t} else {\n\t\treturn -1;\n\t}\n}";
+const default_c = "//Try changing the compiler settings!\n" +
+                  "int main() {\n" +
+                  "\tint x = (5 + 3) * 2;\n" +
+                  "\tif (x == 2) {\n" +
+                  "\t\treturn 0;\n" +
+                  "\t} else {\n" +
+                  "\t\treturn -1;\n" +
+                  "\t}\n" +
+                  "}\n";
 editor.setValue(default_c);
 editor.clearSelection();
+
+console.log("The compiler runs in web assembly. You cannot affect it from here, sorry\n" +
+            "You can find the source here though: https://www.github.com/SKyletoft/cflisp");
