@@ -1,18 +1,16 @@
 use crate::*;
-use std::{
-	borrow::Cow,
-	collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
 pub fn language_element(
 	block: &[LanguageElement],
 	upper_variables: &HashSet<Variable>,
 	outer_functions: &HashSet<Function>,
-	structs: &HashMap<Cow<str>, Variable>,
+	structs: &HashMap<&str, Vec<Variable>>,
 ) -> Result<bool, ParseError> {
 	let mut variables = upper_variables.to_owned();
 	let mut functions = outer_functions.to_owned();
+	let mut structs = structs.to_owned();
 
 	for line in block {
 		match line {
@@ -28,7 +26,7 @@ pub fn language_element(
 			}
 
 			LanguageElement::VariableAssignment { name: _, value } => {
-				if !statement_element(value, &variables, &functions, structs)? {
+				if !statement_element(value, &variables, &functions, &structs)? {
 					return Ok(false);
 				}
 			}
@@ -43,14 +41,14 @@ pub fn language_element(
 					typ: typ.clone(),
 					name: name.as_ref(),
 				});
-				if !statement_element(value, &variables, &functions, structs)? {
+				if !statement_element(value, &variables, &functions, &structs)? {
 					return Ok(false);
 				}
 			}
 
 			LanguageElement::PointerAssignment { ptr, value } => {
-				if !statement_element(ptr, &variables, &functions, structs)?
-					|| !statement_element(value, &variables, &functions, structs)?
+				if !statement_element(ptr, &variables, &functions, &structs)?
+					|| !statement_element(value, &variables, &functions, &structs)?
 				{
 					return Ok(false);
 				}
@@ -68,7 +66,7 @@ pub fn language_element(
 					parametres: args.to_vec(),
 				});
 
-				if !language_element(block, &variables, &functions, structs)? {
+				if !language_element(block, &variables, &functions, &structs)? {
 					return Ok(false);
 				}
 			}
@@ -78,11 +76,11 @@ pub fn language_element(
 				then,
 				else_then,
 			} => {
-				if !statement_element(condition, &variables, &functions, structs)?
-					|| !language_element(then, &variables, &functions, structs)?
+				if !statement_element(condition, &variables, &functions, &structs)?
+					|| !language_element(then, &variables, &functions, &structs)?
 					|| !else_then
 						.as_deref()
-						.map(|v| language_element(v, &variables, &functions, structs))
+						.map(|v| language_element(v, &variables, &functions, &structs))
 						.unwrap_or(Ok(true))?
 				{
 					return Ok(false);
@@ -95,18 +93,18 @@ pub fn language_element(
 				post,
 				body,
 			} => {
-				if !statement_element(condition, &variables, &functions, structs)?
-					|| !language_element(init, &variables, &functions, structs)?
-					|| !language_element(post, &variables, &functions, structs)?
-					|| !language_element(body, &variables, &functions, structs)?
+				if !statement_element(condition, &variables, &functions, &structs)?
+					|| !language_element(init, &variables, &functions, &structs)?
+					|| !language_element(post, &variables, &functions, &structs)?
+					|| !language_element(body, &variables, &functions, &structs)?
 				{
 					return Ok(false);
 				}
 			}
 
 			LanguageElement::While { condition, body } => {
-				if !statement_element(condition, &variables, &functions, structs)?
-					|| !language_element(body, &variables, &functions, structs)?
+				if !statement_element(condition, &variables, &functions, &structs)?
+					|| !language_element(body, &variables, &functions, &structs)?
 				{
 					return Ok(false);
 				}
@@ -116,20 +114,78 @@ pub fn language_element(
 			LanguageElement::Return(_) => {}
 
 			LanguageElement::Statement(statement) => {
-				if !statement_element(statement, &variables, &functions, structs)? {
+				if !statement_element(statement, &variables, &functions, &structs)? {
 					return Ok(false);
 				}
 			}
 
-			LanguageElement::StructAssignment { name, value } => todo!(),
+			LanguageElement::StructAssignment { name, value } => {
+				let name: &str = &name;
+				let fields = structs
+					.get(name)
+					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+				if !fields.len() == value.len() {
+					return Ok(false);
+				}
+				for (field, value) in fields.iter().zip(value.iter()) {
+					if !statement_element(value, &variables, &functions, &structs)?
+						|| type_of(value, &functions, &variables, &structs)? != field.typ
+					{
+						return Ok(false);
+					}
+				}
+			}
+
 			LanguageElement::StructDeclarationAssignment {
 				typ,
 				name,
 				value,
-				is_static,
-			} => todo!(),
-			LanguageElement::StructFieldPointerAssignment { name, field, value } => todo!(),
-			LanguageElement::StructDefinition { .. } => {}
+				is_static: _,
+			} => {
+				variables.insert(Variable {
+					typ: typ.clone(),
+					name: name.as_ref(),
+				});
+				let struct_type = if let Type::Struct(name) = typ {
+					Ok(*name)
+				} else {
+					Err(ParseError(line!(), "Undefined struct type"))
+				}?;
+				let fields = structs
+					.get(struct_type)
+					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+				if !fields.len() == value.len() {
+					return Ok(false);
+				}
+				for (field, value) in fields.iter().zip(value.iter()) {
+					if !statement_element(value, &variables, &functions, &structs)?
+						|| type_of(value, &functions, &variables, &structs)? != field.typ
+					{
+						return Ok(false);
+					}
+				}
+			}
+
+			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
+				let name: &str = &name;
+				let fields = structs
+					.get(name)
+					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+				let field_type = fields
+					.iter()
+					.find(|Variable { name, typ: _ }| name == field)
+					.ok_or(ParseError(line!(), "Undefined field"))?;
+				if !statement_element(value, &variables, &functions, &structs)?
+					|| type_of(value, &functions, &variables, &structs)? != field_type.typ
+				{
+					return Ok(false);
+				}
+			}
+
+			LanguageElement::StructDefinition { name, members } => {
+				let name: &str = &name;
+				structs.insert(name, members.to_owned());
+			}
 		}
 	}
 
@@ -140,7 +196,7 @@ pub fn type_of(
 	elem: &StatementElement,
 	functions: &HashSet<Function>,
 	variables: &HashSet<Variable>,
-	structs: &HashMap<Cow<str>, Variable>,
+	structs: &HashMap<&str, Vec<Variable>>,
 ) -> Result<NativeType, ParseError> {
 	let res = match elem {
 		StatementElement::Num(_) => NativeType::Int,
@@ -204,7 +260,7 @@ pub fn statement_element(
 	elem: &StatementElement,
 	variables: &HashSet<Variable>,
 	functions: &HashSet<Function>,
-	structs: &HashMap<Cow<str>, Variable>,
+	structs: &HashMap<&str, Vec<Variable>>,
 ) -> Result<bool, ParseError> {
 	let res = match elem {
 		StatementElement::FunctionCall { name, parametres } => {

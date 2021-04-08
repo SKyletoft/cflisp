@@ -6,3 +6,5 @@ Rewrite typechecker
 Typechecker: Refuse void arguments
 
 Early returns don't clear the stack. (in inner scopes, i.e. for loops or if-then statements) AGAIN
+
+The ternary operator exists. Yay. HOW DO YOU EVEN PARSE THAT THING PROPERLY?!
