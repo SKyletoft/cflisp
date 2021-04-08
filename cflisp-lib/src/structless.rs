@@ -590,34 +590,38 @@ impl<'a> StatementElementStructless<'a> {
 					functions,
 				)?),
 			},
-			StatementElement::And { lhs, rhs } => StatementElementStructless::And {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::Or { lhs, rhs } => StatementElementStructless::Or {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
+			StatementElement::And { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
+				StatementElementStructless::And {
+					lhs: Box::new(StatementElementStructless::from(
+						lhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+					rhs: Box::new(StatementElementStructless::from(
+						rhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+				}
+			}
+			StatementElement::Or { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
+				StatementElementStructless::Or {
+					lhs: Box::new(StatementElementStructless::from(
+						lhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+					rhs: Box::new(StatementElementStructless::from(
+						rhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+				}
+			}
 			StatementElement::Xor { lhs, rhs } => StatementElementStructless::Xor {
 				lhs: Box::new(StatementElementStructless::from(
 					lhs.as_ref(),
@@ -721,14 +725,16 @@ impl<'a> StatementElementStructless<'a> {
 				)?),
 			},
 
-			StatementElement::Not { lhs } => StatementElementStructless::Not {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
+			StatementElement::Not { lhs } | StatementElement::BitNot { lhs } => {
+				StatementElementStructless::Not {
+					lhs: Box::new(StatementElementStructless::from(
+						lhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+				}
+			}
 
 			StatementElement::FunctionCall { name, parametres } => {
 				let mut new_parametres = Vec::new();
