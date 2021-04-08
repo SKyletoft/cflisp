@@ -32,6 +32,17 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	BitAnd {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	BitOr {
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
+	BitNot {
+		lhs: Box<StatementElement<'a>>,
+	},
 	And {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -40,12 +51,12 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	Not {
+		lhs: Box<StatementElement<'a>>,
+	},
 	Xor {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
-	},
-	Not {
-		lhs: Box<StatementElement<'a>>,
 	},
 	GreaterThan {
 		lhs: Box<StatementElement<'a>>,
@@ -131,8 +142,11 @@ impl<'a> StatementElement<'a> {
 			StatementElement::RShift { lhs: _, rhs: _ } => Instruction::LSRA,
 			StatementElement::And { lhs: _, rhs: _ } => Instruction::ANDA(adr),
 			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
-			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
 			StatementElement::Not { lhs: _ } => Instruction::COMA,
+			StatementElement::BitAnd { lhs: _, rhs: _ } => Instruction::ANDA(adr),
+			StatementElement::BitOr { lhs: _, rhs: _ } => Instruction::ORA(adr),
+			StatementElement::BitNot { lhs: _ } => Instruction::COMA, //Is this really correct?
+			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
 			StatementElement::GreaterThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::LessThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
 			StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
@@ -172,6 +186,8 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::RShift { lhs, rhs }
 			| StatementElement::And { lhs, rhs }
 			| StatementElement::Or { lhs, rhs }
+			| StatementElement::BitAnd { lhs, rhs }
+			| StatementElement::BitOr { lhs, rhs }
 			| StatementElement::Xor { lhs, rhs }
 			| StatementElement::GreaterThan { lhs, rhs }
 			| StatementElement::LessThan { lhs, rhs }
@@ -179,7 +195,9 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::LessThanEqual { lhs, rhs }
 			| StatementElement::Cmp { lhs, rhs }
 			| StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Not { lhs } => lhs.as_ref().depth(),
+			StatementElement::Not { lhs } | StatementElement::BitNot { lhs } => {
+				lhs.as_ref().depth()
+			}
 			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElement::Deref(n) => n.as_ref().depth(),
 			StatementElement::Var(_)
@@ -281,7 +299,7 @@ impl<'a> StatementElement<'a> {
 
 		let un_ops: [(MaybeParsed, UnOpFnPtr); 4] = [
 			(Unparsed(StatementToken::BitNot), |l| {
-				Ok(StatementElement::Not { lhs: Box::new(l) })
+				Ok(StatementElement::BitNot { lhs: Box::new(l) })
 			}),
 			(Unparsed(StatementToken::BoolNot), |l| {
 				Ok(StatementElement::Not { lhs: Box::new(l) })
@@ -381,7 +399,7 @@ impl<'a> StatementElement<'a> {
 				})
 			}),
 			(Unparsed(StatementToken::BitAnd), |l, r| {
-				Ok(StatementElement::And {
+				Ok(StatementElement::BitAnd {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				})
@@ -393,7 +411,7 @@ impl<'a> StatementElement<'a> {
 				})
 			}),
 			(Unparsed(StatementToken::BitOr), |l, r| {
-				Ok(StatementElement::Or {
+				Ok(StatementElement::BitOr {
 					lhs: Box::new(l),
 					rhs: Box::new(r),
 				})
@@ -448,6 +466,8 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::RShift { lhs, rhs }
 			| StatementElement::And { lhs, rhs }
 			| StatementElement::Or { lhs, rhs }
+			| StatementElement::BitAnd { lhs, rhs }
+			| StatementElement::BitOr { lhs, rhs }
 			| StatementElement::Xor { lhs, rhs }
 			| StatementElement::GreaterThan { lhs, rhs }
 			| StatementElement::LessThan { lhs, rhs }
@@ -456,6 +476,7 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::NotCmp { lhs, rhs }
 			| StatementElement::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
 			StatementElement::Not { lhs: _ }
+			| StatementElement::BitNot { lhs: _ }
 			| StatementElement::FunctionCall {
 				name: _,
 				parametres: _,
