@@ -812,6 +812,8 @@ impl<'a> StatementElementStructless<'a> {
 					rhs: Box::new(StatementElementStructless::AdrOf(name.clone())),
 				}))
 			}
+
+			StatementElement::Ternary { .. } => todo!(),
 		};
 		Ok(res)
 	}

@@ -133,6 +133,34 @@ fn get_block(s: &str) -> Option<(Token, &str)> {
 	Some((token, rest))
 }
 
+///Gets the middle part of a ternary statement to later be used as a binary operator
+/// if the expression lack a colon None will be returned.
+/// `?` and `:` are not included in the string
+fn get_ternary_op(s: &str) -> Option<(Token, &str)> {
+	if !s.starts_with('?') {
+		return None;
+	}
+	let mut parentheses = 0;
+	let mut len = 0;
+	for c in s.chars() {
+		len += 1;
+		match c {
+			'?' => parentheses += 1,
+			':' => parentheses -= 1,
+			_ => {}
+		}
+		if parentheses == 0 {
+			break;
+		}
+	}
+	if parentheses != 0 {
+		return None;
+	}
+	let token = Token::Ternary(&s[1..len - 1]);
+	let rest = &s[len..];
+	Some((token, rest))
+}
+
 ///Gets a complete statement in square brackets. Returns None on unmatched brackets.
 /// The brackets are not in the string in the UnparsedArrayAccess token
 fn get_array_access(s: &str) -> Option<(Token, &str)> {
@@ -226,6 +254,7 @@ pub fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_parenthesis(s))
 		.or_else(|| get_block(s))
 		.or_else(|| get_array_access(s))
+		.or_else(|| get_ternary_op(s))
 		.or_else(|| get_char(s))
 		.or_else(|| get_name(s))
 		.ok_or(ParseError(line!(), "Couldn't parse token"))
@@ -239,7 +268,7 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 //Literal, needs following whitespace, closure to return token
 //Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
-const PATTERNS: [(&str, bool, TokenFunction); 85] = [
+const PATTERNS: [(&str, bool, TokenFunction); 84] = [
 	("_Alignas", true, || AlignAs),
 	("_Alignof", true, || AlignOf),
 	("_Atomic", true, || Atomic),
@@ -324,5 +353,4 @@ const PATTERNS: [(&str, bool, TokenFunction); 85] = [
 	(",", false, || Comma),
 	(";", false, || NewLine),
 	(":", false, || Colon),
-	("?", false, || Ternary),
 ];

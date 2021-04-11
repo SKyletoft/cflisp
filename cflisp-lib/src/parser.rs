@@ -376,6 +376,7 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	vec
 }
 
+//Rewrite to return a `Cow<str>` instead?
 ///Takes the entire source code and removes the rest of the line for each line with a `//`.
 /// Does *not* handle multiline comments
 pub fn remove_comments(s: &str) -> String {
@@ -385,4 +386,28 @@ pub fn remove_comments(s: &str) -> String {
 		out.push_str(&line[..comment_start]);
 	}
 	out
+}
+
+pub fn remove_multiline_comments(s: &str) -> Result<Cow<str>, ParseError> {
+	const OPEN: &str = "/*";
+	const CLOSE: &str = "*/";
+	let next = s.find(OPEN);
+	if next.is_none() {
+		return Ok(Cow::Borrowed(s));
+	}
+	let next = next.unwrap();
+	let after = s[(next + 2)..].find(OPEN);
+	let close = s[(next + 2)..].find(CLOSE);
+	if close.is_none() {
+		return Ok(Cow::Borrowed(s));
+	}
+	let close = close.unwrap();
+	if let Some(after) = after {
+		if after < close {
+			let new_s = remove_multiline_comments(&s[(next + 2)..])?;
+			let new_close = (&new_s).find(CLOSE).expect("");
+		}
+	}
+
+	todo!()
 }

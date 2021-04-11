@@ -153,3 +153,53 @@ fn parse_numbers() {
 		}
 	}
 }
+
+#[test]
+fn comments() {
+	let expected = "keep this and this";
+
+	let cases = [
+		"keep this //remove this\nand this",
+		"keep this /*not this*/and this",
+		"keep this /*not this\nor this*/and this",
+		"ke/*hello!*/ep thi//not this\ns/*\n\n\n\nhello//not me*/ and this",
+		"keep /* /* /* /* NESTED COMMENTS! */ */ */ */this and this",
+	];
+	for &case in cases.iter() {
+		let result_1 = parser::remove_multiline_comments(case).unwrap();
+		dbg!(&result_1);
+		let result_2 = parser::remove_comments(&result_1);
+		assert_eq!(result_2, expected);
+	}
+}
+
+#[test]
+fn ternary_op() {
+	let case_1 = "5 < 6 ? 1 : 0";
+	let expected_1 = StatementElement::Ternary {
+		cond: Box::new(StatementElement::LessThan {
+			lhs: Box::new(StatementElement::Num(5)),
+			rhs: Box::new(StatementElement::Num(6)),
+		}),
+		lhs: Box::new(StatementElement::Num(1)),
+		rhs: Box::new(StatementElement::Num(0)),
+	};
+	let res_1 = StatementElement::from_source_str(case_1).unwrap();
+	assert_eq!(res_1, expected_1);
+
+	let case_2 = "a < b ? c : d ? f : g";
+	let expected_2 = StatementElement::Ternary {
+		cond: Box::new(StatementElement::LessThan {
+			lhs: Box::new(StatementElement::Var(Cow::Borrowed("a"))),
+			rhs: Box::new(StatementElement::Var(Cow::Borrowed("b"))),
+		}),
+		lhs: Box::new(StatementElement::Var(Cow::Borrowed("c"))),
+		rhs: Box::new(StatementElement::Ternary {
+			cond: Box::new(StatementElement::Var(Cow::Borrowed("d"))),
+			lhs: Box::new(StatementElement::Var(Cow::Borrowed("f"))),
+			rhs: Box::new(StatementElement::Var(Cow::Borrowed("g"))),
+		}),
+	};
+	let res_2 = StatementElement::from_source_str(case_2).unwrap();
+	assert_eq!(res_2, expected_2);
+}

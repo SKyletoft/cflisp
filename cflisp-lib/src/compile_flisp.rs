@@ -290,10 +290,9 @@ fn compile_element<'a>(
 				args_base,
 				false,
 			)?;
-			args_count -= args.len() as isize + 1;
-			if args_count != 0 {
+			if args_count != args_base {
 				function_body.push((
-					Instruction::LEASP(Addressing::SP(args_count)),
+					Instruction::LEASP(Addressing::SP(args_count - args_base)),
 					Some("Clearing variables".into()),
 				));
 			}
@@ -322,7 +321,7 @@ fn compile_element<'a>(
 					stack_size: &mut then_stack,
 					line_id: state.line_id,
 				},
-				*state.stack_size,
+				stack_base,
 				false,
 			)?;
 			if then_stack != *state.stack_size {
@@ -343,7 +342,7 @@ fn compile_element<'a>(
 						stack_size: &mut else_stack,
 						line_id: state.line_id,
 					},
-					*state.stack_size,
+					stack_base,
 					false,
 				)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));

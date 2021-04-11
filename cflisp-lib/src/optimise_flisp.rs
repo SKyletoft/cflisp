@@ -258,6 +258,10 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+/*
+	THIS IS BROKEN
+	Not sure how, but disabling it fixes the factorial program
+*/
 //For each tmp allocation, find how many unused bytes there are and reduce the allocation by that much.
 // Won't remove 0 size allocations, just run nop afterwards.
 fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {

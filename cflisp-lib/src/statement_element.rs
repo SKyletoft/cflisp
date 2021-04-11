@@ -82,6 +82,11 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	Ternary {
+		cond: Box<StatementElement<'a>>,
+		lhs: Box<StatementElement<'a>>,
+		rhs: Box<StatementElement<'a>>,
+	},
 	FunctionCall {
 		name: Cow<'a, str>,
 		parametres: Vec<StatementElement<'a>>,
@@ -170,6 +175,8 @@ impl<'a> StatementElement<'a> {
 					"Internal error: special cases and literals, not instructions?",
 				))
 			}
+
+			StatementElement::Ternary { .. } => todo!(),
 		};
 
 		Ok(res)
@@ -210,6 +217,8 @@ impl<'a> StatementElement<'a> {
 				name: _,
 				parametres: _,
 			} => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
+
+			StatementElement::Ternary { .. } => todo!(),
 		};
 		rest + 1
 	}
@@ -439,6 +448,8 @@ impl<'a> StatementElement<'a> {
 		for (from, to) in bin_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
+
+		todo!("TERNARY OPERATOR HERE");
 
 		if working_tokens.len() != 1 {
 			dbg!(working_tokens);
