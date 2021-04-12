@@ -646,26 +646,8 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let mut jumps_to = instructions
 		.iter()
-		.filter_map(|(inst, _)| match inst {
-			Instruction::LDA(Addressing::Label(lbl))
-			| Instruction::LDX(Addressing::Label(lbl))
-			| Instruction::LDY(Addressing::Label(lbl))
-			| Instruction::LDSP(Addressing::Label(lbl))
-			| Instruction::ADDA(Addressing::Label(lbl))
-			| Instruction::SUBA(Addressing::Label(lbl))
-			| Instruction::ANDA(Addressing::Label(lbl))
-			| Instruction::ORA(Addressing::Label(lbl))
-			| Instruction::EORA(Addressing::Label(lbl))
-			| Instruction::STA(Addressing::Label(lbl))
-			| Instruction::JMP(Addressing::Label(lbl))
-			| Instruction::BNE(Addressing::Label(lbl))
-			| Instruction::BEQ(Addressing::Label(lbl))
-			| Instruction::BGE(Addressing::Label(lbl))
-			| Instruction::BLT(Addressing::Label(lbl))
-			| Instruction::LEASP(Addressing::Label(lbl))
-			| Instruction::CMPA(Addressing::Label(lbl))
-			| Instruction::INC(Addressing::Label(lbl))
-			| Instruction::JSR(Addressing::Label(lbl)) => Some(lbl.clone()),
+		.filter_map(|(inst, _)| match inst.get_adr() {
+			Some(Addressing::Label(lbl)) => Some(lbl.clone()),
 			_ => None,
 		})
 		.collect::<HashSet<String>>();
