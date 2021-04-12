@@ -376,7 +376,10 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 ///Removes all comments from the source code.
 /// Recursive multiline comments are treated properly.
 pub fn remove_comments(s: &str) -> String {
-	match remove_single_line_comments(remove_multiline_comments(Cow::Borrowed(s))) {
+	let cow_str = Cow::Borrowed(s);
+	let no_multilines = remove_multiline_comments(cow_str);
+	let no_single_lines = remove_single_line_comments(no_multilines);
+	match no_single_lines {
 		Cow::Owned(s) => s,
 		Cow::Borrowed(s) => s.to_owned(),
 	}
@@ -384,20 +387,17 @@ pub fn remove_comments(s: &str) -> String {
 
 ///Takes the entire source code and removes the rest of the line for each line with a `//`.
 fn remove_single_line_comments(mut s: Cow<str>) -> Cow<str> {
-	let mut searched_through = 0;
-	while let Some(idx) = s[searched_through..]
-		.find("//")
-		.map(|v| v + searched_through)
-	{
-		let end = s[searched_through + idx..]
+	//Could be sped up if we didn't start the search over each time,
+	// but apparently I can't write code that doesn't crash
+	while let Some(idx) = s.find("//") {
+		let end = s[idx..]
 			.find('\n')
-			.map(|v| v + searched_through + idx)
+			.map(|v| v + idx)
 			.unwrap_or_else(|| s.len());
 		match &mut s {
 			Cow::Owned(slice) => slice.replace_range(idx..end, ""),
 			Cow::Borrowed(slice) => s = Cow::Owned(slice[..idx].to_string() + &slice[end..]),
 		}
-		searched_through = idx;
 	}
 	s
 }

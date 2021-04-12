@@ -1,0 +1,17 @@
+hello world
+
+this won't though
+
+
+Something to fill the space
+
+More space to fill
+
+int main() {
+	int *nullptr = 0;
+	int x        = 5;
+	if (x == 5) { x = 3; }
+	*nullptr = x;
+	
+	
+}

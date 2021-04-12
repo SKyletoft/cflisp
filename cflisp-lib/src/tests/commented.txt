@@ -1,0 +1,28 @@
+hello world
+//This will be removed
+this won't though
+
+/*
+ * this is a multi
+ * line comment
+ */
+Something to fill the space
+/*
+ *
+ * /*
+ *  *
+ *  * And this is nested
+ *  *
+ *  */
+ *
+ */
+More space to fill
+
+int main() {
+	int *nullptr = 0;
+	int x        = 5;
+	if (x == 5) { x = 3; }
+	*nullptr = x;
+	//**nullptr  = 2;
+	//***nullptr = 3;
+}

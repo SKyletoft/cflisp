@@ -179,6 +179,11 @@ fn comments() {
 		let result = parser::remove_comments(case);
 		assert_eq!(result, expected_2, "\n{:?}", case);
 	}
+
+	let case_3 = include_str!("commented.txt");
+	let expected_3 = include_str!("commentless.txt");
+	let result_3 = parser::remove_comments(case_3);
+	assert_eq!(result_3, expected_3);
 }
 
 #[test]
