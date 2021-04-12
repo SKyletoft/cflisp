@@ -1,5 +1,6 @@
-**/target
-**.lock
-**/.vscode
+**target**
+**.lock**
+**.vscode**
 **out**
 **pkg**
+**.idea**
