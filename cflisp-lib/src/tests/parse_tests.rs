@@ -156,19 +156,28 @@ fn parse_numbers() {
 
 #[test]
 fn comments() {
-	let expected = "keep this and this";
+	let expected_1 = "keep this and this";
+	let expected_2 = "a\nb\nc\n";
 
-	let cases = [
-		"keep this //remove this\nand this",
+	let cases_1 = [
+		"keep this and this// but not this",
 		"keep this /*not this*/and this",
 		"keep this /*not this\nor this*/and this",
-		"ke/*hello!*/ep thi//not this\ns/*\n\n\n\nhello//not me*/ and this",
+		"ke/*hello!*/ep this/*\n\n\n\nhello//not me*/ and this",
 		"keep /* /* /* /* NESTED COMMENTS! */ */ */ */this and this",
 	];
-	for &case in cases.iter() {
-		let result_1 = parser::remove_multiline_comments(Cow::Borrowed(case));
-		let result_2 = parser::remove_comments(&result_1);
-		assert_eq!(result_2, expected);
+	for &case in cases_1.iter() {
+		let result = parser::remove_comments(case);
+		assert_eq!(result, expected_1, "\n{:?}", case);
+	}
+
+	let cases_2 = [
+		"a//hello\nb\nc\n",
+		"a//hi//continued\nb//more comments \nc\n",
+	];
+	for &case in cases_2.iter() {
+		let result = parser::remove_comments(case);
+		assert_eq!(result, expected_2, "\n{:?}", case);
 	}
 }
 
