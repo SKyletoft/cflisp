@@ -385,26 +385,28 @@ pub fn remove_comments(s: &str) -> String {
 	out
 }
 
-pub fn remove_multiline_comments(s: &str) -> Result<Cow<str>, ParseError> {
+pub fn remove_multiline_comments(mut s: Cow<str>) -> Cow<str> {
 	const OPEN: &str = "/*";
 	const CLOSE: &str = "*/";
-	let next = s.find(OPEN);
-	if next.is_none() {
-		return Ok(Cow::Borrowed(s));
-	}
-	let next = next.unwrap();
-	let after = s[(next + 2)..].find(OPEN);
-	let close = s[(next + 2)..].find(CLOSE);
-	if close.is_none() {
-		return Ok(Cow::Borrowed(s));
-	}
-	let close = close.unwrap();
-	if let Some(after) = after {
-		if after < close {
-			let new_s = remove_multiline_comments(&s[(next + 2)..])?;
-			let new_close = (&new_s).find(CLOSE).expect("");
+	loop {
+		dbg!(&s);
+		if s.is_empty() {
+			return s;
 		}
+		let first_end = s.find(CLOSE);
+		if first_end.is_none() {
+			return s;
+		}
+		let first_end = first_end.unwrap();
+		let mut latest_start = 0;
+		let mut maybe_latest_start = s[latest_start..first_end].find(OPEN);
+		if maybe_latest_start.is_none() {
+			return s;
+		}
+		while let Some(start) = maybe_latest_start {
+			latest_start += start + 2;
+			maybe_latest_start = s[latest_start..first_end].find(OPEN);
+		}
+		s = Cow::Owned(s[..latest_start - 2].to_string() + &s[first_end + 2..]);
 	}
-
-	todo!()
 }

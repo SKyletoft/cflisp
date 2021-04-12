@@ -166,8 +166,7 @@ fn comments() {
 		"keep /* /* /* /* NESTED COMMENTS! */ */ */ */this and this",
 	];
 	for &case in cases.iter() {
-		let result_1 = parser::remove_multiline_comments(case).unwrap();
-		dbg!(&result_1);
+		let result_1 = parser::remove_multiline_comments(Cow::Borrowed(case));
 		let result_2 = parser::remove_comments(&result_1);
 		assert_eq!(result_2, expected);
 	}
