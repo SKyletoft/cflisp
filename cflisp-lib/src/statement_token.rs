@@ -28,6 +28,7 @@ pub enum StatementToken<'a> {
 	BoolNot,
 	BitNot,
 	Parentheses(Vec<StatementToken<'a>>),
+	Ternary(Vec<StatementToken<'a>>),
 	BitAnd,
 	FieldAccess,
 	FieldPointerAccess,
@@ -70,6 +71,11 @@ impl<'a> StatementToken<'a> {
 				Token::NotCmp => StatementToken::NotCmp,
 				Token::FieldAccess => StatementToken::FieldAccess,
 				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
+				Token::Ternary(b) => {
+					let tokenised = Token::by_byte(b)?;
+					let as_statement = StatementToken::from_tokens(&tokenised)?;
+					StatementToken::Ternary(as_statement)
+				}
 				Token::UnparsedParentheses(b) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
 						res[last] =

@@ -449,7 +449,7 @@ impl<'a> StatementElement<'a> {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
 
-		todo!("TERNARY OPERATOR HERE");
+		do_ternary_op(&mut working_tokens)?;
 
 		if working_tokens.len() != 1 {
 			dbg!(working_tokens);
@@ -533,6 +533,33 @@ fn do_binary_operation<'a>(
 				should've been parsed first has not been parsed",
 			));
 		}
+	}
+	Ok(())
+}
+
+fn do_ternary_op<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<(), ParseError> {
+	let mut idx = tokens.len().wrapping_sub(1);
+	while idx != usize::MAX {
+		if let Some(Unparsed(StatementToken::Ternary(lhs))) = tokens.get(idx) {
+			let lhs = StatementElement::from_statement_tokens(lhs.clone())?;
+			let right = tokens.remove(idx + 1);
+			let cond = tokens.remove(idx - 1);
+			if let (Parsed(cond), Parsed(rhs)) = (cond, right) {
+				//The removal of the left item offset the index by one
+				tokens[idx - 1] = Parsed(StatementElement::Ternary {
+					cond: Box::new(cond),
+					lhs: Box::new(lhs),
+					rhs: Box::new(rhs),
+				});
+			} else {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Element that \
+					should've been parsed first has not been parsed",
+				));
+			}
+		}
+		idx = idx.wrapping_sub(1);
 	}
 	Ok(())
 }
