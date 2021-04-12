@@ -108,13 +108,11 @@ fn main() {
 	if flags.assemble {
 		let path = std::env::vars()
 			.find(|(name, _)| name == PATH)
-			.map(|(_, paths)| paths);
-		if let Some(p) = path
-			.as_ref()
-			.map(|s| {
-				s.split(':')
-					.filter_map(|p| {
-						let path: PathBuf = (p.to_string() + QAFLISP).into();
+			.map(|(_, path_var)| {
+				path_var
+					.split(':')
+					.filter_map(|path_segment| {
+						let path: PathBuf = (path_segment.to_string() + QAFLISP).into();
 						if path.exists() {
 							Some(path)
 						} else {
@@ -123,8 +121,8 @@ fn main() {
 					})
 					.next()
 			})
-			.flatten()
-		{
+			.flatten();
+		if let Some(p) = path {
 			let res = Command::new(p)
 				.arg(flags.out)
 				.output()
