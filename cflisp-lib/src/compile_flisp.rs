@@ -487,7 +487,10 @@ fn compile_element<'a>(
 			compile_statement(statement, state)?
 		}
 
-		LanguageElementStructless::Block(block) => {
+		LanguageElementStructless::Block {
+			block,
+			scope_name: _,
+		} => {
 			let mut inner_variables = state.variables.clone();
 			let mut inner_stack = *state.stack_size;
 			let scope_name = state.scope_name.to_string() + "_scoped";
