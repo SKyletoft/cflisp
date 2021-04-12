@@ -373,38 +373,70 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	vec
 }
 
-//Rewrite to return a `Cow<str>` instead?
-///Takes the entire source code and removes the rest of the line for each line with a `//`.
-/// Does *not* handle multiline comments
+///Removes all comments from the source code.
+/// Recursive multiline comments are treated properly.
 pub fn remove_comments(s: &str) -> String {
-	let mut out = String::new();
-	for line in s.lines() {
-		let comment_start = line.find("//").unwrap_or_else(|| line.len());
-		out.push_str(&line[..comment_start]);
+	match remove_single_line_comments(remove_multiline_comments(Cow::Borrowed(s))) {
+		Cow::Owned(s) => s,
+		Cow::Borrowed(s) => s.to_owned(),
 	}
-	out
 }
 
-pub fn remove_multiline_comments(s: &str) -> Result<Cow<str>, ParseError> {
+///Takes the entire source code and removes the rest of the line for each line with a `//`.
+fn remove_single_line_comments(mut s: Cow<str>) -> Cow<str> {
+	let mut searched_through = 0;
+	while let Some(idx) = s[searched_through..]
+		.find("//")
+		.map(|v| v + searched_through)
+	{
+		let end = s[searched_through + idx..]
+			.find('\n')
+			.map(|v| v + searched_through + idx)
+			.unwrap_or_else(|| s.len());
+		match &mut s {
+			Cow::Owned(slice) => slice.replace_range(idx..end, ""),
+			Cow::Borrowed(slice) => s = Cow::Owned(slice[..idx].to_string() + &slice[end..]),
+		}
+		searched_through = idx;
+	}
+	s
+}
+
+///Takes the entire source code and removes everything between `/*` and `*/`.
+/// Works with recursive comments.
+/// Should probably be run before the single line version?
+fn remove_multiline_comments(mut s: Cow<str>) -> Cow<str> {
 	const OPEN: &str = "/*";
 	const CLOSE: &str = "*/";
-	let next = s.find(OPEN);
-	if next.is_none() {
-		return Ok(Cow::Borrowed(s));
-	}
-	let next = next.unwrap();
-	let after = s[(next + 2)..].find(OPEN);
-	let close = s[(next + 2)..].find(CLOSE);
-	if close.is_none() {
-		return Ok(Cow::Borrowed(s));
-	}
-	let close = close.unwrap();
-	if let Some(after) = after {
-		if after < close {
-			let new_s = remove_multiline_comments(&s[(next + 2)..])?;
-			let new_close = (&new_s).find(CLOSE).expect("");
+	loop {
+		//Find the first comment ending and find the last start before it,
+		// remove everything between them, repeat till there are no comments.
+		if s.is_empty() {
+			return s;
+		}
+		let first_end = s.find(CLOSE);
+		//No end: return early, even if it might be unbalanced
+		if first_end.is_none() {
+			return s;
+		}
+		let first_end = first_end.unwrap();
+		let mut latest_start = 0;
+		let mut maybe_latest_start = s[latest_start..first_end].find(OPEN);
+		//No start: return as it is, even though we know it's unbalanced
+		if maybe_latest_start.is_none() {
+			return s;
+		}
+		while let Some(start) = maybe_latest_start {
+			latest_start += start + 2;
+			maybe_latest_start = s[latest_start..first_end].find(OPEN);
+		}
+		if let Cow::Owned(s) = &mut s {
+			//Replace with `remove_range` is something like that ever gets stabilised?
+			let from = latest_start - 2;
+			let to = first_end + 2;
+			s.replace_range(from..to, "");
+		} else {
+			s = Cow::Owned(s[..latest_start - 2].to_string() + &s[first_end + 2..]);
 		}
 	}
-
-	todo!()
 }
