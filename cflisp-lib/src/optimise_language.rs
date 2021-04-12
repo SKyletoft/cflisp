@@ -1,4 +1,5 @@
 use crate::*;
+use std::borrow::Cow;
 
 pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
 	statement_optimisation(elements)?;
@@ -60,7 +61,10 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 			LanguageElementStructless::Return(_)
 			| LanguageElementStructless::Statement(_)
 			| LanguageElementStructless::StructDeclaration { .. } => {}
-			LanguageElementStructless::Block(block) => {
+			LanguageElementStructless::Block {
+				block,
+				scope_name: _,
+			} => {
 				all_optimisations(block)?;
 			}
 		}
@@ -78,11 +82,17 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				else_then,
 			} => match condition {
 				StatementElementStructless::Bool(true) => {
-					elements[idx] = LanguageElementStructless::Block(then.clone());
+					elements[idx] = LanguageElementStructless::Block {
+						block: then.clone(),
+						scope_name: Cow::Owned(String::from("if_then")),
+					};
 				}
 				StatementElementStructless::Bool(false) => {
 					if let Some(else_then) = else_then {
-						elements[idx] = LanguageElementStructless::Block(else_then.clone());
+						elements[idx] = LanguageElementStructless::Block {
+							block: else_then.clone(),
+							scope_name: Cow::Owned(String::from("if_else")),
+						};
 					} else {
 						elements.remove(idx);
 						continue;
@@ -97,7 +107,10 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				body: _,
 			} => {
 				if condition == &StatementElementStructless::Bool(false) {
-					elements[idx] = LanguageElementStructless::Block(init.clone());
+					elements[idx] = LanguageElementStructless::Block {
+						block: init.clone(),
+						scope_name: Cow::Owned(String::from("for_init")),
+					};
 					continue;
 				}
 			}

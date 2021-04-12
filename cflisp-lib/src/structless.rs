@@ -53,7 +53,10 @@ pub enum LanguageElementStructless<'a> {
 		name: Cow<'a, str>,
 		is_static: bool,
 	},
-	Block(BlockStructless<'a>),
+	Block {
+		block: BlockStructless<'a>,
+		scope_name: Cow<'a, str>,
+	},
 }
 
 impl<'a> LanguageElementStructless<'a> {
