@@ -27,23 +27,21 @@ fn main() {
 		.map(|s| s.as_str())
 		.collect::<Vec<&str>>();
 	if files.is_empty() {
-		eprintln!("Error: No input files");
-		process::exit(-1);
+		exit_error("Error: No input files");
 	}
 	let mut source = String::new();
 	for file in files {
-		source.push_str(&fs::read_to_string(file).unwrap_or_else(|e| {
-			eprintln!("IO Error: Could not read file ({})", e);
-			process::exit(-1);
-		}));
+		source.push_str(
+			&fs::read_to_string(file).unwrap_or_else(|e| {
+				exit_error(&format!("IO Error: File could not be read ({})", e))
+			}),
+		);
 		source.push('\n');
 	}
 	source = parser::remove_comments(&source);
 
-	let parsed = parser::parse(&source, !flags.debug).unwrap_or_else(|e| {
-		eprintln!("Parse Error ({})", e);
-		process::exit(-1);
-	});
+	let parsed = parser::parse(&source, !flags.debug)
+		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 	if flags.tree {
 		dbg!(&parsed);
 	}
@@ -54,25 +52,16 @@ fn main() {
 			&HashSet::new(),
 			&HashMap::new(),
 		)
-		.unwrap_or_else(|e| {
-			eprintln!("Name error ({})", e);
-			process::exit(-1);
-		});
+		.unwrap_or_else(|e| exit_error(&format!("Name error ({})", e)));
 		if !ok {
-			eprintln!("Error: type check or name resolution error");
-			process::exit(-1);
+			exit_error("Error: type check or name resolution error")
 		}
 	}
 	let mut struct_filtered = LanguageElementStructless::from_language_elements(parsed)
-		.unwrap_or_else(|e| {
-			eprintln!("Parse Error ({})", e);
-			process::exit(-1);
-		});
+		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 	if flags.optimise >= 2 {
-		optimise_language::all_optimisations(&mut struct_filtered).unwrap_or_else(|e| {
-			eprintln!("Name error ({})", e);
-			process::exit(-1);
-		});
+		optimise_language::all_optimisations(&mut struct_filtered)
+			.unwrap_or_else(|e| exit_error(&format!("Name error ({})", e)));
 	}
 	if flags.tree_structless {
 		if flags.tree {
@@ -80,18 +69,14 @@ fn main() {
 		}
 		dbg!(&struct_filtered);
 	}
-	let mut instr = compile_flisp::compile(&struct_filtered, &flags).unwrap_or_else(|e| {
-		eprintln!("Compilation error ({})", e);
-		process::exit(-1);
-	});
+	let mut instr = compile_flisp::compile(&struct_filtered, &flags)
+		.unwrap_or_else(|e| exit_error(&format!("Compilation error ({})", e)));
 	if !flags.debug {
 		optimise_flisp::remove_unused_labels(&mut instr);
 		optimise_flisp::repeat_rts(&mut instr);
 	}
-	let mut compiled = text::instructions_to_text(&instr, &flags).unwrap_or_else(|e| {
-		eprintln!("Program too large? ({})", e);
-		process::exit(-1);
-	});
+	let mut compiled = text::instructions_to_text(&instr, &flags)
+		.unwrap_or_else(|e| exit_error(&format!("Program too large? ({})", e)));
 	text::automatic_imports(&mut compiled, flags.debug);
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
@@ -100,45 +85,36 @@ fn main() {
 		println!("{}", &compiled);
 	}
 	if !flags.print_result || flags.assemble {
-		fs::write(&flags.out, &compiled).unwrap_or_else(|e| {
-			eprintln!("IO Error: Could not save file ({})", e);
-			process::exit(-1);
-		});
+		fs::write(&flags.out, &compiled)
+			.unwrap_or_else(|e| exit_error(&format!("IO Error: Could not save file ({})", e)));
 	}
 	if flags.assemble {
-		let path = std::env::vars()
+		let (_, path_var) = std::env::vars()
 			.find(|(name, _)| name == PATH)
-			.map(|(_, path_var)| {
-				path_var
-					.split(':')
-					.filter_map(|path_segment| {
-						let path: PathBuf = (path_segment.to_string() + QAFLISP).into();
-						if path.exists() {
-							Some(path)
-						} else {
-							None
-						}
-					})
-					.next()
+			.unwrap_or_else(|| exit_error("PATH variable doesn't exist"));
+		let qaflisp_path = path_var
+			.split(':')
+			.filter_map(|path_segment| {
+				let path: PathBuf = (path_segment.to_string() + QAFLISP).into();
+				if path.exists() {
+					Some(path)
+				} else {
+					None
+				}
 			})
-			.flatten();
-		if let Some(p) = path {
-			let res = Command::new(p)
-				.arg(flags.out)
-				.output()
-				.map(|out| String::from_utf8(out.stdout))
-				.unwrap_or_else(|_| {
-					eprintln!("Failed to call qaflisp");
-					process::exit(-1);
-				})
-				.unwrap_or_else(|_| {
-					eprintln!("Output isn't utf8?");
-					process::exit(-1);
-				});
-			print!("{}", res);
-		} else {
-			eprintln!("Couldn't find qaflisp");
-			process::exit(-1);
-		}
+			.next()
+			.unwrap_or_else(|| exit_error("Couldn't find qaflisp"));
+		let program_call = Command::new(qaflisp_path)
+			.arg(flags.out)
+			.output()
+			.unwrap_or_else(|_| exit_error("Output isn't utf8?"));
+		let res = String::from_utf8(program_call.stdout)
+			.unwrap_or_else(|_| exit_error("Failed to call qaflisp"));
+		print!("{}", res);
 	}
+}
+
+fn exit_error(msg: &str) -> ! {
+	eprintln!("{}", msg);
+	process::exit(-1);
 }
