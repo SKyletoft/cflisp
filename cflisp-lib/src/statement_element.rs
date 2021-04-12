@@ -537,7 +537,7 @@ fn do_binary_operation<'a>(
 	Ok(())
 }
 
-fn do_ternary_op<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<(), ParseError> {
+fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		if let Some(Unparsed(StatementToken::Ternary(lhs))) = tokens.get(idx) {
