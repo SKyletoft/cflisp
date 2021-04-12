@@ -1,5 +1,5 @@
 use crate::*;
-use std::{borrow::Cow, ops::Add};
+use std::borrow::Cow;
 
 pub fn parse<'a>(
 	source: &'a str,
@@ -46,12 +46,9 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 		match tokens {
 			//Struct member assignment
 			[Token::Name(n), FieldAccess, Token::Name(field), Assign, ..] => {
-				let name = n.to_string().add("::").add(field);
+				let name = helper::merge_name_and_field(n, field);
 				let rhs = StatementElement::from_tokens(&tokens[4..])?;
-				LanguageElement::VariableAssignment {
-					name: Cow::Owned(name),
-					value: rhs,
-				}
+				LanguageElement::VariableAssignment { name, value: rhs }
 			}
 
 			//Struct member assignment through pointer
