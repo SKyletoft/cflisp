@@ -16,7 +16,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	load_a(instructions);
 	function_op_load_reduce(instructions);
 	repeat_a(instructions);
-	reduce_reserves(instructions)?;
+	//reduce_reserves(instructions)?;
 	nop(instructions); //Should go AFTER reduce reserves
 	inc(instructions);
 	inca(instructions);
@@ -434,6 +434,21 @@ fn inc(instructions: &mut Vec<CommentedInstruction>) {
 		if let (
 			(Instruction::LDA(from), _),
 			(Instruction::ADDA(Addressing::Data(1)), _),
+			(Instruction::STA(to), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if to == from {
+				instructions[idx].0 = Instruction::INC(to.clone());
+				instructions.remove(idx + 2);
+				instructions.remove(idx + 1);
+			}
+		}
+		if let (
+			(Instruction::LDA(Addressing::Data(1)), _),
+			(Instruction::ADDA(from), _),
 			(Instruction::STA(to), _),
 		) = (
 			&instructions[idx],
