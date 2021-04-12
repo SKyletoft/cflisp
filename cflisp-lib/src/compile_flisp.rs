@@ -305,56 +305,17 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
-			let then_str = format!("if_then_{}_{}", state.scope_name, state.line_id);
 			let else_str = format!("if_else_{}_{}", state.scope_name, state.line_id);
 			let end_str = format!("if_end_{}_{}", state.scope_name, state.line_id);
 			let mut cond = compile_statement(condition, state)?;
 			cond.push((Instruction::TSTA, None));
-			let mut then_stack = *state.stack_size;
-			let mut then_block = compile_elements(
-				then,
-				&mut State {
-					variables: &mut state.variables.clone(),
-					global_variables: state.global_variables,
-					functions: state.functions,
-					scope_name: &then_str,
-					stack_size: &mut then_stack,
-					line_id: state.line_id,
-				},
-				stack_base,
-				false,
-			)?;
-			if then_stack != *state.stack_size {
-				cond.push((
-					Instruction::LEASP(Addressing::SP(then_stack - *state.stack_size)),
-					None,
-				));
-			}
+			let mut then_block = compile_element(then, state, stack_base, optimise)?;
 			if let Some(v) = else_then {
-				let mut else_stack = *state.stack_size;
-				let mut else_block = compile_elements(
-					v,
-					&mut State {
-						variables: &mut state.variables.clone(),
-						global_variables: state.global_variables,
-						functions: state.functions,
-						scope_name: &else_str,
-						stack_size: &mut else_stack,
-						line_id: state.line_id,
-					},
-					stack_base,
-					false,
-				)?;
+				let mut else_block = compile_element(v, state, stack_base, optimise)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut else_block);
-				if else_stack != *state.stack_size {
-					cond.push((
-						Instruction::LEASP(Addressing::SP(else_stack - *state.stack_size)),
-						Some("This happened".into()),
-					));
-				}
 			} else {
 				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
 				cond.append(&mut then_block);
@@ -363,120 +324,31 @@ fn compile_element<'a>(
 			cond
 		}
 
-		LanguageElementStructless::For {
-			init,
-			condition,
-			post,
-			body,
-		} => {
-			let init_str = format!("for_init_{}_{}", state.scope_name, state.line_id);
-			let cond_str = format!("for_cond_{}_{}", state.scope_name, state.line_id);
-			let post_str = format!("for_post_{}_{}", state.scope_name, state.line_id);
-			let body_str = format!("for_body_{}_{}", state.scope_name, state.line_id);
-			let end_str = format!("for_end_{}_{}", state.scope_name, state.line_id);
-			let mut inner_variables = state.variables.clone();
-			let mut inner_stack = *state.stack_size;
-			let mut inner_state = State {
-				variables: &mut inner_variables,
-				global_variables: state.global_variables,
-				functions: state.functions,
-				scope_name: &init_str,
-				stack_size: &mut inner_stack,
-				line_id: state.line_id,
-			};
-			let mut instructions = compile_elements(init, &mut inner_state, stack_base, optimise)?;
-			instructions.push((Instruction::Label(cond_str.clone()), None));
-			instructions.append(&mut compile_statement(condition, &mut inner_state)?);
-			instructions.push((Instruction::TSTA, None));
-			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
-			let mut inner_inner_stack = inner_stack;
-			instructions.append(&mut compile_elements(
-				body,
-				&mut State {
-					variables: &mut inner_variables,
-					global_variables: state.global_variables,
-					functions: state.functions,
-					scope_name: &body_str,
-					stack_size: &mut inner_inner_stack,
-					line_id: state.line_id,
-				},
-				stack_base,
-				optimise,
-			)?);
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_inner_stack - inner_stack)),
-				None,
-			));
-			instructions.append(&mut compile_elements(
-				post,
-				&mut State {
-					variables: &mut inner_variables,
-					global_variables: state.global_variables,
-					functions: state.functions,
-					scope_name: &post_str,
-					stack_size: &mut inner_stack,
-					line_id: state.line_id,
-				},
-				stack_base,
-				optimise,
-			)?);
-			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
-			instructions.push((Instruction::Label(end_str), None));
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
-				None,
-			));
-			instructions
-		}
-
-		LanguageElementStructless::While { condition, body } => {
-			let cond_str = format!("while_cond_{}_{}", state.scope_name, state.line_id);
-			let body_str = format!("while_body_{}_{}", state.scope_name, state.line_id);
-			let end_str = format!("while_end_{}_{}", state.scope_name, state.line_id);
+		LanguageElementStructless::Loop { condition, body } => {
+			let cond_str = format!("cond_{}", state.scope_name);
+			let end_str = format!("end_{}", state.scope_name);
 			let mut instructions = vec![(Instruction::Label(cond_str.clone()), None)];
 			instructions.append(&mut compile_statement(condition, state)?);
 			instructions.push((Instruction::TSTA, None));
 			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
-			let mut inner_stack = *state.stack_size;
-			instructions.append(&mut compile_elements(
-				body,
-				&mut State {
-					variables: &mut state.variables.clone(),
-					global_variables: state.global_variables,
-					functions: state.functions,
-					scope_name: &body_str,
-					stack_size: &mut inner_stack,
-					line_id: state.line_id,
-				},
-				stack_base,
-				optimise,
-			)?);
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
-				None,
-			));
+			instructions.append(&mut compile_element(body, state, stack_base, optimise)?);
 			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
 			instructions.push((Instruction::Label(end_str), None));
 			instructions
 		}
 
 		LanguageElementStructless::Return(ret) => {
+			let stack_clear = (
+				Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
+				None,
+			);
 			if let Some(statement) = ret {
 				let mut statement = compile_statement(statement, state)?;
-				statement.push((
-					Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
-					None,
-				));
+				statement.push(stack_clear);
 				statement.push((Instruction::RTS, None));
 				statement
 			} else {
-				vec![
-					(
-						Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
-						None,
-					),
-					(Instruction::RTS, None),
-				]
+				vec![stack_clear, (Instruction::RTS, None)]
 			}
 		}
 
@@ -487,13 +359,10 @@ fn compile_element<'a>(
 			compile_statement(statement, state)?
 		}
 
-		LanguageElementStructless::Block {
-			block,
-			scope_name: _,
-		} => {
+		LanguageElementStructless::Block { block, scope_name } => {
 			let mut inner_variables = state.variables.clone();
 			let mut inner_stack = *state.stack_size;
-			let scope_name = state.scope_name.to_string() + "_scoped";
+			let scope_name = format!("{}_{}_{}", scope_name, state.scope_name, state.line_id);
 			let mut inner_state = State {
 				variables: &mut inner_variables,
 				global_variables: state.global_variables,
@@ -503,10 +372,10 @@ fn compile_element<'a>(
 				line_id: state.line_id,
 			};
 			let mut instructions = compile_elements(block, &mut inner_state, stack_base, optimise)?;
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(inner_stack - *state.stack_size)),
-				None,
-			));
+			let stack_diff = inner_stack - *state.stack_size;
+			if stack_diff != 0 {
+				instructions.push((Instruction::LEASP(Addressing::SP(stack_diff)), None));
+			}
 			instructions
 		}
 	};
@@ -534,12 +403,12 @@ fn compile_statement<'a>(
 	if tmps > 0 {
 		let mut block = vec![(
 			Instruction::LEASP(Addressing::SP(-tmps)),
-			Some(Cow::from("Reserving memory for statement")),
+			Some(Cow::Borrowed("Reserving memory for statement")),
 		)];
 		block.append(&mut statement_instructions);
 		block.append(&mut vec![(
 			Instruction::LEASP(Addressing::SP(tmps)), //why not -1?
-			Some(Cow::from("Clearing memory for statement")),
+			Some(Cow::Borrowed("Clearing memory for statement")),
 		)]);
 		statement_instructions = block;
 	};
@@ -903,7 +772,7 @@ fn compile_statement_inner<'a>(
 					vec![
 						(
 							Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)),
-							Some(Cow::from("SP -> Stack")),
+							Some(Cow::Borrowed("SP -> Stack")),
 						),
 						(
 							Instruction::ADDA(Addressing::SP(n)),

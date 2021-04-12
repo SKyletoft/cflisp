@@ -1,9 +1,21 @@
 use crate::*;
-use std::borrow::Cow;
 
 pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
 	statement_optimisation(elements)?;
 	dead_code_elimination(elements);
+	Ok(())
+}
+
+fn single_statement_optimisation(
+	element: &mut LanguageElementStructless,
+) -> Result<(), ParseError> {
+	if let LanguageElementStructless::Block {
+		block,
+		scope_name: _,
+	} = element
+	{
+		all_optimisations(block)?;
+	}
 	Ok(())
 }
 
@@ -38,25 +50,14 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 				else_then,
 			} => {
 				optimise_statement::all_optimisations(condition)?;
-				all_optimisations(then)?;
+				single_statement_optimisation(then)?;
 				if let Some(else_then) = else_then {
-					all_optimisations(else_then)?;
+					single_statement_optimisation(else_then)?;
 				}
 			}
-			LanguageElementStructless::For {
-				init,
-				condition,
-				post,
-				body,
-			} => {
+			LanguageElementStructless::Loop { condition, body } => {
 				optimise_statement::all_optimisations(condition)?;
-				all_optimisations(init)?;
-				all_optimisations(post)?;
-				all_optimisations(body)?;
-			}
-			LanguageElementStructless::While { condition, body } => {
-				optimise_statement::all_optimisations(condition)?;
-				all_optimisations(body)?;
+				single_statement_optimisation(body)?;
 			}
 			LanguageElementStructless::Return(_)
 			| LanguageElementStructless::Statement(_)
@@ -81,18 +82,10 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				then,
 				else_then,
 			} => match condition {
-				StatementElementStructless::Bool(true) => {
-					elements[idx] = LanguageElementStructless::Block {
-						block: then.clone(),
-						scope_name: Cow::Owned(String::from("if_then")),
-					};
-				}
+				StatementElementStructless::Bool(true) => elements[idx] = *then.clone(),
 				StatementElementStructless::Bool(false) => {
 					if let Some(else_then) = else_then {
-						elements[idx] = LanguageElementStructless::Block {
-							block: else_then.clone(),
-							scope_name: Cow::Owned(String::from("if_else")),
-						};
+						elements[idx] = *else_then.clone();
 					} else {
 						elements.remove(idx);
 						continue;
@@ -100,21 +93,7 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				}
 				_ => {}
 			},
-			LanguageElementStructless::For {
-				init,
-				condition,
-				post: _,
-				body: _,
-			} => {
-				if condition == &StatementElementStructless::Bool(false) {
-					elements[idx] = LanguageElementStructless::Block {
-						block: init.clone(),
-						scope_name: Cow::Owned(String::from("for_init")),
-					};
-					continue;
-				}
-			}
-			LanguageElementStructless::While { condition, body: _ } => {
+			LanguageElementStructless::Loop { condition, body: _ } => {
 				if condition == &StatementElementStructless::Bool(false) {
 					elements.remove(idx);
 					continue;

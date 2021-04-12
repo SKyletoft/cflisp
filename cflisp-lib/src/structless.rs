@@ -34,18 +34,12 @@ pub enum LanguageElementStructless<'a> {
 	},
 	IfStatement {
 		condition: StatementElementStructless<'a>,
-		then: BlockStructless<'a>,
-		else_then: Option<BlockStructless<'a>>,
+		then: Box<LanguageElementStructless<'a>>,
+		else_then: Option<Box<LanguageElementStructless<'a>>>,
 	},
-	For {
-		init: BlockStructless<'a>,
+	Loop {
 		condition: StatementElementStructless<'a>,
-		post: BlockStructless<'a>,
-		body: BlockStructless<'a>,
-	},
-	While {
-		condition: StatementElementStructless<'a>,
-		body: BlockStructless<'a>,
+		body: Box<LanguageElementStructless<'a>>,
 	},
 	Return(Option<StatementElementStructless<'a>>),
 	Statement(StatementElementStructless<'a>),
@@ -311,20 +305,26 @@ impl<'a> LanguageElementStructless<'a> {
 						structs_and_struct_pointers,
 						functions,
 					)?,
-					then: LanguageElementStructless::from_language_elements_internal(
-						then,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?,
-					//no, clippy, this can't be replaced with a Option::map
-					else_then: if let Some(else_then) = else_then {
-						Some(LanguageElementStructless::from_language_elements_internal(
-							else_then,
+					then: Box::new(LanguageElementStructless::Block {
+						block: LanguageElementStructless::from_language_elements_internal(
+							then,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
-						)?)
+						)?,
+						scope_name: Cow::Borrowed("if_then"),
+					}),
+					//no, clippy, this can't be replaced with a Option::map
+					else_then: if let Some(else_then) = else_then {
+						Some(Box::new(LanguageElementStructless::Block {
+							block: LanguageElementStructless::from_language_elements_internal(
+								else_then,
+								struct_types,
+								structs_and_struct_pointers,
+								functions,
+							)?,
+							scope_name: Cow::Borrowed("if_else"),
+						}))
 					} else {
 						None
 					},
@@ -334,46 +334,64 @@ impl<'a> LanguageElementStructless<'a> {
 					condition,
 					post,
 					body,
-				} => new_elements.push(LanguageElementStructless::For {
-					init: LanguageElementStructless::from_language_elements_internal(
-						init,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?,
-					condition: StatementElementStructless::from(
+				} => {
+					let mut init_block =
+						LanguageElementStructless::from_language_elements_internal(
+							init,
+							struct_types,
+							structs_and_struct_pointers,
+							functions,
+						)?;
+					let condition = StatementElementStructless::from(
 						&condition,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
-					)?,
-					post: LanguageElementStructless::from_language_elements_internal(
-						post,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?,
-					body: LanguageElementStructless::from_language_elements_internal(
+					)?;
+					let mut body = LanguageElementStructless::from_language_elements_internal(
 						body,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
-					)?,
-				}),
+					)?;
+					let mut post = LanguageElementStructless::from_language_elements_internal(
+						post,
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?;
+
+					body.append(&mut post);
+					init_block.push(LanguageElementStructless::Loop {
+						condition,
+						body: Box::new(LanguageElementStructless::Block {
+							scope_name: Cow::Borrowed("for_body"),
+							block: body,
+						}),
+					});
+
+					new_elements.push(LanguageElementStructless::Block {
+						scope_name: Cow::Borrowed("for_init"),
+						block: init_block,
+					})
+				}
 				LanguageElement::While { condition, body } => {
-					new_elements.push(LanguageElementStructless::While {
+					new_elements.push(LanguageElementStructless::Loop {
 						condition: StatementElementStructless::from(
 							&condition,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
-						body: LanguageElementStructless::from_language_elements_internal(
-							body,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-						)?,
+						body: Box::new(LanguageElementStructless::Block {
+							block: LanguageElementStructless::from_language_elements_internal(
+								body,
+								struct_types,
+								structs_and_struct_pointers,
+								functions,
+							)?,
+							scope_name: Cow::Borrowed("while_body"),
+						}),
 					})
 				}
 				LanguageElement::Return(ret) => {
