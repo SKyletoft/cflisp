@@ -76,3 +76,51 @@ fn const_eval() {
 	optimise_statement::const_eval(&mut case_3);
 	assert_eq!(case_3, expected_3);
 }
+
+#[test]
+fn remove_unused_variables() {
+	let mut case_1 = vec![
+		LanguageElementStructless::VariableDeclarationAssignment {
+			name: Cow::Borrowed("x"),
+			typ: NativeType::Int,
+			value: StatementElementStructless::Num(5),
+			is_static: false,
+		},
+		LanguageElementStructless::VariableDeclarationAssignment {
+			name: Cow::Borrowed("y"),
+			typ: NativeType::Int,
+			value: StatementElementStructless::Add {
+				lhs: Box::new(StatementElementStructless::Num(1)),
+				rhs: Box::new(StatementElementStructless::Var(Cow::Borrowed("x"))),
+			},
+			is_static: false,
+		},
+		LanguageElementStructless::VariableDeclarationAssignment {
+			name: Cow::Borrowed("z"),
+			typ: NativeType::Int,
+			value: StatementElementStructless::Num(5),
+			is_static: false,
+		},
+		LanguageElementStructless::Statement(StatementElementStructless::Var(Cow::Borrowed("y"))),
+	];
+	let expected_1 = vec![
+		LanguageElementStructless::VariableDeclarationAssignment {
+			name: Cow::Borrowed("x"),
+			typ: NativeType::Int,
+			value: StatementElementStructless::Num(5),
+			is_static: false,
+		},
+		LanguageElementStructless::VariableDeclarationAssignment {
+			name: Cow::Borrowed("y"),
+			typ: NativeType::Int,
+			value: StatementElementStructless::Add {
+				lhs: Box::new(StatementElementStructless::Num(1)),
+				rhs: Box::new(StatementElementStructless::Var(Cow::Borrowed("x"))),
+			},
+			is_static: false,
+		},
+		LanguageElementStructless::Statement(StatementElementStructless::Var(Cow::Borrowed("y"))),
+	];
+	optimise_language::remove_unused_variables(&mut case_1);
+	assert_eq!(case_1, expected_1);
+}
