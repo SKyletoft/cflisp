@@ -1,10 +1,8 @@
 use crate::*;
 use std::{borrow::Cow, collections::HashMap};
 
-///Internal representation of the program.
-/// Can represent any language pattern considered valid.
-/// (language patterns are complete lines. Right hand side
-/// statements are `StatementElement`s)
+///Simplified internal representation of a program.
+/// Doesn't contain structs or for loops
 #[derive(Debug, Clone, PartialEq)]
 pub enum LanguageElementStructless<'a> {
 	VariableDeclaration {
@@ -841,55 +839,7 @@ impl<'a> StatementElementStructless<'a> {
 }
 
 impl<'a> StatementElementStructless<'a> {
-	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
-	pub fn as_flisp_instruction(&self, adr: Addressing) -> Result<Instruction, CompileError> {
-		let res = match self {
-			StatementElementStructless::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
-			StatementElementStructless::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::Mul { lhs: _, rhs: _ }
-			| StatementElementStructless::Div { lhs: _, rhs: _ }
-			| StatementElementStructless::Mod { lhs: _, rhs: _ } => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: function call, not instruction?",
-				));
-			}
-			StatementElementStructless::LShift { lhs: _, rhs: _ } => Instruction::LSLA,
-			StatementElementStructless::RShift { lhs: _, rhs: _ } => Instruction::LSRA,
-			StatementElementStructless::And { lhs: _, rhs: _ } => Instruction::ANDA(adr),
-			StatementElementStructless::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
-			StatementElementStructless::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
-			StatementElementStructless::Not { lhs: _ } => Instruction::COMA,
-			StatementElementStructless::GreaterThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::LessThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::GreaterThanEqual { lhs: _, rhs: _ } => {
-				Instruction::SUBA(adr)
-			}
-			StatementElementStructless::LessThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::NotCmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElementStructless::Var(_)
-			| StatementElementStructless::Num(_)
-			| StatementElementStructless::Char(_)
-			| StatementElementStructless::Bool(_)
-			| StatementElementStructless::Array(_)
-			| StatementElementStructless::Deref(_)
-			| StatementElementStructless::AdrOf(_)
-			| StatementElementStructless::FunctionCall {
-				name: _,
-				parametres: _,
-			} => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: special cases and literals, not instructions?",
-				))
-			}
-		};
-
-		Ok(res)
-	}
-
-	pub fn depth(&self) -> usize {
+	pub(crate) fn depth(&self) -> usize {
 		let rest = match self {
 			StatementElementStructless::Add { lhs, rhs }
 			| StatementElementStructless::Sub { lhs, rhs }
@@ -925,7 +875,7 @@ impl<'a> StatementElementStructless<'a> {
 		rest + 1
 	}
 
-	pub fn internal_ref(
+	pub(crate) fn internal_ref(
 		&self,
 	) -> Option<(&StatementElementStructless, &StatementElementStructless)> {
 		match self {

@@ -9,7 +9,7 @@ pub struct Variable<'a> {
 }
 
 impl<'a> Variable<'a> {
-	pub fn split_into_native(
+	pub(crate) fn split_into_native(
 		self,
 		struct_defs: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
@@ -86,7 +86,7 @@ pub enum Type<'a> {
 }
 
 impl<'a> Type<'a> {
-	pub fn ptr(target: Type<'a>) -> Type<'a> {
+	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
 		Type::Ptr(Box::new(target))
 	}
 }
@@ -104,7 +104,7 @@ pub enum NativeType {
 }
 
 impl NativeType {
-	pub fn ptr(target: NativeType) -> NativeType {
+	pub(crate) fn ptr(target: NativeType) -> NativeType {
 		NativeType::Ptr(Box::new(target))
 	}
 }
@@ -143,7 +143,7 @@ impl<'a> From<&NativeType> for Type<'a> {
 }
 
 impl<'a> Type<'a> {
-	pub fn get_struct_type(&self) -> Option<&'a str> {
+	pub(crate) fn get_struct_type(&self) -> Option<&'a str> {
 		match self {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
 			Type::Struct(n) => Some(n),

@@ -1,3 +1,4 @@
+use crate::*;
 use std::{borrow::Cow, fmt};
 
 // Replace Cow<'a, str> with a Cow<String>?
@@ -139,8 +140,53 @@ impl fmt::UpperHex for Instruction {
 }
 
 impl Instruction {
+	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
+	pub(crate) fn from_statement_element_structless(
+		elem: &StatementElementStructless,
+		adr: Addressing,
+	) -> Result<Instruction, CompileError> {
+		let res = match elem {
+			StatementElementStructless::Add { .. } => Instruction::ADDA(adr),
+			StatementElementStructless::Sub { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::Mul { .. }
+			| StatementElementStructless::Div { .. }
+			| StatementElementStructless::Mod { .. } => {
+				return Err(CompileError(
+					line!(),
+					"Internal error: function call, not instruction?",
+				));
+			}
+			StatementElementStructless::LShift { .. } => Instruction::LSLA,
+			StatementElementStructless::RShift { .. } => Instruction::LSRA,
+			StatementElementStructless::And { .. } => Instruction::ANDA(adr),
+			StatementElementStructless::Or { .. } => Instruction::ORA(adr),
+			StatementElementStructless::Xor { .. } => Instruction::EORA(adr),
+			StatementElementStructless::Not { lhs: _ } => Instruction::COMA,
+			StatementElementStructless::GreaterThan { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::LessThan { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::GreaterThanEqual { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::LessThanEqual { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::Cmp { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::NotCmp { .. } => Instruction::SUBA(adr),
+			StatementElementStructless::Var(_)
+			| StatementElementStructless::Num(_)
+			| StatementElementStructless::Char(_)
+			| StatementElementStructless::Bool(_)
+			| StatementElementStructless::Array(_)
+			| StatementElementStructless::Deref(_)
+			| StatementElementStructless::AdrOf(_)
+			| StatementElementStructless::FunctionCall { .. } => {
+				return Err(CompileError(
+					line!(),
+					"Internal error: special cases and literals, not instructions?",
+				))
+			}
+		};
+
+		Ok(res)
+	}
 	///The size in bytes that it will take up in the final compiled binary
-	pub fn size(&self) -> usize {
+	pub(crate) fn size(&self) -> usize {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -180,7 +226,7 @@ impl Instruction {
 	}
 
 	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
-	pub fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
+	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -220,7 +266,7 @@ impl Instruction {
 	}
 
 	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
-	pub fn get_adr(&self) -> Option<&Addressing> {
+	pub(crate) fn get_adr(&self) -> Option<&Addressing> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)

@@ -1,11 +1,5 @@
 use crate::*;
 
-///Removes the first and last characters. Panics if the string is too short
-pub fn remove_parentheses(s: &str) -> &str {
-	assert!(s.len() >= 2);
-	s[1..s.len() - 1].trim()
-}
-
 //Correctness says return a Result. Ergonomics say trust the user to read the docs
 ///Returns 0 on invalid
 fn hex_digit_value(digit: u8) -> isize {
@@ -248,7 +242,7 @@ fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 		.map(|(pat, _, t)| (t(), s[pat.len()..].trim()))
 }
 
-pub fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
+pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 	None.or_else(|| get_number(s))
 		.or_else(|| get_single_token_match(s))
 		.or_else(|| get_parenthesis(s))

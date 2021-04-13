@@ -71,7 +71,7 @@ pub enum LanguageElement<'a> {
 }
 
 impl<'a> LanguageElement<'a> {
-	pub fn make_static(mut self) -> Result<Self, ParseError> {
+	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
 		match &mut self {
 			LanguageElement::VariableDeclaration {
 				typ: _,

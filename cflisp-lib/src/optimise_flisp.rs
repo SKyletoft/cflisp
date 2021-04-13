@@ -1,5 +1,5 @@
 use crate::*;
-use std::{cmp::Ordering, collections::HashSet};
+use std::{cmp::Ordering, collections::HashSet, iter};
 
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
@@ -659,14 +659,14 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 
 ///Removes labels that are never used. Includes everything, even function names
 pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
-	let mut jumps_to = instructions
+	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst.get_adr() {
 			Some(Addressing::Label(lbl)) => Some(lbl.clone()),
 			_ => None,
 		})
+		.chain(iter::once("main".to_string()))
 		.collect::<HashSet<String>>();
-	jumps_to.insert("main".to_string());
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
 			jumps_to.contains(lbl)
