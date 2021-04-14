@@ -509,250 +509,59 @@ impl<'a> StatementElementStructless<'a> {
 		structs_and_struct_pointers: &HashMap<Cow<'a, str>, &'a str>,
 		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Self, ParseError> {
+		macro_rules! bin_op {
+			($i:ident, $lhs:expr, $rhs: expr) => {
+				StatementElementStructless::$i {
+					lhs: Box::new(StatementElementStructless::from(
+						$lhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+					rhs: Box::new(StatementElementStructless::from(
+						$rhs.as_ref(),
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?),
+				}
+			};
+		}
+		macro_rules! un_op {
+			($i:ident, $lhs:expr) => {
+				StatementElementStructless::$i(Box::new(StatementElementStructless::from(
+					$lhs.as_ref(),
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+				)?))
+			};
+		}
+
 		//Todo! Figure out macro_rules for this repetition nonsense
 		let res = match other {
-			StatementElement::Add { lhs, rhs } => StatementElementStructless::Add {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::Sub { lhs, rhs } => StatementElementStructless::Sub {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::Mul { lhs, rhs } => StatementElementStructless::Mul {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::Div { lhs, rhs } => StatementElementStructless::Div {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::Mod { lhs, rhs } => StatementElementStructless::Mod {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::LShift { lhs, rhs } => StatementElementStructless::LShift {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::RShift { lhs, rhs } => StatementElementStructless::RShift {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
+			StatementElement::Add { lhs, rhs } => bin_op!(Add, lhs, rhs),
+			StatementElement::Sub { lhs, rhs } => bin_op!(Sub, lhs, rhs),
+			StatementElement::Mul { lhs, rhs } => bin_op!(Mul, lhs, rhs),
+			StatementElement::Div { lhs, rhs } => bin_op!(Div, lhs, rhs),
+			StatementElement::Mod { lhs, rhs } => bin_op!(Mod, lhs, rhs),
+			StatementElement::LShift { lhs, rhs } => bin_op!(LShift, lhs, rhs),
+			StatementElement::RShift { lhs, rhs } => bin_op!(RShift, lhs, rhs),
 			StatementElement::BoolAnd { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
-				StatementElementStructless::And {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-					rhs: Box::new(StatementElementStructless::from(
-						rhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
+				bin_op!(And, lhs, rhs)
 			}
 			StatementElement::BoolOr { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
-				StatementElementStructless::Or {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-					rhs: Box::new(StatementElementStructless::from(
-						rhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
+				bin_op!(Or, lhs, rhs)
 			}
-			StatementElement::Xor { lhs, rhs } => StatementElementStructless::Xor {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::GreaterThan { lhs, rhs } => StatementElementStructless::GreaterThan {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::LessThan { lhs, rhs } => StatementElementStructless::LessThan {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::GreaterThanEqual { lhs, rhs } => {
-				StatementElementStructless::GreaterThanEqual {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-					rhs: Box::new(StatementElementStructless::from(
-						rhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
-			}
-			StatementElement::LessThanEqual { lhs, rhs } => {
-				StatementElementStructless::LessThanEqual {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-					rhs: Box::new(StatementElementStructless::from(
-						rhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
-			}
-			StatementElement::Cmp { lhs, rhs } => StatementElementStructless::Cmp {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-			StatementElement::NotCmp { lhs, rhs } => StatementElementStructless::NotCmp {
-				lhs: Box::new(StatementElementStructless::from(
-					lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-				rhs: Box::new(StatementElementStructless::from(
-					rhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?),
-			},
-
+			StatementElement::Xor { lhs, rhs } => bin_op!(Xor, lhs, rhs),
+			StatementElement::GreaterThan { lhs, rhs } => bin_op!(GreaterThan, lhs, rhs),
+			StatementElement::LessThan { lhs, rhs } => bin_op!(LessThan, lhs, rhs),
+			StatementElement::GreaterThanEqual { lhs, rhs } => bin_op!(GreaterThanEqual, lhs, rhs),
+			StatementElement::LessThanEqual { lhs, rhs } => bin_op!(LessThanEqual, lhs, rhs),
+			StatementElement::Cmp { lhs, rhs } => bin_op!(Cmp, lhs, rhs),
+			StatementElement::NotCmp { lhs, rhs } => bin_op!(NotCmp, lhs, rhs),
 			StatementElement::BoolNot { lhs } | StatementElement::BitNot { lhs } => {
-				StatementElementStructless::Not {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
+				un_op!(Not, lhs)
 			}
 
 			StatementElement::FunctionCall { name, parametres } => {
@@ -804,14 +613,7 @@ impl<'a> StatementElementStructless<'a> {
 					})
 					.collect::<Result<_, _>>()?,
 			),
-			StatementElement::Deref(n) => {
-				StatementElementStructless::Deref(Box::new(StatementElementStructless::from(
-					n,
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-				)?))
-			}
+			StatementElement::Deref(n) => un_op!(Deref, n),
 			StatementElement::AdrOf(n) => StatementElementStructless::AdrOf(n.clone()),
 
 			StatementElement::FieldPointerAccess(name, field) => {
