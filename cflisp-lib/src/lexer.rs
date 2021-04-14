@@ -73,20 +73,18 @@ fn get_number(s: &str) -> Option<(Token, &str)> {
 		.or_else(|| get_positive_number(s))
 }
 
-///Gets a complete statement in parenthesis. Returns None on unmatched parentheses.
-/// The parentheses are not in the string in the UnparsedParentheses token
-fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
-	if !s.starts_with('(') {
+fn get_prio_section(start: char, end: char, s: &str) -> Option<(&str, &str)> {
+	if !s.starts_with(start) {
 		return None;
 	}
 	let mut parentheses = 0;
 	let mut len = 0;
 	for c in s.chars() {
 		len += 1;
-		match c {
-			'(' => parentheses += 1,
-			')' => parentheses -= 1,
-			_ => {}
+		if c == start {
+			parentheses += 1;
+		} else if c == end {
+			parentheses -= 1;
 		}
 		if parentheses == 0 {
 			break;
@@ -95,91 +93,34 @@ fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
 	if parentheses != 0 {
 		return None;
 	}
-	let token = Token::UnparsedParentheses(&s[1..len - 1]);
+	let token = &s[1..len - 1];
 	let rest = &s[len..];
 	Some((token, rest))
+}
+
+///Gets a complete statement in parenthesis. Returns None on unmatched parentheses.
+/// The parentheses are not in the string in the UnparsedParentheses token
+fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
+	get_prio_section('(', ')', s).map(|(a, b)| (Token::UnparsedParentheses(a), b))
 }
 
 ///Gets a complete statement in curly brackets. Returns None on unmatched brackets.
 /// The brackets are not in the string in the UnparsedBlock token
 fn get_block(s: &str) -> Option<(Token, &str)> {
-	if !s.starts_with('{') {
-		return None;
-	}
-	let mut parentheses = 0;
-	let mut len = 0;
-	for c in s.chars() {
-		len += 1;
-		match c {
-			'{' => parentheses += 1,
-			'}' => parentheses -= 1,
-			_ => {}
-		}
-		if parentheses == 0 {
-			break;
-		}
-	}
-	if parentheses != 0 {
-		return None;
-	}
-	let token = Token::UnparsedBlock(&s[1..len - 1]);
-	let rest = &s[len..];
-	Some((token, rest))
+	get_prio_section('{', '}', s).map(|(a, b)| (Token::UnparsedBlock(a), b))
 }
 
 ///Gets the middle part of a ternary statement to later be used as a binary operator
 /// if the expression lack a colon None will be returned.
 /// `?` and `:` are not included in the string
 fn get_ternary_op(s: &str) -> Option<(Token, &str)> {
-	if !s.starts_with('?') {
-		return None;
-	}
-	let mut parentheses = 0;
-	let mut len = 0;
-	for c in s.chars() {
-		len += 1;
-		match c {
-			'?' => parentheses += 1,
-			':' => parentheses -= 1,
-			_ => {}
-		}
-		if parentheses == 0 {
-			break;
-		}
-	}
-	if parentheses != 0 {
-		return None;
-	}
-	let token = Token::Ternary(&s[1..len - 1]);
-	let rest = &s[len..];
-	Some((token, rest))
+	get_prio_section('?', ':', s).map(|(a, b)| (Token::Ternary(a), b))
 }
 
 ///Gets a complete statement in square brackets. Returns None on unmatched brackets.
 /// The brackets are not in the string in the UnparsedArrayAccess token
 fn get_array_access(s: &str) -> Option<(Token, &str)> {
-	if !s.starts_with('[') {
-		return None;
-	}
-	let mut parentheses = 0;
-	let mut len = 0;
-	for c in s.chars() {
-		len += 1;
-		match c {
-			'[' => parentheses += 1,
-			']' => parentheses -= 1,
-			_ => {}
-		}
-		if parentheses == 0 {
-			break;
-		}
-	}
-	if parentheses != 0 {
-		return None;
-	}
-	let token = Token::UnparsedArrayAccess(&s[1..len - 1]);
-	let rest = &s[len..];
-	Some((token, rest))
+	get_prio_section('[', ']', s).map(|(a, b)| (Token::UnparsedArrayAccess(a), b))
 }
 
 ///Gets char in apostrophes. returns None on unmatched apostrophes
