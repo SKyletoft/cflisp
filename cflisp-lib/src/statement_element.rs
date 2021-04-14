@@ -40,9 +40,7 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	BitNot {
-		lhs: Box<StatementElement<'a>>,
-	},
+	BitNot(Box<StatementElement<'a>>),
 	BoolAnd {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -51,9 +49,7 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	BoolNot {
-		lhs: Box<StatementElement<'a>>,
-	},
+	BoolNot(Box<StatementElement<'a>>),
 	Xor {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -226,7 +222,7 @@ impl<'a> StatementElement<'a> {
 		macro_rules! gen_unary_op {
 			($i:ident) => {
 				(Unparsed(StatementToken::$i), |l| {
-					Ok(StatementElement::$i { lhs: Box::new(l) })
+					Ok(StatementElement::$i(Box::new(l)))
 				})
 			};
 		}
@@ -275,7 +271,6 @@ impl<'a> StatementElement<'a> {
 		for (from, to) in un_ops.iter() {
 			do_unary_operation(&mut working_tokens, from, *to)?;
 		}
-
 		for (from, to) in bin_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}

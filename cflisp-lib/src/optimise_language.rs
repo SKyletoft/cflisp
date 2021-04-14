@@ -11,11 +11,7 @@ pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Resul
 fn single_statement_optimisation(
 	element: &mut LanguageElementStructless,
 ) -> Result<(), ParseError> {
-	if let LanguageElementStructless::Block {
-		block,
-		scope_name: _,
-	} = element
-	{
+	if let LanguageElementStructless::Block { block, .. } = element {
 		all_optimisations(block)?;
 	}
 	Ok(())
@@ -25,25 +21,15 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 	for element in elements {
 		match element {
 			LanguageElementStructless::VariableDeclaration { .. } => {}
-			LanguageElementStructless::VariableAssignment { name: _, value }
-			| LanguageElementStructless::VariableDeclarationAssignment {
-				typ: _,
-				name: _,
-				value,
-				is_static: _,
-			} => {
+			LanguageElementStructless::VariableAssignment { value, .. }
+			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
 				optimise_statement::all_optimisations(value)?;
 			}
 			LanguageElementStructless::PointerAssignment { ptr, value } => {
 				optimise_statement::all_optimisations(ptr)?;
 				optimise_statement::all_optimisations(value)?;
 			}
-			LanguageElementStructless::FunctionDeclaration {
-				typ: _,
-				name: _,
-				args: _,
-				block,
-			} => {
+			LanguageElementStructless::FunctionDeclaration { block, .. } => {
 				all_optimisations(block)?;
 			}
 			LanguageElementStructless::IfStatement {
@@ -64,10 +50,7 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 			LanguageElementStructless::Return(_)
 			| LanguageElementStructless::Statement(_)
 			| LanguageElementStructless::StructDeclaration { .. } => {}
-			LanguageElementStructless::Block {
-				block,
-				scope_name: _,
-			} => {
+			LanguageElementStructless::Block { block, .. } => {
 				all_optimisations(block)?;
 			}
 		}
@@ -121,17 +104,8 @@ pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructle
 	let mut used_variables = HashSet::new();
 	find_variables_le(&mut used_variables, elements);
 	elements.retain(|elem| match elem {
-		LanguageElementStructless::VariableDeclarationAssignment {
-			typ: _,
-			name,
-			value: _,
-			is_static: _,
-		}
-		| LanguageElementStructless::VariableDeclaration {
-			typ: _,
-			name,
-			is_static: _,
-		} => {
+		LanguageElementStructless::VariableDeclarationAssignment { name, .. }
+		| LanguageElementStructless::VariableDeclaration { name, .. } => {
 			let name: &str = name;
 			used_variables.contains(name)
 		}
@@ -145,13 +119,8 @@ fn find_variables_le<'a>(
 ) {
 	for element in elements {
 		match element {
-			LanguageElementStructless::VariableAssignment { name: _, value }
-			| LanguageElementStructless::VariableDeclarationAssignment {
-				typ: _,
-				name: _,
-				value,
-				is_static: _,
-			} => {
+			LanguageElementStructless::VariableAssignment { value, .. }
+			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
 				find_variables_se(vars, value);
 			}
 			LanguageElementStructless::PointerAssignment { ptr, value } => {
@@ -170,7 +139,7 @@ fn find_variables_le<'a>(
 			LanguageElementStructless::IfStatement {
 				condition,
 				then: body,
-				else_then: _,
+				..
 			}
 			| LanguageElementStructless::Loop { condition, body } => {
 				find_variables_se(vars, condition);
@@ -180,10 +149,7 @@ fn find_variables_le<'a>(
 			| LanguageElementStructless::Statement(statement) => {
 				find_variables_se(vars, statement);
 			}
-			LanguageElementStructless::Block {
-				block,
-				scope_name: _,
-			} => {
+			LanguageElementStructless::Block { block, .. } => {
 				find_variables_le(vars, block);
 			}
 
@@ -213,7 +179,7 @@ fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StatementEleme
 			find_variables_se(vars, lhs);
 			find_variables_se(vars, rhs);
 		}
-		StatementElementStructless::Deref(lhs) | StatementElementStructless::Not { lhs } => {
+		StatementElementStructless::Deref(lhs) | StatementElementStructless::Not(lhs) => {
 			find_variables_se(vars, lhs);
 		}
 		StatementElementStructless::FunctionCall { .. }

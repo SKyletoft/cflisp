@@ -161,7 +161,7 @@ impl Instruction {
 			StatementElementStructless::And { .. } => Instruction::ANDA(adr),
 			StatementElementStructless::Or { .. } => Instruction::ORA(adr),
 			StatementElementStructless::Xor { .. } => Instruction::EORA(adr),
-			StatementElementStructless::Not { lhs: _ } => Instruction::COMA,
+			StatementElementStructless::Not(_) => Instruction::COMA,
 			StatementElementStructless::GreaterThan { .. } => Instruction::SUBA(adr),
 			StatementElementStructless::LessThan { .. } => Instruction::SUBA(adr),
 			StatementElementStructless::GreaterThanEqual { .. } => Instruction::SUBA(adr),

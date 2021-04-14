@@ -14,28 +14,21 @@ pub fn language_element(
 
 	for line in block {
 		match line {
-			LanguageElement::VariableDeclaration {
-				typ,
-				name,
-				is_static: _,
-			} => {
+			LanguageElement::VariableDeclaration { typ, name, .. } => {
 				variables.insert(Variable {
 					typ: typ.clone(),
 					name: name.as_ref(),
 				});
 			}
 
-			LanguageElement::VariableAssignment { name: _, value } => {
+			LanguageElement::VariableAssignment { value, .. } => {
 				if !statement_element(value, &variables, &functions, &structs)? {
 					return Ok(false);
 				}
 			}
 
 			LanguageElement::VariableDeclarationAssignment {
-				typ,
-				name,
-				value,
-				is_static: _,
+				typ, name, value, ..
 			} => {
 				variables.insert(Variable {
 					typ: typ.clone(),
@@ -137,10 +130,7 @@ pub fn language_element(
 			}
 
 			LanguageElement::StructDeclarationAssignment {
-				typ,
-				name,
-				value,
-				is_static: _,
+				typ, name, value, ..
 			} => {
 				variables.insert(Variable {
 					typ: typ.clone(),
@@ -202,28 +192,25 @@ pub(crate) fn type_of(
 		StatementElement::Num(_) => NativeType::Int,
 		StatementElement::Char(_) => NativeType::Char,
 		StatementElement::Bool(_) => NativeType::Bool,
-		StatementElement::Add { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::Sub { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::Mul { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::Div { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::Mod { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::LShift { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::RShift { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::BoolAnd { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::BoolOr { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::Xor { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::BoolNot { lhs: _ } => NativeType::Bool,
-		StatementElement::GreaterThan { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::LessThan { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::LessThanEqual { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::Cmp { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::NotCmp { lhs: _, rhs: _ } => NativeType::Bool,
+		StatementElement::Add { .. } => NativeType::Int,
+		StatementElement::Sub { .. } => NativeType::Int,
+		StatementElement::Mul { .. } => NativeType::Int,
+		StatementElement::Div { .. } => NativeType::Int,
+		StatementElement::Mod { .. } => NativeType::Int,
+		StatementElement::LShift { .. } => NativeType::Int,
+		StatementElement::RShift { .. } => NativeType::Int,
+		StatementElement::BoolAnd { .. } => NativeType::Bool,
+		StatementElement::BoolOr { .. } => NativeType::Bool,
+		StatementElement::Xor { .. } => NativeType::Bool,
+		StatementElement::BoolNot(_) => NativeType::Bool,
+		StatementElement::GreaterThan { .. } => NativeType::Bool,
+		StatementElement::LessThan { .. } => NativeType::Bool,
+		StatementElement::GreaterThanEqual { .. } => NativeType::Bool,
+		StatementElement::LessThanEqual { .. } => NativeType::Bool,
+		StatementElement::Cmp { .. } => NativeType::Bool,
+		StatementElement::NotCmp { .. } => NativeType::Bool,
 
-		StatementElement::FunctionCall {
-			name,
-			parametres: _,
-		} => functions
+		StatementElement::FunctionCall { name, .. } => functions
 			.iter()
 			.find(|f| f.name == name)
 			.map(|f| f.return_type.clone())
@@ -301,7 +288,7 @@ pub fn statement_element(
 				&& statement_element(rhs.as_ref(), variables, functions, structs)?
 		}
 
-		StatementElement::BoolNot { lhs } => {
+		StatementElement::BoolNot(lhs) => {
 			statement_element(lhs.as_ref(), variables, functions, structs)?
 		}
 

@@ -73,27 +73,13 @@ pub enum LanguageElement<'a> {
 impl<'a> LanguageElement<'a> {
 	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
 		match &mut self {
-			LanguageElement::VariableDeclaration {
-				typ: _,
-				name: _,
-				is_static,
-			} => {
+			LanguageElement::VariableDeclaration { is_static, .. } => {
 				*is_static = true;
 			}
-			LanguageElement::VariableDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static,
-			} => {
+			LanguageElement::VariableDeclarationAssignment { is_static, .. } => {
 				*is_static = true;
 			}
-			LanguageElement::StructDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static,
-			} => {
+			LanguageElement::StructDeclarationAssignment { is_static, .. } => {
 				*is_static = true;
 			}
 			_ => {

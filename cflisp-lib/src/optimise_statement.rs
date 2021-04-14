@@ -128,7 +128,7 @@ pub(crate) fn const_eval<'a>(
 			.or_else(|| {
 				maybe_get_bools(lhs, rhs).map(|(a, b)| StatementElementStructless::Bool(a ^ b))
 			}),
-		StatementElementStructless::Not { lhs } => match const_eval(lhs.as_mut()) {
+		StatementElementStructless::Not(lhs) => match const_eval(lhs.as_mut()) {
 			Some(StatementElementStructless::Num(a)) => Some(StatementElementStructless::Num(!a)),
 			Some(StatementElementStructless::Bool(a)) => Some(StatementElementStructless::Bool(!a)),
 			_ => None,

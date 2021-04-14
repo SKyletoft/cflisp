@@ -239,7 +239,7 @@ impl<'a> LanguageElementStructless<'a> {
 						.ok_or(ParseError(line!(), "Undefined struct type"))?;
 					let idx = fields
 						.iter()
-						.position(|&Variable { typ: _, name }| name == field)
+						.position(|&Variable { name, .. }| name == field)
 						.ok_or(ParseError(line!(), "Unknown field name"))?;
 					let new_ptr = if idx == 0 {
 						StatementElementStructless::Var(name)
@@ -462,9 +462,7 @@ pub enum StatementElementStructless<'a> {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
 	},
-	Not {
-		lhs: Box<StatementElementStructless<'a>>,
-	},
+	Not(Box<StatementElementStructless<'a>>),
 	GreaterThan {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
@@ -560,7 +558,7 @@ impl<'a> StatementElementStructless<'a> {
 			StatementElement::LessThanEqual { lhs, rhs } => bin_op!(LessThanEqual, lhs, rhs),
 			StatementElement::Cmp { lhs, rhs } => bin_op!(Cmp, lhs, rhs),
 			StatementElement::NotCmp { lhs, rhs } => bin_op!(NotCmp, lhs, rhs),
-			StatementElement::BoolNot { lhs } | StatementElement::BitNot { lhs } => {
+			StatementElement::BoolNot(lhs) | StatementElement::BitNot(lhs) => {
 				un_op!(Not, lhs)
 			}
 
@@ -661,7 +659,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::NotCmp { lhs, rhs } => {
 				lhs.as_ref().depth().max(rhs.as_ref().depth())
 			}
-			StatementElementStructless::Not { lhs } => lhs.as_ref().depth(),
+			StatementElementStructless::Not(lhs) => lhs.as_ref().depth(),
 			StatementElementStructless::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElementStructless::Deref(n) => n.as_ref().depth(),
 			StatementElementStructless::Var(_)
@@ -669,10 +667,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::Char(_)
 			| StatementElementStructless::Bool(_)
 			| StatementElementStructless::AdrOf(_) => 0,
-			StatementElementStructless::FunctionCall {
-				name: _,
-				parametres: _,
-			} => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
+			StatementElementStructless::FunctionCall { .. } => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
 		};
 		rest + 1
 	}
@@ -697,11 +692,8 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::LessThanEqual { lhs, rhs }
 			| StatementElementStructless::NotCmp { lhs, rhs }
 			| StatementElementStructless::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
-			StatementElementStructless::Not { lhs: _ }
-			| StatementElementStructless::FunctionCall {
-				name: _,
-				parametres: _,
-			}
+			StatementElementStructless::Not(_)
+			| StatementElementStructless::FunctionCall { .. }
 			| StatementElementStructless::Var(_)
 			| StatementElementStructless::Num(_)
 			| StatementElementStructless::Char(_)
