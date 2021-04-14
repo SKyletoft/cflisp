@@ -609,7 +609,7 @@ impl<'a> StatementElementStructless<'a> {
 					functions,
 				)?),
 			},
-			StatementElement::And { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
+			StatementElement::BoolAnd { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
 				StatementElementStructless::And {
 					lhs: Box::new(StatementElementStructless::from(
 						lhs.as_ref(),
@@ -625,7 +625,7 @@ impl<'a> StatementElementStructless<'a> {
 					)?),
 				}
 			}
-			StatementElement::Or { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
+			StatementElement::BoolOr { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
 				StatementElementStructless::Or {
 					lhs: Box::new(StatementElementStructless::from(
 						lhs.as_ref(),
@@ -744,7 +744,7 @@ impl<'a> StatementElementStructless<'a> {
 				)?),
 			},
 
-			StatementElement::Not { lhs } | StatementElement::BitNot { lhs } => {
+			StatementElement::BoolNot { lhs } | StatementElement::BitNot { lhs } => {
 				StatementElementStructless::Not {
 					lhs: Box::new(StatementElementStructless::from(
 						lhs.as_ref(),

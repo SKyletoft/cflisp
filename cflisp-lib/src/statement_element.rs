@@ -43,15 +43,15 @@ pub enum StatementElement<'a> {
 	BitNot {
 		lhs: Box<StatementElement<'a>>,
 	},
-	And {
+	BoolAnd {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	Or {
+	BoolOr {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	Not {
+	BoolNot {
 		lhs: Box<StatementElement<'a>>,
 	},
 	Xor {
@@ -213,13 +213,27 @@ impl<'a> StatementElement<'a> {
 			}),
 		];
 
+		macro_rules! gen_bin_op {
+			($i:ident) => {
+				(Unparsed(StatementToken::$i), |l, r| {
+					Ok(StatementElement::$i {
+						lhs: Box::new(l),
+						rhs: Box::new(r),
+					})
+				})
+			};
+		}
+		macro_rules! gen_unary_op {
+			($i:ident) => {
+				(Unparsed(StatementToken::$i), |l| {
+					Ok(StatementElement::$i { lhs: Box::new(l) })
+				})
+			};
+		}
+
 		let un_ops: [(MaybeParsed, UnOpFnPtr); 4] = [
-			(Unparsed(StatementToken::BitNot), |l| {
-				Ok(StatementElement::BitNot { lhs: Box::new(l) })
-			}),
-			(Unparsed(StatementToken::BoolNot), |l| {
-				Ok(StatementElement::Not { lhs: Box::new(l) })
-			}),
+			gen_unary_op!(BitNot),
+			gen_unary_op!(BoolNot),
 			(Unparsed(StatementToken::Mul), |l| {
 				Ok(StatementElement::Deref(Box::new(l)))
 			}),
@@ -234,116 +248,25 @@ impl<'a> StatementElement<'a> {
 				}
 			}),
 		];
-
 		let bin_ops: [(MaybeParsed, OpFnPtr); 18] = [
-			(Unparsed(StatementToken::Mul), |l, r| {
-				Ok(StatementElement::Mul {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Div), |l, r| {
-				Ok(StatementElement::Div {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Mod), |l, r| {
-				Ok(StatementElement::Mod {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Add), |l, r| {
-				Ok(StatementElement::Add {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Sub), |l, r| {
-				Ok(StatementElement::Sub {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::LShift), |l, r| {
-				Ok(StatementElement::LShift {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::RShift), |l, r| {
-				Ok(StatementElement::RShift {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::LessThan), |l, r| {
-				Ok(StatementElement::LessThan {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::LessThanEqual), |l, r| {
-				Ok(StatementElement::LessThanEqual {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::GreaterThan), |l, r| {
-				Ok(StatementElement::GreaterThan {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::GreaterThanEqual), |l, r| {
-				Ok(StatementElement::GreaterThanEqual {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Cmp), |l, r| {
-				Ok(StatementElement::Cmp {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::NotCmp), |l, r| {
-				Ok(StatementElement::NotCmp {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::BitAnd), |l, r| {
-				Ok(StatementElement::BitAnd {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::Xor), |l, r| {
-				Ok(StatementElement::Xor {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::BitOr), |l, r| {
-				Ok(StatementElement::BitOr {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::BoolAnd), |l, r| {
-				Ok(StatementElement::And {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
-			(Unparsed(StatementToken::BoolOr), |l, r| {
-				Ok(StatementElement::Or {
-					lhs: Box::new(l),
-					rhs: Box::new(r),
-				})
-			}),
+			gen_bin_op!(Mul),
+			gen_bin_op!(Div),
+			gen_bin_op!(Mod),
+			gen_bin_op!(Add),
+			gen_bin_op!(Sub),
+			gen_bin_op!(LShift),
+			gen_bin_op!(RShift),
+			gen_bin_op!(LessThan),
+			gen_bin_op!(LessThanEqual),
+			gen_bin_op!(GreaterThan),
+			gen_bin_op!(GreaterThanEqual),
+			gen_bin_op!(Cmp),
+			gen_bin_op!(NotCmp),
+			gen_bin_op!(BitAnd),
+			gen_bin_op!(Xor),
+			gen_bin_op!(BitOr),
+			gen_bin_op!(BoolAnd),
+			gen_bin_op!(BoolOr),
 		];
 
 		for (from, to) in ptr_ops.iter() {
@@ -352,6 +275,7 @@ impl<'a> StatementElement<'a> {
 		for (from, to) in un_ops.iter() {
 			do_unary_operation(&mut working_tokens, from, *to)?;
 		}
+
 		for (from, to) in bin_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
@@ -472,50 +396,29 @@ pub(crate) fn move_declarations_first(block: &mut Block) {
 		match element {
 			LanguageElement::StructDefinition { .. } => 0,
 			LanguageElement::StructDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static: true,
+				is_static: true, ..
 			} => 1,
 			LanguageElement::VariableDeclaration {
-				typ: _,
-				name: _,
-				is_static: true,
+				is_static: true, ..
 			} => 1,
 
 			LanguageElement::VariableDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static: true,
+				is_static: true, ..
 			} => 1,
 
 			LanguageElement::StructDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static: false,
+				is_static: false, ..
 			} => 1,
 
 			LanguageElement::VariableDeclaration {
-				typ: _,
-				name: _,
-				is_static: false,
+				is_static: false, ..
 			} => 2,
 
 			LanguageElement::VariableDeclarationAssignment {
-				typ: _,
-				name: _,
-				value: _,
-				is_static: false,
+				is_static: false, ..
 			} => 2,
 
-			LanguageElement::FunctionDeclaration {
-				typ: _,
-				name: _,
-				args: _,
-				block: _,
-			} => 3,
+			LanguageElement::FunctionDeclaration { .. } => 3,
 			_ => 4,
 		}
 	};

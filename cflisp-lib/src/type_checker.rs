@@ -209,10 +209,10 @@ pub(crate) fn type_of(
 		StatementElement::Mod { lhs: _, rhs: _ } => NativeType::Int,
 		StatementElement::LShift { lhs: _, rhs: _ } => NativeType::Int,
 		StatementElement::RShift { lhs: _, rhs: _ } => NativeType::Int,
-		StatementElement::And { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::Or { lhs: _, rhs: _ } => NativeType::Bool,
+		StatementElement::BoolAnd { lhs: _, rhs: _ } => NativeType::Bool,
+		StatementElement::BoolOr { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::Xor { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::Not { lhs: _ } => NativeType::Bool,
+		StatementElement::BoolNot { lhs: _ } => NativeType::Bool,
 		StatementElement::GreaterThan { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::LessThan { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => NativeType::Bool,
@@ -291,8 +291,8 @@ pub fn statement_element(
 		| StatementElement::Mod { lhs, rhs }
 		| StatementElement::LShift { lhs, rhs }
 		| StatementElement::RShift { lhs, rhs }
-		| StatementElement::And { lhs, rhs }
-		| StatementElement::Or { lhs, rhs }
+		| StatementElement::BoolAnd { lhs, rhs }
+		| StatementElement::BoolOr { lhs, rhs }
 		| StatementElement::Xor { lhs, rhs }
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
@@ -301,7 +301,7 @@ pub fn statement_element(
 				&& statement_element(rhs.as_ref(), variables, functions, structs)?
 		}
 
-		StatementElement::Not { lhs } => {
+		StatementElement::BoolNot { lhs } => {
 			statement_element(lhs.as_ref(), variables, functions, structs)?
 		}
 
