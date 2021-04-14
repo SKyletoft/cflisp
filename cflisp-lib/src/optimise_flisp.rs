@@ -1,11 +1,10 @@
 use crate::*;
-use std::{cmp::Ordering, collections::HashSet};
+use std::{borrow::Cow, cmp::Ordering, collections::HashSet};
 
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
 pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
-	remove_post_early_return_code(instructions);
 	load_xy(instructions);
 	repeat_xy(instructions);
 	repeat_load(instructions);
@@ -13,15 +12,17 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	cmp_neq_jmp(instructions);
 	cmp_gt_jmp(instructions);
 	cmp_gte_jmp(instructions);
+	reduce_reserves(instructions)?;
+	merge_allocs(instructions);
+	nop(instructions); //Should go AFTER reduce reserves
+	repeat_a(instructions);
 	load_a(instructions);
 	function_op_load_reduce(instructions);
-	repeat_a(instructions);
-	//reduce_reserves(instructions)?;
-	nop(instructions); //Should go AFTER reduce reserves
 	inc(instructions);
 	inca(instructions);
 	dec(instructions);
 	deca(instructions);
+	remove_post_early_return_code(instructions);
 
 	Ok(())
 }
@@ -258,6 +259,23 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+		if let (
+			(Instruction::LEASP(Addressing::SP(a)), first_comment),
+			(Instruction::LEASP(Addressing::SP(b)), second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			let comment = merge_comments!(first_comment, second_comment);
+			instructions[idx] = (Instruction::LEASP(Addressing::SP(*a + *b)), comment);
+			instructions.remove(idx + 1);
+		} else {
+			idx += 1;
+		}
+	}
+}
+
 /*
 	THIS IS BROKEN
 	Not sure how, but disabling it fixes the factorial program
@@ -330,6 +348,17 @@ fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), C
 									*adr -= minimum_access + 1;
 								}
 							}
+							/*{
+								//Because the borrow checker still can't handle indices
+								let (left, right) = instructions.split_at_mut(sp_index + 1);
+								if let (Some(Addressing::SP(start)), Some(Addressing::SP(end))) = (
+									left[sp_index].0.get_adr_mut(),
+									right[idx - (sp_index + 1)].0.get_adr_mut(),
+								) {
+									*start += minimum_access;
+									*end -= minimum_access;
+								}
+							}*/
 						}
 					}
 				}
