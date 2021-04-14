@@ -239,7 +239,7 @@ impl<'a> LanguageElementStructless<'a> {
 						.ok_or(ParseError(line!(), "Undefined struct type"))?;
 					let idx = fields
 						.iter()
-						.position(|&Variable { typ: _, name }| name == field)
+						.position(|&Variable { name, .. }| name == field)
 						.ok_or(ParseError(line!(), "Unknown field name"))?;
 					let new_ptr = if idx == 0 {
 						StatementElementStructless::Var(name)
@@ -863,10 +863,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::Char(_)
 			| StatementElementStructless::Bool(_)
 			| StatementElementStructless::AdrOf(_) => 0,
-			StatementElementStructless::FunctionCall {
-				name: _,
-				parametres: _,
-			} => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
+			StatementElementStructless::FunctionCall { .. } => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
 		};
 		rest + 1
 	}
@@ -892,10 +889,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::NotCmp { lhs, rhs }
 			| StatementElementStructless::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
 			StatementElementStructless::Not(_)
-			| StatementElementStructless::FunctionCall {
-				name: _,
-				parametres: _,
-			}
+			| StatementElementStructless::FunctionCall { .. }
 			| StatementElementStructless::Var(_)
 			| StatementElementStructless::Num(_)
 			| StatementElementStructless::Char(_)

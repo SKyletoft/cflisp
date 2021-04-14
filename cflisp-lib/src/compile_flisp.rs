@@ -254,10 +254,7 @@ fn compile_element<'a>(
 		}
 
 		LanguageElementStructless::FunctionDeclaration {
-			typ: _,
-			name,
-			args,
-			block,
+			name, args, block, ..
 		} => {
 			if state.functions.contains_key(name) {
 				return Err(CompileError(
@@ -456,7 +453,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElementStructless::Mul { rhs: _, lhs: _ } => {
+				StatementElementStructless::Mul { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -465,7 +462,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::Cmp { rhs: _, lhs: _ } => {
+				StatementElementStructless::Cmp { .. } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -474,7 +471,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::NotCmp { rhs: _, lhs: _ } => {
+				StatementElementStructless::NotCmp { .. } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -541,7 +538,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElementStructless::Div { rhs: _, lhs: _ } => {
+				StatementElementStructless::Div { .. } => {
 					instructions.push((Instruction::PSHA, Some("div rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -550,7 +547,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::Mod { rhs: _, lhs: _ } => {
+				StatementElementStructless::Mod { .. } => {
 					instructions.push((Instruction::PSHA, Some("mod rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -559,8 +556,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::GreaterThan { rhs: _, lhs: _ }
-				| StatementElementStructless::LessThan { rhs: _, lhs: _ } => {
+				StatementElementStructless::GreaterThan { .. }
+				| StatementElementStructless::LessThan { .. } => {
 					instructions.push((Instruction::PSHA, Some("gt rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -569,8 +566,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::LessThanEqual { rhs: _, lhs: _ }
-				| StatementElementStructless::GreaterThanEqual { rhs: _, lhs: _ } => {
+				StatementElementStructless::LessThanEqual { .. }
+				| StatementElementStructless::GreaterThanEqual { .. } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -580,17 +577,15 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
-				StatementElementStructless::RShift { lhs: _, rhs: _ }
-				| StatementElementStructless::LShift { lhs: _, rhs: _ } => {
+				StatementElementStructless::RShift { .. }
+				| StatementElementStructless::LShift { .. } => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StatementElementStructless::Num(n) = rhs.as_ref() {
 						if *n < 0 {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
 						}
-						let inst = if matches!(
-							statement,
-							StatementElementStructless::RShift { lhs: _, rhs: _ }
-						) {
+						let inst = if matches!(statement, StatementElementStructless::RShift { .. })
+						{
 							Instruction::LSRA
 						} else {
 							Instruction::LSLA
@@ -603,10 +598,8 @@ fn compile_statement_inner<'a>(
 							format!("bit_shift_start_{}_{}", state.scope_name, state.line_id);
 						let end_str =
 							format!("bit_shift_end_{}_{}", state.scope_name, state.line_id);
-						let inst = if matches!(
-							statement,
-							StatementElementStructless::RShift { lhs: _, rhs: _ }
-						) {
+						let inst = if matches!(statement, StatementElementStructless::RShift { .. })
+						{
 							Instruction::LSR(Addressing::SP(*tmps_used))
 						} else {
 							Instruction::LSL(Addressing::SP(*tmps_used))
@@ -660,13 +653,7 @@ fn compile_statement_inner<'a>(
 					"Name resolution failed? Shouldn't it've been checked by now?",
 				)
 			})?;
-			for (
-				statement,
-				NativeVariable {
-					name: v_name,
-					typ: _,
-				},
-			) in parametres.iter().zip(
+			for (statement, NativeVariable { name: v_name, .. }) in parametres.iter().zip(
 				arg_names
 					.iter()
 					.filter(|NativeVariable { typ, name: _ }| !matches!(typ, NativeType::Void)),
@@ -713,7 +700,7 @@ fn compile_statement_inner<'a>(
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
-					&StatementElementStructless::Add { lhs: _, rhs: _ },
+					&StatementElementStructless::Add { .. },
 					Some((
 						StatementElementStructless::Var(name),
 						&StatementElementStructless::Num(offset),
@@ -732,7 +719,7 @@ fn compile_statement_inner<'a>(
 				}
 				//General opt
 				(
-					&StatementElementStructless::Add { lhs: _, rhs: _ },
+					&StatementElementStructless::Add { .. },
 					Some((StatementElementStructless::Var(name), rhs)),
 				) => {
 					let adr = adr_for_name(
