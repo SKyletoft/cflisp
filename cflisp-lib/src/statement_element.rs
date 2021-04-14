@@ -1,7 +1,7 @@
 use crate::*;
 use std::borrow::Cow;
 
-///Tree structure to represent a statement. Boolean and bitwise logic are combined
+///Tree structure to represent a statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatementElement<'a> {
 	Add {
@@ -130,99 +130,6 @@ impl<'a> MaybeParsed<'a> {
 }
 
 impl<'a> StatementElement<'a> {
-	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
-	pub fn as_flisp_instruction(&self, adr: Addressing) -> Result<Instruction, CompileError> {
-		let res = match self {
-			StatementElement::Add { lhs: _, rhs: _ } => Instruction::ADDA(adr),
-			StatementElement::Sub { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::Mul { lhs: _, rhs: _ }
-			| StatementElement::Div { lhs: _, rhs: _ }
-			| StatementElement::Mod { lhs: _, rhs: _ } => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: function call, not instruction?",
-				));
-			}
-			StatementElement::LShift { lhs: _, rhs: _ } => Instruction::LSLA,
-			StatementElement::RShift { lhs: _, rhs: _ } => Instruction::LSRA,
-			StatementElement::And { lhs: _, rhs: _ } => Instruction::ANDA(adr),
-			StatementElement::Or { lhs: _, rhs: _ } => Instruction::ORA(adr),
-			StatementElement::Not { lhs: _ } => Instruction::COMA,
-			StatementElement::BitAnd { lhs: _, rhs: _ } => Instruction::ANDA(adr),
-			StatementElement::BitOr { lhs: _, rhs: _ } => Instruction::ORA(adr),
-			StatementElement::BitNot { lhs: _ } => Instruction::COMA, //Is this really correct?
-			StatementElement::Xor { lhs: _, rhs: _ } => Instruction::EORA(adr),
-			StatementElement::GreaterThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::LessThan { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::LessThanEqual { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::Cmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::NotCmp { lhs: _, rhs: _ } => Instruction::SUBA(adr),
-			StatementElement::FieldPointerAccess(_, _)
-			| StatementElement::Var(_)
-			| StatementElement::Num(_)
-			| StatementElement::Char(_)
-			| StatementElement::Bool(_)
-			| StatementElement::Array(_)
-			| StatementElement::Deref(_)
-			| StatementElement::AdrOf(_)
-			| StatementElement::FunctionCall {
-				name: _,
-				parametres: _,
-			} => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: special cases and literals, not instructions?",
-				))
-			}
-
-			StatementElement::Ternary { .. } => todo!(),
-		};
-
-		Ok(res)
-	}
-
-	pub fn depth(&self) -> usize {
-		let rest = match self {
-			StatementElement::Add { lhs, rhs }
-			| StatementElement::Sub { lhs, rhs }
-			| StatementElement::Mul { lhs, rhs }
-			| StatementElement::Div { lhs, rhs }
-			| StatementElement::Mod { lhs, rhs }
-			| StatementElement::LShift { lhs, rhs }
-			| StatementElement::RShift { lhs, rhs }
-			| StatementElement::And { lhs, rhs }
-			| StatementElement::Or { lhs, rhs }
-			| StatementElement::BitAnd { lhs, rhs }
-			| StatementElement::BitOr { lhs, rhs }
-			| StatementElement::Xor { lhs, rhs }
-			| StatementElement::GreaterThan { lhs, rhs }
-			| StatementElement::LessThan { lhs, rhs }
-			| StatementElement::GreaterThanEqual { lhs, rhs }
-			| StatementElement::LessThanEqual { lhs, rhs }
-			| StatementElement::Cmp { lhs, rhs }
-			| StatementElement::NotCmp { lhs, rhs } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
-			StatementElement::Not { lhs } | StatementElement::BitNot { lhs } => {
-				lhs.as_ref().depth()
-			}
-			StatementElement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
-			StatementElement::Deref(n) => n.as_ref().depth(),
-			StatementElement::Var(_)
-			| StatementElement::Num(_)
-			| StatementElement::Char(_)
-			| StatementElement::Bool(_)
-			| StatementElement::AdrOf(_)
-			| StatementElement::FieldPointerAccess(_, _) => 0,
-			StatementElement::FunctionCall {
-				name: _,
-				parametres: _,
-			} => 1, //Each parametre is its own memory alloc but can still require 1 if the function call is on the rhs
-
-			StatementElement::Ternary { .. } => todo!(),
-		};
-		rest + 1
-	}
-
 	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {
 		let res = match token {
 			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
@@ -262,17 +169,17 @@ impl<'a> StatementElement<'a> {
 	}
 
 	//Cannot be implemented as the FromStr trait as that trait doesn't allow a lifetime on the string
-	pub fn from_source_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
+	pub(crate) fn from_source_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
 		let tokens = Token::parse_statement_tokens(s)?;
 		StatementElement::from_statement_tokens(tokens)
 	}
 
-	pub fn from_tokens(tokens: &[Token<'a>]) -> Result<StatementElement<'a>, ParseError> {
+	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<StatementElement<'a>, ParseError> {
 		let statement_tokens = StatementToken::from_tokens(tokens)?;
 		StatementElement::from_statement_tokens(statement_tokens)
 	}
 
-	pub fn from_statement_tokens(
+	pub(crate) fn from_statement_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
 		let mut working_tokens: Vec<MaybeParsed<'a>> = tokens
@@ -465,44 +372,6 @@ impl<'a> StatementElement<'a> {
 			))
 		}
 	}
-
-	pub fn internal_ref(&self) -> Option<(&StatementElement, &StatementElement)> {
-		match self {
-			StatementElement::Add { lhs, rhs }
-			| StatementElement::Sub { lhs, rhs }
-			| StatementElement::Mul { lhs, rhs }
-			| StatementElement::Div { lhs, rhs }
-			| StatementElement::Mod { lhs, rhs }
-			| StatementElement::LShift { lhs, rhs }
-			| StatementElement::RShift { lhs, rhs }
-			| StatementElement::And { lhs, rhs }
-			| StatementElement::Or { lhs, rhs }
-			| StatementElement::BitAnd { lhs, rhs }
-			| StatementElement::BitOr { lhs, rhs }
-			| StatementElement::Xor { lhs, rhs }
-			| StatementElement::GreaterThan { lhs, rhs }
-			| StatementElement::LessThan { lhs, rhs }
-			| StatementElement::GreaterThanEqual { lhs, rhs }
-			| StatementElement::LessThanEqual { lhs, rhs }
-			| StatementElement::NotCmp { lhs, rhs }
-			| StatementElement::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
-			StatementElement::Not { lhs: _ }
-			| StatementElement::BitNot { lhs: _ }
-			| StatementElement::FunctionCall {
-				name: _,
-				parametres: _,
-			}
-			| StatementElement::Var(_)
-			| StatementElement::Num(_)
-			| StatementElement::Char(_)
-			| StatementElement::Bool(_)
-			| StatementElement::Array(_)
-			| StatementElement::Deref(_)
-			| StatementElement::AdrOf(_) => None,
-
-			_ => todo!(),
-		}
-	}
 }
 
 fn do_binary_operation<'a>(
@@ -598,7 +467,7 @@ fn do_unary_operation<'a>(
 	Ok(())
 }
 
-pub fn move_declarations_first(block: &mut Block) {
+pub(crate) fn move_declarations_first(block: &mut Block) {
 	let give_value = |element: &LanguageElement| -> usize {
 		match element {
 			LanguageElement::StructDefinition { .. } => 0,

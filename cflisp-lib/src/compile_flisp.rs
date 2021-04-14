@@ -490,7 +490,7 @@ fn compile_statement_inner<'a>(
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((
-							statement.as_flisp_instruction(adr.clone())?,
+							Instruction::from_statement_element_structless(statement, adr.clone())?,
 							comment.clone(),
 						));
 					} else {
@@ -498,7 +498,10 @@ fn compile_statement_inner<'a>(
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(*tmps_used))?,
+							Instruction::from_statement_element_structless(
+								statement,
+								Addressing::SP(*tmps_used),
+							)?,
 							None,
 						));
 					}
@@ -627,7 +630,7 @@ fn compile_statement_inner<'a>(
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((
-							statement.as_flisp_instruction(adr.clone())?,
+							Instruction::from_statement_element_structless(statement, adr.clone())?,
 							comment.clone(),
 						));
 					} else {
@@ -635,7 +638,10 @@ fn compile_statement_inner<'a>(
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
 						instructions.push((
-							statement.as_flisp_instruction(Addressing::SP(*tmps_used))?,
+							Instruction::from_statement_element_structless(
+								statement,
+								Addressing::SP(*tmps_used),
+							)?,
 							None,
 						));
 					}

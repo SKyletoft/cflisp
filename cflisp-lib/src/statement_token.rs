@@ -40,7 +40,7 @@ pub enum StatementToken<'a> {
 }
 
 impl<'a> StatementToken<'a> {
-	pub fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
+	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
 		let mut res = Vec::new();
 		for token in tokens {
 			let last = res.len().wrapping_sub(1);
@@ -128,7 +128,7 @@ impl<'a> StatementToken<'a> {
 		Ok(res)
 	}
 
-	pub fn is_op(&self) -> bool {
+	pub(crate) fn is_op(&self) -> bool {
 		matches!(
 			self,
 			StatementToken::Add

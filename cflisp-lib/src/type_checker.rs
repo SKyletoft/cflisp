@@ -192,7 +192,7 @@ pub fn language_element(
 	Ok(true)
 }
 
-pub fn type_of(
+pub(crate) fn type_of(
 	elem: &StatementElement,
 	functions: &HashSet<Function>,
 	variables: &HashSet<Variable>,

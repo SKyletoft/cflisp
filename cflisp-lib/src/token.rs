@@ -87,7 +87,7 @@ pub enum Token<'a> {
 impl<'a> Token<'a> {
 	///Splits a string into a list of tokens by matching pattern by pattern instead of
 	/// splitting and then converting into tokens
-	pub fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
+	pub(crate) fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		let mut src = source.trim_start();
 		let mut vec = Vec::new();
 		while !src.is_empty() {
@@ -100,7 +100,7 @@ impl<'a> Token<'a> {
 	}
 
 	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
-	pub fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
+	pub(crate) fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
@@ -109,7 +109,9 @@ impl<'a> Token<'a> {
 	}
 
 	///Converts string from `Token::UnparsedBlock` into `StatementToken`s
-	pub fn parse_statement_tokens(s: &'a str) -> Result<Vec<StatementToken<'a>>, ParseError> {
+	pub(crate) fn parse_statement_tokens(
+		s: &'a str,
+	) -> Result<Vec<StatementToken<'a>>, ParseError> {
 		//let res = Token::parse_str_to_vec(s)?;
 		let res = Token::by_byte(s)?;
 		if res.contains(&NewLine) {
@@ -119,7 +121,7 @@ impl<'a> Token<'a> {
 	}
 
 	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
-	pub fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
+	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
 		if s.is_empty() {
 			Ok(vec![])
 		} else {
@@ -131,7 +133,7 @@ impl<'a> Token<'a> {
 	}
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Function *declaration*, not call)
-	pub fn parse_argument_list_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+	pub(crate) fn parse_argument_list_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
@@ -164,7 +166,7 @@ impl<'a> Token<'a> {
 	}
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
-	pub fn parse_struct_member_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+	pub(crate) fn parse_struct_member_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
