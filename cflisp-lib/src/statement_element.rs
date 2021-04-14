@@ -227,14 +227,20 @@ impl<'a> StatementElement<'a> {
 			};
 		}
 
-		let un_ops: [(MaybeParsed, UnOpFnPtr); 4] = [
+		let un_ops: [(MaybeParsed, UnOpFnPtr); 5] = [
 			gen_unary_op!(BitNot),
 			gen_unary_op!(BoolNot),
-			(Unparsed(StatementToken::Mul), |l| {
-				Ok(StatementElement::Deref(Box::new(l)))
+			(Unparsed(StatementToken::Sub), |r| {
+				Ok(StatementElement::Sub {
+					lhs: Box::new(StatementElement::Num(0)),
+					rhs: Box::new(r),
+				})
 			}),
-			(Unparsed(StatementToken::BitAnd), |l| {
-				if let StatementElement::Var(n) = l {
+			(Unparsed(StatementToken::Mul), |r| {
+				Ok(StatementElement::Deref(Box::new(r)))
+			}),
+			(Unparsed(StatementToken::BitAnd), |r| {
+				if let StatementElement::Var(n) = r {
 					Ok(StatementElement::AdrOf(n))
 				} else {
 					Err(ParseError(

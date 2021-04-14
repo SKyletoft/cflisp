@@ -216,3 +216,25 @@ fn ternary_op() {
 	let res_2 = StatementElement::from_source_str(case_2).unwrap();
 	assert_eq!(res_2, expected_2);
 }
+
+#[test]
+fn negate() {
+	let case_1 = "-x";
+	let expected_1 = StatementElement::Sub {
+		lhs: Box::new(StatementElement::Num(0)),
+		rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
+	};
+	let res_1 = StatementElement::from_source_str(case_1).unwrap();
+	assert_eq!(res_1, expected_1);
+
+	let case_2 = "-(-x)";
+	let expected_2 = StatementElement::Sub {
+		lhs: Box::new(StatementElement::Num(0)),
+		rhs: Box::new(StatementElement::Sub {
+			lhs: Box::new(StatementElement::Num(0)),
+			rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
+		}),
+	};
+	let res_2 = StatementElement::from_source_str(case_2).unwrap();
+	assert_eq!(res_2, expected_2);
+}
