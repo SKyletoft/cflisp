@@ -213,7 +213,7 @@ fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StatementEleme
 			find_variables_se(vars, lhs);
 			find_variables_se(vars, rhs);
 		}
-		StatementElementStructless::Deref(lhs) | StatementElementStructless::Not { lhs } => {
+		StatementElementStructless::Deref(lhs) | StatementElementStructless::Not(lhs) => {
 			find_variables_se(vars, lhs);
 		}
 		StatementElementStructless::FunctionCall { .. }

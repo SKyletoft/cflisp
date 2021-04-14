@@ -799,7 +799,7 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElementStructless::Not { lhs } => {
+		StatementElementStructless::Not(lhs) => {
 			let mut instructions = compile_statement_inner(lhs, state, tmps_used)?;
 			instructions.push((Instruction::COMA, None));
 			instructions

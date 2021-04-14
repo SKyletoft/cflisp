@@ -212,7 +212,7 @@ pub(crate) fn type_of(
 		StatementElement::BoolAnd { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::BoolOr { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::Xor { lhs: _, rhs: _ } => NativeType::Bool,
-		StatementElement::BoolNot { lhs: _ } => NativeType::Bool,
+		StatementElement::BoolNot(_) => NativeType::Bool,
 		StatementElement::GreaterThan { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::LessThan { lhs: _, rhs: _ } => NativeType::Bool,
 		StatementElement::GreaterThanEqual { lhs: _, rhs: _ } => NativeType::Bool,
@@ -301,7 +301,7 @@ pub fn statement_element(
 				&& statement_element(rhs.as_ref(), variables, functions, structs)?
 		}
 
-		StatementElement::BoolNot { lhs } => {
+		StatementElement::BoolNot(lhs) => {
 			statement_element(lhs.as_ref(), variables, functions, structs)?
 		}
 

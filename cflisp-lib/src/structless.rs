@@ -462,9 +462,7 @@ pub enum StatementElementStructless<'a> {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
 	},
-	Not {
-		lhs: Box<StatementElementStructless<'a>>,
-	},
+	Not(Box<StatementElementStructless<'a>>),
 	GreaterThan {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
@@ -744,15 +742,13 @@ impl<'a> StatementElementStructless<'a> {
 				)?),
 			},
 
-			StatementElement::BoolNot { lhs } | StatementElement::BitNot { lhs } => {
-				StatementElementStructless::Not {
-					lhs: Box::new(StatementElementStructless::from(
-						lhs.as_ref(),
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-					)?),
-				}
+			StatementElement::BoolNot(lhs) | StatementElement::BitNot(lhs) => {
+				StatementElementStructless::Not(Box::new(StatementElementStructless::from(
+					lhs.as_ref(),
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+				)?))
 			}
 
 			StatementElement::FunctionCall { name, parametres } => {
@@ -859,7 +855,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::NotCmp { lhs, rhs } => {
 				lhs.as_ref().depth().max(rhs.as_ref().depth())
 			}
-			StatementElementStructless::Not { lhs } => lhs.as_ref().depth(),
+			StatementElementStructless::Not(lhs) => lhs.as_ref().depth(),
 			StatementElementStructless::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StatementElementStructless::Deref(n) => n.as_ref().depth(),
 			StatementElementStructless::Var(_)
@@ -895,7 +891,7 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::LessThanEqual { lhs, rhs }
 			| StatementElementStructless::NotCmp { lhs, rhs }
 			| StatementElementStructless::Cmp { lhs, rhs } => Some((lhs.as_ref(), rhs.as_ref())),
-			StatementElementStructless::Not { lhs: _ }
+			StatementElementStructless::Not(_)
 			| StatementElementStructless::FunctionCall {
 				name: _,
 				parametres: _,
