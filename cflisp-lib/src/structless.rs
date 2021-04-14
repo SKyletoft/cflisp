@@ -545,12 +545,6 @@ impl<'a> StatementElementStructless<'a> {
 			StatementElement::Mod { lhs, rhs } => bin_op!(Mod, lhs, rhs),
 			StatementElement::LShift { lhs, rhs } => bin_op!(LShift, lhs, rhs),
 			StatementElement::RShift { lhs, rhs } => bin_op!(RShift, lhs, rhs),
-			StatementElement::BoolAnd { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
-				bin_op!(And, lhs, rhs)
-			}
-			StatementElement::BoolOr { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
-				bin_op!(Or, lhs, rhs)
-			}
 			StatementElement::Xor { lhs, rhs } => bin_op!(Xor, lhs, rhs),
 			StatementElement::GreaterThan { lhs, rhs } => bin_op!(GreaterThan, lhs, rhs),
 			StatementElement::LessThan { lhs, rhs } => bin_op!(LessThan, lhs, rhs),
@@ -558,6 +552,12 @@ impl<'a> StatementElementStructless<'a> {
 			StatementElement::LessThanEqual { lhs, rhs } => bin_op!(LessThanEqual, lhs, rhs),
 			StatementElement::Cmp { lhs, rhs } => bin_op!(Cmp, lhs, rhs),
 			StatementElement::NotCmp { lhs, rhs } => bin_op!(NotCmp, lhs, rhs),
+			StatementElement::BoolAnd { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
+				bin_op!(And, lhs, rhs)
+			}
+			StatementElement::BoolOr { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
+				bin_op!(Or, lhs, rhs)
+			}
 			StatementElement::BoolNot(lhs) | StatementElement::BitNot(lhs) => {
 				un_op!(Not, lhs)
 			}
