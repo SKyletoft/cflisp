@@ -1,5 +1,6 @@
 use crate::*;
-use std::{borrow::Cow, cmp::Ordering, collections::HashSet};
+use compile_flisp::ABOVE_STACK_OFFSET;
+use std::{borrow::Cow, cmp::Ordering, collections::HashSet, iter};
 
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
@@ -34,8 +35,8 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(addressing), _),
-			(Instruction::STA(Addressing::SP(-1)), _),
-			(Instruction::LDX(Addressing::SP(-1)), _),
+			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -47,8 +48,8 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 		}
 		if let (
 			(Instruction::LDA(addressing), _),
-			(Instruction::STA(Addressing::SP(-1)), _),
-			(Instruction::LDY(Addressing::SP(-1)), _),
+			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)), _),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -229,8 +230,8 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	while instructions.len() >= 3 && idx < instructions.len() - 3 {
 		//Load to A the address of A
 		if let (
-			(Instruction::STA(Addressing::SP(-1)), _),
-			(Instruction::LDX(Addressing::SP(-1)), _),
+			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _),
 			(Instruction::LDA(Addressing::Xn(0)), _),
 		) = (
 			&instructions[idx],

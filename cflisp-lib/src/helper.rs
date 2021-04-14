@@ -10,8 +10,8 @@ macro_rules! merge_comments {
 		$only.clone()
 	};
 	($lhs:expr, $($rhs:expr), +) => {{
-		let rest = merge_comments!($($rhs), +);
 		let lhs: &Option<Cow<str>> = $lhs;
+		let rest = merge_comments!($($rhs), +);
 		if let (Some(l), Some(r)) = (lhs, &rest) {
 			Some(Cow::Owned(l.to_string() + ", " + &r))
 		} else {

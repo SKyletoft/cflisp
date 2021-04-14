@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap};
 use crate::*;
 
 ///Technically illegal address for use in register -> register transfers
-const ABOVE_STACK_OFFSET: isize = -1;
+pub(crate) const ABOVE_STACK_OFFSET: isize = -1;
 
 ///Name (lifetime from source code), (Type, Stack position (from the bottom))
 type Variables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, (NativeType, isize)>;
