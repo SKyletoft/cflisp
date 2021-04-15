@@ -40,7 +40,6 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	BitNot(Box<StatementElement<'a>>),
 	BoolAnd {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -49,7 +48,6 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
-	BoolNot(Box<StatementElement<'a>>),
 	Xor {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
@@ -87,6 +85,8 @@ pub enum StatementElement<'a> {
 		name: Cow<'a, str>,
 		parametres: Vec<StatementElement<'a>>,
 	},
+	BitNot(Box<StatementElement<'a>>),
+	BoolNot(Box<StatementElement<'a>>),
 	Var(Cow<'a, str>),
 	Num(isize),
 	Char(char),

@@ -462,7 +462,6 @@ pub enum StatementElementStructless<'a> {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
 	},
-	Not(Box<StatementElementStructless<'a>>),
 	GreaterThan {
 		lhs: Box<StatementElementStructless<'a>>,
 		rhs: Box<StatementElementStructless<'a>>,
@@ -491,6 +490,7 @@ pub enum StatementElementStructless<'a> {
 		name: Cow<'a, str>,
 		parametres: Vec<StatementElementStructless<'a>>,
 	},
+	Not(Box<StatementElementStructless<'a>>),
 	Var(Cow<'a, str>),
 	Num(isize),
 	Char(char),
