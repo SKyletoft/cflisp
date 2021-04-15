@@ -1,8 +1,10 @@
 use wasm_bindgen::prelude::*;
 
 use cflisp_lib::{
-	compile_flisp, flags::Flags, optimise_flisp, optimise_language, parser,
-	structless::LanguageElementStructless, text,
+	flags::Flags,
+	flisp::{compile_flisp, optimise_flisp, text},
+	optimise_language, parser,
+	structless::LanguageElementStructless,
 };
 
 #[wasm_bindgen]

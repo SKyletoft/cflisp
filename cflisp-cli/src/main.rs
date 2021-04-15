@@ -6,8 +6,11 @@ use std::{
 };
 
 use cflisp_lib::{
-	compile_flisp, flags::Flags, optimise_flisp, optimise_language, parser,
-	structless::LanguageElementStructless, text, type_checker,
+	flags::Flags,
+	flisp::{compile_flisp, optimise_flisp, text},
+	optimise_language, parser,
+	structless::LanguageElementStructless,
+	type_checker,
 };
 
 const PATH: &str = "PATH";
