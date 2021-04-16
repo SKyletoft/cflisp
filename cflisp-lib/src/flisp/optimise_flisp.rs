@@ -450,7 +450,7 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while idx < instructions.len() {
 		match instructions[idx].0 {
-			Instruction::RTS => {
+			Instruction::RTS if !remove => {
 				remove = true;
 				idx += 1;
 				continue;
@@ -751,13 +751,14 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst.get_adr() {
-			Some(Addressing::Label(lbl)) => Some(lbl.clone()),
+			Some(Addressing::Label(lbl)) => Some(lbl.to_string()),
 			_ => None,
 		})
 		.chain(iter::once("main".to_string()))
 		.collect::<HashSet<String>>();
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
+			let lbl: &str = lbl;
 			jumps_to.contains(lbl)
 		} else {
 			true

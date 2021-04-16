@@ -5,28 +5,28 @@ use std::{borrow::Cow, fmt};
 ///`(Instruction, Option<Cow<'a, str>>)`
 ///
 /// The comment should have the same lifetime as the input source code (or `&'static`)
-pub type CommentedInstruction<'a> = (Instruction, Option<Cow<'a, str>>);
+pub type CommentedInstruction<'a> = (Instruction<'a>, Option<Cow<'a, str>>);
 
 ///A flisp instruction. Usually appears as the first half of a `CommentedInstruction` tuple.
 /// Can also be a label or FCB assembler directive.
 /// Naming scheme follows flisp rather than Rust naming conventions
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Instruction {
-	LDA(Addressing),
-	STA(Addressing),
-	LDX(Addressing),
-	LDY(Addressing),
-	LDSP(Addressing),
-	STSP(Addressing),
-	LEASP(Addressing),
+pub enum Instruction<'a> {
+	LDA(Addressing<'a>),
+	STA(Addressing<'a>),
+	LDX(Addressing<'a>),
+	LDY(Addressing<'a>),
+	LDSP(Addressing<'a>),
+	STSP(Addressing<'a>),
+	LEASP(Addressing<'a>),
 
-	ADDA(Addressing),
-	SUBA(Addressing),
-	ANDA(Addressing),
-	ORA(Addressing),
-	EORA(Addressing),
-	CMPA(Addressing),
+	ADDA(Addressing<'a>),
+	SUBA(Addressing<'a>),
+	ANDA(Addressing<'a>),
+	ORA(Addressing<'a>),
+	EORA(Addressing<'a>),
+	CMPA(Addressing<'a>),
 	INCA,
 	DECA,
 
@@ -35,27 +35,27 @@ pub enum Instruction {
 	LSLA,
 	LSRA,
 
-	JMP(Addressing),
-	BNE(Addressing),
-	BEQ(Addressing),
-	BGE(Addressing),
-	BLT(Addressing),
+	JMP(Addressing<'a>),
+	BNE(Addressing<'a>),
+	BEQ(Addressing<'a>),
+	BGE(Addressing<'a>),
+	BLT(Addressing<'a>),
 
-	INC(Addressing),
-	DEC(Addressing),
-	LSL(Addressing),
-	LSR(Addressing),
+	INC(Addressing<'a>),
+	DEC(Addressing<'a>),
+	LSL(Addressing<'a>),
+	LSR(Addressing<'a>),
 
 	PSHA,
 	PULA,
 	RTS,
-	JSR(Addressing),
-	Label(String),
+	JSR(Addressing<'a>),
+	Label(Cow<'a, str>),
 	FCB(Vec<isize>),
 }
 
-impl fmt::Display for Instruction {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<'a> fmt::Display for Instruction<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Instruction::LDA(a) => write!(f, "\tLDA\t{}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{}", *a),
@@ -101,8 +101,9 @@ impl fmt::Display for Instruction {
 		}
 	}
 }
-impl fmt::UpperHex for Instruction {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+impl<'a> fmt::UpperHex for Instruction<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Instruction::LDA(a) => write!(f, "\tLDA\t{:X}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{:X}", *a),
@@ -139,12 +140,12 @@ impl fmt::UpperHex for Instruction {
 	}
 }
 
-impl Instruction {
+impl<'a> Instruction<'a> {
 	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
 	pub(crate) fn from_statement_element_structless(
-		elem: &StatementElementStructless,
-		adr: Addressing,
-	) -> Result<Instruction, CompileError> {
+		elem: &StatementElementStructless<'a>,
+		adr: Addressing<'a>,
+	) -> Result<Instruction<'a>, CompileError> {
 		let res = match elem {
 			StatementElementStructless::Add { .. } => Instruction::ADDA(adr),
 			StatementElementStructless::Sub { .. } => Instruction::SUBA(adr),
@@ -226,7 +227,7 @@ impl Instruction {
 	}
 
 	///Gets the inner Addressing enum. Doesn't work on Labels as they contain a `String` directly
-	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing> {
+	pub(crate) fn get_adr_mut(&mut self) -> Option<&mut Addressing<'a>> {
 		match self {
 			Instruction::LDA(a)
 			| Instruction::LDX(a)
@@ -311,19 +312,19 @@ impl Instruction {
 /// stop you from misusing this.
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Addressing {
+pub enum Addressing<'a> {
 	Data(isize),
 	Adr(isize),
 	SP(isize),
 	Xn(isize),
 	Yn(isize),
-	Label(String),
-	DataLabel(String),
+	Label(Cow<'a, str>),
+	DataLabel(Cow<'a, str>),
 	AX,
 	AY,
 }
 
-impl Addressing {
+impl<'a> Addressing<'a> {
 	///The size in bytes that it will take up in the final compiled binary
 	fn size(&self) -> usize {
 		match self {
@@ -338,7 +339,7 @@ impl Addressing {
 	}
 }
 
-impl fmt::Display for Addressing {
+impl<'a> fmt::Display for Addressing<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			// mod 256 to allow -255 to 255 instead of -127 to 127
@@ -355,7 +356,7 @@ impl fmt::Display for Addressing {
 	}
 }
 
-impl fmt::UpperHex for Addressing {
+impl<'a> fmt::UpperHex for Addressing<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Addressing::Data(d) => write!(f, "#${:02X}", *d as u8),

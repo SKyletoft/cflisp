@@ -40,7 +40,7 @@ pub fn instructions_to_text(
 		if !matches!(i, Instruction::Label(n) if n.len() < 8)
 			|| matches!((i, next), (Instruction::RTS, Instruction::Label(lbl)) if !(lbl.starts_with("if") || lbl.starts_with("for") || lbl.starts_with("while")))
 			|| matches!((i, next), (Instruction::FCB(_), Instruction::Label(_)))
-			|| matches!((i, next), (Instruction::Label(_), Instruction::Label(_)))
+			|| matches!((i, next), (Instruction::Label(_), Instruction::Label(lbl)) if !lbl.starts_with('\n'))
 		{
 			output.push('\n');
 		}
