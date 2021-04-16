@@ -303,6 +303,7 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::PULA, comment);
 			instructions.remove(idx + 1);
+			idx -= 1;
 			continue;
 		}
 		if let (
@@ -313,6 +314,15 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::PULA, comment);
 			instructions.remove(idx + 1);
+			idx -= 1;
+			continue;
+		}
+		if let ((Instruction::PSHA, _), (Instruction::PULA, _)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			instructions.remove(idx);
+			instructions.remove(idx);
+			idx -= 1;
 			continue;
 		}
 		idx += 1;

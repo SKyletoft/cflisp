@@ -234,7 +234,12 @@ fn compile_element<'a>(
 						(typ.clone(), *state.stack_size),
 					);
 					*state.stack_size += 1;
-					statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
+					//statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
+					statement.push((Instruction::LEASP(Addressing::SP(-1)), None));
+					statement.push((
+						Instruction::STA(Addressing::SP(0)),
+						Some(Cow::Borrowed(name.as_ref())),
+					));
 					statement
 				}
 			}
@@ -692,10 +697,12 @@ fn compile_statement_inner<'a>(
 				));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.clone())), None));
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(parametres.len() as isize)),
-				None,
-			));
+			if !parametres.is_empty() {
+				instructions.push((
+					Instruction::LEASP(Addressing::SP(parametres.len() as isize)),
+					None,
+				));
+			}
 			instructions
 		}
 
