@@ -43,7 +43,7 @@ run();
 
 const default_c = "//Try changing the compiler settings!\n" +
                   "int main() {\n" +
-                  "\tint x = (5 + 3) * 2;\n" +
+                  "\t/*const*/ int x = (5 + 3) * 2;\n" +
                   "\tif (x == 2) {\n" +
                   "\t\treturn 0;\n" +
                   "\t} else {\n" +
