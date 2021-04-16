@@ -109,7 +109,8 @@ pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructle
 	let mut used_variables = HashSet::new();
 	find_variables_le(&mut used_variables, elements);
 	elements.retain(|elem| match elem {
-		LanguageElementStructless::VariableDeclarationAssignment { name, .. }
+		LanguageElementStructless::VariableAssignment { name, .. }
+		| LanguageElementStructless::VariableDeclarationAssignment { name, .. }
 		| LanguageElementStructless::VariableDeclaration { name, .. } => {
 			let name: &str = name;
 			used_variables.contains(name)
@@ -124,6 +125,18 @@ fn find_variables_le<'a>(
 ) {
 	for element in elements {
 		match element {
+			LanguageElementStructless::VariableDeclaration {
+				name,
+				is_volatile: true,
+				..
+			}
+			| LanguageElementStructless::VariableDeclarationAssignment {
+				name,
+				is_volatile: true,
+				..
+			} => {
+				vars.insert(name.to_string());
+			}
 			LanguageElementStructless::VariableAssignment { value, .. }
 			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
 				find_variables_se(vars, value);
@@ -217,6 +230,7 @@ fn const_prop_inner<'a>(
 				name,
 				value,
 				is_const: true,
+				is_volatile: false,
 				..
 			} => {
 				optimise_statement::const_prop(value, constants);
