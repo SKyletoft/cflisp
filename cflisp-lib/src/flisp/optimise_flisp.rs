@@ -35,7 +35,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 /// address load to X and write to X,0 to a write to address directly.
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(addressing), _),
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
@@ -87,7 +87,7 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 /// check if the new load is dependent on the old load
 fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
 			((Instruction::LDA(_), _), (Instruction::LDA(_), _))
@@ -104,12 +104,13 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 ///Removes repeat RTS that can occur after unused labels have been eliminated
 pub fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
 			((Instruction::RTS, _), (Instruction::RTS, _))
 		) {
 			instructions.remove(idx);
+			continue;
 		}
 		idx += 1;
 	}
@@ -230,7 +231,7 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 ///Simpifies some sequences of loading to A
 fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		//Load to A the address of A
 		if let (
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
@@ -265,7 +266,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 
 fn psha(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(-1)), first_comment),
 			(Instruction::STA(Addressing::SP(0)), second_comment),
@@ -293,7 +294,7 @@ fn psha(instructions: &mut Vec<CommentedInstruction>) {
 
 fn pula(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LDA(Addressing::SP(0)), first_comment),
 			(Instruction::LEASP(Addressing::SP(1)), second_comment),
@@ -320,7 +321,7 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 
 fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(a)), first_comment),
 			(Instruction::LEASP(Addressing::SP(b)), second_comment),
@@ -472,7 +473,7 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 /// calls follow each other
 fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 4 && idx < instructions.len() - 4 {
+	while instructions.len() >= 4 && idx <= instructions.len() - 4 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(2)), _),
 			(Instruction::PSHA, _),
@@ -495,7 +496,7 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces subtraction by one with a DEC instruction
 fn dec(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(Addressing::Data(1)), _),
 			(Instruction::SUBA(from), _),
@@ -518,7 +519,7 @@ fn dec(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces addition by one with an INC instruction
 fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(from), _),
 			(Instruction::ADDA(Addressing::Data(1)), _),
@@ -575,7 +576,7 @@ fn deca(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BEQ instruction directly
 fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -617,7 +618,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BNE instruction directly
 fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 7 && idx < instructions.len() - 7 {
+	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -662,7 +663,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BGE instruction directly
 fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -704,7 +705,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BLT instruction directly
 fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 7 && idx < instructions.len() - 7 {
+	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
