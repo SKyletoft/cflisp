@@ -209,6 +209,9 @@ pub(crate) fn type_of(
 		StatementElement::LessThanEqual { .. } => NativeType::Bool,
 		StatementElement::Cmp { .. } => NativeType::Bool,
 		StatementElement::NotCmp { .. } => NativeType::Bool,
+		StatementElement::BitAnd { .. } => NativeType::Int,
+		StatementElement::BitOr { .. } => NativeType::Int,
+		StatementElement::BitNot(_) => NativeType::Int,
 
 		StatementElement::FunctionCall { name, .. } => functions
 			.iter()
@@ -238,7 +241,39 @@ pub(crate) fn type_of(
 				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?,
 		),
 
-		_ => todo!(),
+		StatementElement::Ternary { lhs, rhs, .. } => {
+			let l = type_of(lhs, functions, variables, structs)?;
+			let r = type_of(rhs, functions, variables, structs)?;
+			if l != r {
+				return Err(ParseError(
+					line!(),
+					"Ternary operator doesn't return same type on both branches",
+				));
+			}
+			l
+		}
+		StatementElement::FieldPointerAccess(name, field) => {
+			let name: &str = &name;
+			let struct_type = if let Type::Struct(struct_type) = variables
+				.iter()
+				.find(|v| v.name == name)
+				.ok_or(ParseError(line!(), "Cannot resolve variable"))?
+				.typ
+			{
+				Ok(struct_type)
+			} else {
+				Err(ParseError(line!(), "Variable isn't a struct"))
+			}?;
+
+			let typ = &structs
+				.get(struct_type)
+				.ok_or(ParseError(line!(), "Cannot resolve struct type"))?
+				.iter()
+				.find(|f| f.name == field)
+				.ok_or(ParseError(line!(), "Cannot resolve field name"))?
+				.typ;
+			typ.into()
+		}
 	};
 	Ok(res)
 }

@@ -508,7 +508,7 @@ impl<'a> StatementElementStructless<'a> {
 		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 	) -> Result<Self, ParseError> {
 		macro_rules! bin_op {
-			($i:ident, $lhs:expr, $rhs: expr) => {
+			($i:ident, $lhs:expr, $rhs:expr) => {
 				StatementElementStructless::$i {
 					lhs: Box::new(StatementElementStructless::from(
 						$lhs.as_ref(),
