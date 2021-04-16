@@ -23,7 +23,7 @@ impl Default for Flags {
 			comments: true,
 			tree: false,
 			tree_structless: false,
-			type_check: false,
+			type_check: true,
 			print_result: false,
 			assemble: false,
 			debug: false,
