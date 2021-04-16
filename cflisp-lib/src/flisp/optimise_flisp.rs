@@ -24,6 +24,8 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	inca(instructions);
 	dec(instructions);
 	deca(instructions);
+	psha(instructions);
+	pula(instructions);
 	remove_post_early_return_code(instructions);
 
 	Ok(())
@@ -256,6 +258,61 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 			if !matches!(adr, Addressing::AX | Addressing::AY) {
 				instructions.remove(idx);
 			}
+		}
+		idx += 1;
+	}
+}
+
+fn psha(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+		if let (
+			(Instruction::LEASP(Addressing::SP(-1)), first_comment),
+			(Instruction::STA(Addressing::SP(0)), second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			let comment = merge_comments!(first_comment, second_comment);
+			instructions[idx] = (Instruction::PSHA, comment);
+			instructions.remove(idx + 1);
+			continue;
+		}
+		//This really shouldn't happen, but might, so let's just handle it anyway
+		if let (
+			(Instruction::STA(Addressing::SP(-1)), first_comment),
+			(Instruction::LEASP(Addressing::SP(-1)), second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			let comment = merge_comments!(first_comment, second_comment);
+			instructions[idx] = (Instruction::PSHA, comment);
+			instructions.remove(idx + 1);
+			continue;
+		}
+		idx += 1;
+	}
+}
+
+fn pula(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+		if let (
+			(Instruction::LDA(Addressing::SP(0)), first_comment),
+			(Instruction::LEASP(Addressing::SP(1)), second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			let comment = merge_comments!(first_comment, second_comment);
+			instructions[idx] = (Instruction::PULA, comment);
+			instructions.remove(idx + 1);
+			continue;
+		}
+		if let (
+			(Instruction::LEASP(Addressing::SP(1)), first_comment),
+			(Instruction::LDA(Addressing::SP(-1)), second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			let comment = merge_comments!(first_comment, second_comment);
+			instructions[idx] = (Instruction::PULA, comment);
+			instructions.remove(idx + 1);
+			continue;
 		}
 		idx += 1;
 	}
