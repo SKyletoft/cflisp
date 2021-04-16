@@ -85,6 +85,8 @@ fn remove_unused_variables() {
 			typ: NativeType::Int,
 			value: StatementElementStructless::Num(5),
 			is_static: false,
+			is_const: false,
+			is_volatile: false,
 		},
 		LanguageElementStructless::VariableDeclarationAssignment {
 			name: Cow::Borrowed("y"),
@@ -94,12 +96,16 @@ fn remove_unused_variables() {
 				rhs: Box::new(StatementElementStructless::Var(Cow::Borrowed("x"))),
 			},
 			is_static: false,
+			is_const: false,
+			is_volatile: false,
 		},
 		LanguageElementStructless::VariableDeclarationAssignment {
 			name: Cow::Borrowed("z"),
 			typ: NativeType::Int,
 			value: StatementElementStructless::Num(5),
 			is_static: false,
+			is_const: false,
+			is_volatile: false,
 		},
 		LanguageElementStructless::Statement(StatementElementStructless::Var(Cow::Borrowed("y"))),
 	];
@@ -109,6 +115,8 @@ fn remove_unused_variables() {
 			typ: NativeType::Int,
 			value: StatementElementStructless::Num(5),
 			is_static: false,
+			is_const: false,
+			is_volatile: false,
 		},
 		LanguageElementStructless::VariableDeclarationAssignment {
 			name: Cow::Borrowed("y"),
@@ -118,6 +126,8 @@ fn remove_unused_variables() {
 				rhs: Box::new(StatementElementStructless::Var(Cow::Borrowed("x"))),
 			},
 			is_static: false,
+			is_const: false,
+			is_volatile: false,
 		},
 		LanguageElementStructless::Statement(StatementElementStructless::Var(Cow::Borrowed("y"))),
 	];

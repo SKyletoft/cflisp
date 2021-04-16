@@ -11,6 +11,8 @@ pub enum LanguageElement<'a> {
 		typ: Type<'a>,
 		name: Cow<'a, str>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	VariableAssignment {
 		name: Cow<'a, str>,
@@ -25,12 +27,16 @@ pub enum LanguageElement<'a> {
 		name: Cow<'a, str>,
 		value: StatementElement<'a>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	StructDeclarationAssignment {
 		typ: Type<'a>,
 		name: Cow<'a, str>,
 		value: Vec<StatementElement<'a>>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	PointerAssignment {
 		ptr: StatementElement<'a>,
@@ -73,19 +79,59 @@ pub enum LanguageElement<'a> {
 impl<'a> LanguageElement<'a> {
 	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
 		match &mut self {
-			LanguageElement::VariableDeclaration { is_static, .. } => {
+			LanguageElement::VariableDeclaration { is_static, .. } if !*is_static => {
 				*is_static = true;
 			}
-			LanguageElement::VariableDeclarationAssignment { is_static, .. } => {
+			LanguageElement::VariableDeclarationAssignment { is_static, .. } if !*is_static => {
 				*is_static = true;
 			}
-			LanguageElement::StructDeclarationAssignment { is_static, .. } => {
+			LanguageElement::StructDeclarationAssignment { is_static, .. } if !*is_static => {
 				*is_static = true;
 			}
 			_ => {
 				return Err(ParseError(
 					line!(),
 					"Internal error: cannot make element static",
+				))
+			}
+		}
+		Ok(self)
+	}
+	pub(crate) fn make_const(mut self) -> Result<Self, ParseError> {
+		match &mut self {
+			LanguageElement::VariableDeclaration { is_const, .. } if !*is_const => {
+				*is_const = true;
+			}
+			LanguageElement::VariableDeclarationAssignment { is_const, .. } if !*is_const => {
+				*is_const = true;
+			}
+			LanguageElement::StructDeclarationAssignment { is_const, .. } if !*is_const => {
+				*is_const = true;
+			}
+			_ => {
+				return Err(ParseError(
+					line!(),
+					"Internal error: cannot make element const",
+				))
+			}
+		}
+		Ok(self)
+	}
+	pub(crate) fn make_volatile(mut self) -> Result<Self, ParseError> {
+		match &mut self {
+			LanguageElement::VariableDeclaration { is_volatile, .. } if !*is_volatile => {
+				*is_volatile = true;
+			}
+			LanguageElement::VariableDeclarationAssignment { is_volatile, .. } if !*is_volatile => {
+				*is_volatile = true;
+			}
+			LanguageElement::StructDeclarationAssignment { is_volatile, .. } if !*is_volatile => {
+				*is_volatile = true;
+			}
+			_ => {
+				return Err(ParseError(
+					line!(),
+					"Internal error: cannot make element volatile",
 				))
 			}
 		}

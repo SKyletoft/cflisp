@@ -77,7 +77,9 @@ fn compile_element<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElementStructless::StructDeclaration { name, is_static } => {
+		LanguageElementStructless::StructDeclaration {
+			name, is_static, ..
+		} => {
 			if state.scope_name == "global" || *is_static {
 				if state.scope_name == "global" && !is_static {
 					return Err(CompileError(line!(), "Nonstatic global variable!"));
@@ -107,6 +109,7 @@ fn compile_element<'a>(
 			typ,
 			name,
 			is_static,
+			..
 		} => {
 			if state.scope_name == "global" || *is_static {
 				if state.scope_name == "global" && !is_static {
@@ -157,6 +160,7 @@ fn compile_element<'a>(
 			name,
 			value,
 			is_static,
+			..
 		} => {
 			let global_def = |val: &StatementElementStructless| match val {
 				StatementElementStructless::Num(n) => Ok(*n),
