@@ -1,12 +1,17 @@
 use crate::*;
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
-pub fn type_check(block: &[LanguageElement]) -> Result<(), ParseError> {
-	if language_element(block, &HashMap::new(), &HashMap::new(), &HashMap::new())? {
-		Ok(())
-	} else {
-		Err(ParseError(line!(), "Mismatched types"))
-	}
+pub fn type_check(block: &[LanguageElement]) -> Result<(), TypeError> {
+	language_element(
+		block,
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashSet::new(),
+	)
 }
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
@@ -15,49 +20,67 @@ pub(crate) fn language_element(
 	upper_variables: &HashMap<Cow<str>, Type>,
 	outer_functions: &HashMap<Cow<str>, Function>,
 	structs: &HashMap<&str, Vec<Variable>>,
-) -> Result<bool, ParseError> {
+	constants: &HashSet<&str>,
+) -> Result<(), TypeError> {
 	let mut variables = upper_variables.clone();
 	let mut functions = outer_functions.clone();
 	let mut structs = structs.clone();
+	let mut constants = constants.clone();
 
 	for line in block {
 		match line {
-			LanguageElement::VariableDeclaration { typ, name, .. } => {
+			LanguageElement::VariableDeclaration {
+				typ,
+				name,
+				is_const,
+				..
+			} => {
 				variables.insert(name.clone(), typ.clone());
+				if *is_const {
+					constants.insert(&name);
+				}
 			}
 
 			LanguageElement::VariableAssignment { name, value, .. } => {
+				statement_element(value, &variables, &functions, &structs)?;
 				let correct_type = variables
 					.get(name)
-					.ok_or(ParseError(line!(), "Undefined variable"))?;
+					.ok_or(TypeError(line!(), "Undefined variable"))?;
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
-				if !statement_element(value, &variables, &functions, &structs)?
-					|| correct_type != &actual_type
-				{
-					return Ok(false);
+				let name_ref: &str = &name;
+				if correct_type != &actual_type {
+					return Err(TypeError(line!(), "Type mismatch"));
+				}
+				if constants.contains(&name_ref) {
+					return Err(TypeError(line!(), "Assignement to constant"));
 				}
 			}
 
 			LanguageElement::VariableDeclarationAssignment {
-				typ, name, value, ..
+				typ,
+				name,
+				value,
+				is_const,
+				..
 			} => {
+				statement_element(value, &variables, &functions, &structs)?;
 				variables.insert(name.clone(), typ.clone());
+				if *is_const {
+					constants.insert(&name);
+				}
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
-				if !statement_element(value, &variables, &functions, &structs)?
-					|| typ != &actual_type
-				{
-					return Ok(false);
+				if typ != &actual_type {
+					return Err(TypeError(line!(), "Type mismatch"));
 				}
 			}
 
 			LanguageElement::PointerAssignment { ptr, value } => {
+				statement_element(ptr, &variables, &functions, &structs)?;
+				statement_element(value, &variables, &functions, &structs)?;
 				let correct_type = type_of(ptr, &variables, &functions, &structs)?;
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
-				if !statement_element(ptr, &variables, &functions, &structs)?
-					|| !statement_element(value, &variables, &functions, &structs)?
-					|| correct_type != actual_type
-				{
-					return Ok(false);
+				if correct_type != actual_type {
+					return Err(TypeError(line!(), "Type mismatch"));
 				}
 			}
 
@@ -76,11 +99,8 @@ pub(crate) fn language_element(
 					},
 				);
 
-				if !language_element(block, &variables, &functions, &structs)?
-					|| !verify_function_return_type(block, &variables, &functions, &structs, typ)?
-				{
-					return Ok(false);
-				}
+				language_element(block, &variables, &functions, &structs, &constants)?;
+				verify_function_return_type(block, &variables, &functions, &structs, typ)?;
 			}
 
 			LanguageElement::IfStatement {
@@ -88,14 +108,10 @@ pub(crate) fn language_element(
 				then,
 				else_then,
 			} => {
-				if !statement_element(condition, &variables, &functions, &structs)?
-					|| !language_element(then, &variables, &functions, &structs)?
-					|| !else_then
-						.as_deref()
-						.map(|v| language_element(v, &variables, &functions, &structs))
-						.unwrap_or(Ok(true))?
-				{
-					return Ok(false);
+				statement_element(condition, &variables, &functions, &structs)?;
+				language_element(then, &variables, &functions, &structs, &constants)?;
+				if let Some(else_then) = else_then {
+					language_element(else_then, &variables, &functions, &structs, &constants)?;
 				}
 			}
 
@@ -105,45 +121,42 @@ pub(crate) fn language_element(
 				post,
 				body,
 			} => {
-				if !statement_element(condition, &variables, &functions, &structs)?
-					|| !language_element(init, &variables, &functions, &structs)?
-					|| !language_element(post, &variables, &functions, &structs)?
-					|| !language_element(body, &variables, &functions, &structs)?
-				{
-					return Ok(false);
-				}
+				statement_element(condition, &variables, &functions, &structs)?;
+				language_element(init, &variables, &functions, &structs, &constants)?;
+				language_element(post, &variables, &functions, &structs, &constants)?;
+				language_element(body, &variables, &functions, &structs, &constants)?;
 			}
 
 			LanguageElement::While { condition, body } => {
-				if !statement_element(condition, &variables, &functions, &structs)?
-					|| !language_element(body, &variables, &functions, &structs)?
-				{
-					return Ok(false);
-				}
+				statement_element(condition, &variables, &functions, &structs)?;
+				language_element(body, &variables, &functions, &structs, &constants)?;
 			}
 
 			//Is handled by function def instead
 			LanguageElement::Return(_) => {}
 
 			LanguageElement::Statement(statement) => {
-				if !statement_element(statement, &variables, &functions, &structs)? {
-					return Ok(false);
-				}
+				statement_element(statement, &variables, &functions, &structs)?;
 			}
 
 			LanguageElement::StructAssignment { name, value } => {
 				let name: &str = &name;
 				let fields = structs
 					.get(name)
-					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					.ok_or(TypeError(line!(), "Undefined struct type"))?;
 				if !fields.len() == value.len() {
-					return Ok(false);
+					return Err(TypeError(
+						line!(),
+						"Not the correct amount of fields in struct initalisation",
+					));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					if !statement_element(value, &variables, &functions, &structs)?
-						|| type_of(value, &variables, &functions, &structs)? != field.typ
-					{
-						return Ok(false);
+					statement_element(value, &variables, &functions, &structs)?;
+					if type_of(value, &variables, &functions, &structs)? != field.typ {
+						return Err(TypeError(
+							line!(),
+							"Struct field type mismatch in intialisation",
+						));
 					}
 				}
 			}
@@ -155,19 +168,24 @@ pub(crate) fn language_element(
 				let struct_type = if let Type::Struct(name) = typ {
 					Ok(*name)
 				} else {
-					Err(ParseError(line!(), "Undefined struct type"))
+					Err(TypeError(line!(), "Undefined struct type"))
 				}?;
 				let fields = structs
 					.get(struct_type)
-					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					.ok_or(TypeError(line!(), "Undefined struct type"))?;
 				if !fields.len() == value.len() {
-					return Ok(false);
+					return Err(TypeError(
+						line!(),
+						"Not the correct amount of fields in struct initalisation",
+					));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					if !statement_element(value, &variables, &functions, &structs)?
-						|| type_of(value, &variables, &functions, &structs)? != field.typ
-					{
-						return Ok(false);
+					statement_element(value, &variables, &functions, &structs)?;
+					if type_of(value, &variables, &functions, &structs)? != field.typ {
+						return Err(TypeError(
+							line!(),
+							"Struct field type mismatch in intialisation",
+						));
 					}
 				}
 			}
@@ -176,15 +194,17 @@ pub(crate) fn language_element(
 				let name: &str = &name;
 				let fields = structs
 					.get(name)
-					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					.ok_or(TypeError(line!(), "Undefined struct type"))?;
 				let field_type = fields
 					.iter()
 					.find(|Variable { name, typ: _ }| name == field)
-					.ok_or(ParseError(line!(), "Undefined field"))?;
-				if !statement_element(value, &variables, &functions, &structs)?
-					|| type_of(value, &variables, &functions, &structs)? != field_type.typ
-				{
-					return Ok(false);
+					.ok_or(TypeError(line!(), "Undefined field"))?;
+				statement_element(value, &variables, &functions, &structs)?;
+				if type_of(value, &variables, &functions, &structs)? != field_type.typ {
+					return Err(TypeError(
+						line!(),
+						"Struct field type mismatch in pointer assignment",
+					));
 				}
 			}
 
@@ -195,7 +215,7 @@ pub(crate) fn language_element(
 		}
 	}
 
-	Ok(true)
+	Ok(())
 }
 
 pub(crate) fn verify_function_return_type<'a>(
@@ -204,25 +224,26 @@ pub(crate) fn verify_function_return_type<'a>(
 	functions: &'a HashMap<Cow<'a, str>, Function>,
 	structs: &'a HashMap<&'a str, Vec<Variable<'a>>>,
 	correct_return: &Type,
-) -> Result<bool, ParseError> {
+) -> Result<(), TypeError> {
 	macro_rules! chain_blocks {
         ($e:expr) => {
-            !verify_function_return_type(
+            verify_function_return_type(
                 $e,
                 variables,
                 functions,
                 structs,
                 correct_return,
-            )?
+            )?;
         };
         ($e1:expr, $($e2:expr), +) => {
-            !verify_function_return_type(
+            verify_function_return_type(
                 $e1,
                 variables,
                 functions,
                 structs,
                 correct_return,
-            )? || chain_blocks!($($e2), +)
+            )?;
+			chain_blocks!($($e2), +)
         }
     }
 	for elem in elems {
@@ -233,25 +254,19 @@ pub(crate) fn verify_function_return_type<'a>(
 				else_then: None,
 				..
 			} => {
-				if !chain_blocks!(body) {
-					return Ok(false);
-				}
+				chain_blocks!(body);
 			}
 			LanguageElement::IfStatement {
 				then,
 				else_then: Some(else_then),
 				..
 			} => {
-				if chain_blocks!(then, else_then) {
-					return Ok(false);
-				}
+				chain_blocks!(then, else_then);
 			}
 			LanguageElement::For {
 				init, post, body, ..
 			} => {
-				if chain_blocks!(init, post, body) {
-					return Ok(false);
-				}
+				chain_blocks!(init, post, body);
 			}
 			LanguageElement::Return(v) => {
 				let actual_return = if let Some(v) = v {
@@ -259,12 +274,14 @@ pub(crate) fn verify_function_return_type<'a>(
 				} else {
 					Type::Void
 				};
-				return Ok(&actual_return == correct_return);
+				if &actual_return != correct_return {
+					return Err(TypeError(line!(), "Function returns wrong type"));
+				}
 			}
 			_ => {}
 		}
 	}
-	Ok(true)
+	Ok(())
 }
 
 pub(crate) fn type_of<'a>(
@@ -272,7 +289,7 @@ pub(crate) fn type_of<'a>(
 	variables: &'a HashMap<Cow<'a, str>, Type>,
 	functions: &'a HashMap<Cow<'a, str>, Function>,
 	structs: &'a HashMap<&'a str, Vec<Variable<'a>>>,
-) -> Result<Type<'a>, ParseError> {
+) -> Result<Type<'a>, TypeError> {
 	let res = match elem {
 		StatementElement::Char(_) => Type::Char,
 		StatementElement::Num(_)
@@ -300,14 +317,14 @@ pub(crate) fn type_of<'a>(
 
 		StatementElement::FunctionCall { name, .. } => functions
 			.get(name)
-			.ok_or(ParseError(line!(), "Cannot resolve function!"))?
+			.ok_or(TypeError(line!(), "Cannot resolve function!"))?
 			.return_type
 			.clone()
 			.into(),
 
 		StatementElement::Var(name) => variables
 			.get(name)
-			.ok_or(ParseError(line!(), "Cannot resolve variable!"))?
+			.ok_or(TypeError(line!(), "Cannot resolve variable!"))?
 			.clone(),
 
 		StatementElement::Array(arr) => Type::ptr(
@@ -321,7 +338,7 @@ pub(crate) fn type_of<'a>(
 		StatementElement::AdrOf(name) => Type::ptr(
 			variables
 				.get(name)
-				.ok_or(ParseError(line!(), "Cannot resolve variable!"))?
+				.ok_or(TypeError(line!(), "Cannot resolve variable!"))?
 				.clone(),
 		),
 
@@ -329,7 +346,7 @@ pub(crate) fn type_of<'a>(
 			let l = type_of(lhs, variables, functions, structs)?;
 			let r = type_of(rhs, variables, functions, structs)?;
 			if l != r {
-				return Err(ParseError(
+				return Err(TypeError(
 					line!(),
 					"Ternary operator doesn't return same type on both branches",
 				));
@@ -340,19 +357,19 @@ pub(crate) fn type_of<'a>(
 			let name: &str = &name;
 			let struct_type = if let Type::Struct(struct_type) = variables
 				.get(name)
-				.ok_or(ParseError(line!(), "Cannot resolve variable"))?
+				.ok_or(TypeError(line!(), "Cannot resolve variable"))?
 			{
 				Ok(struct_type)
 			} else {
-				Err(ParseError(line!(), "Variable isn't a struct"))
+				Err(TypeError(line!(), "Variable isn't a struct"))
 			}?;
 
 			structs
 				.get(struct_type)
-				.ok_or(ParseError(line!(), "Cannot resolve struct type"))?
+				.ok_or(TypeError(line!(), "Cannot resolve struct type"))?
 				.iter()
 				.find(|f| f.name == field)
-				.ok_or(ParseError(line!(), "Cannot resolve field name"))?
+				.ok_or(TypeError(line!(), "Cannot resolve field name"))?
 				.typ
 				.clone()
 		}
@@ -365,26 +382,25 @@ pub fn statement_element(
 	variables: &HashMap<Cow<str>, Type>,
 	functions: &HashMap<Cow<str>, Function>,
 	structs: &HashMap<&str, Vec<Variable>>,
-) -> Result<bool, ParseError> {
+) -> Result<(), TypeError> {
 	let res = match elem {
 		StatementElement::FunctionCall { name, parametres } => {
 			if let Some(f) = functions.get(name) {
-				let len_eq = f.parametres.len() == parametres.len();
-				let types_are_eq = {
-					for (l, r) in f.parametres.iter().map(|v| &v.typ).zip(
-						parametres
-							.iter()
-							.map(|p| type_of(p, variables, functions, structs)),
-					) {
-						if l != &r? {
-							return Ok(false);
-						}
+				if f.parametres.len() != parametres.len() {
+					return Err(TypeError(
+						line!(),
+						"Wrong amount of arguments in function call",
+					));
+				}
+				for (l, r) in f.parametres.iter().map(|v| &v.typ).zip(
+					parametres
+						.iter()
+						.map(|p| type_of(p, variables, functions, structs)),
+				) {
+					if l != &r? {
+						return Err(TypeError(line!(), "Wrong type in function call"));
 					}
-					true
-				};
-				len_eq && types_are_eq
-			} else {
-				false
+				}
 			}
 		}
 
@@ -401,15 +417,15 @@ pub fn statement_element(
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?
-				&& statement_element(rhs.as_ref(), variables, functions, structs)?
+			statement_element(lhs.as_ref(), variables, functions, structs)?;
+			statement_element(rhs.as_ref(), variables, functions, structs)?;
 		}
 
 		StatementElement::BoolNot(lhs) => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?
+			statement_element(lhs.as_ref(), variables, functions, structs)?;
 		}
 
-		_ => true,
+		_ => {}
 	};
 	Ok(res)
 }

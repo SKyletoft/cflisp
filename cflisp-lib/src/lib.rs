@@ -16,7 +16,7 @@ pub mod token;
 pub mod type_checker;
 pub mod types;
 
-use error::{CompileError, ParseError};
+use error::{CompileError, ParseError, TypeError};
 use flags::Flags;
 use flisp::flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use language_element::LanguageElement;
