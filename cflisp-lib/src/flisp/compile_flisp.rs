@@ -49,10 +49,7 @@ fn compile_elements<'a>(
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let mut instructions = vec![(
-		Instruction::Label(Cow::Owned(format!("\n{}", &state.scope_name))),
-		None,
-	)];
+	let mut instructions = vec![(Instruction::Label(state.scope_name.clone()), None)];
 	for (i, e) in block.iter().enumerate() {
 		let mut new_state = State {
 			variables: state.variables,
@@ -299,6 +296,7 @@ fn compile_element<'a>(
 				args_base,
 				false,
 			)?;
+			function_body.insert(0, (Instruction::Label(Cow::Borrowed("\n")), None));
 			if args_count != args_base {
 				function_body.push((
 					Instruction::LEASP(Addressing::SP(args_count - args_base)),
