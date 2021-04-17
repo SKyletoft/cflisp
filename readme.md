@@ -91,6 +91,5 @@ O (/O1/O2)|optimise| Enables optimisations. In practice it mostly just fixes bad
 * `-a` flag on Windows and Mac
 * Figure out licensing
 * Implement own flisp simulator (16 bit addressing?)
-* Fix the type checker
 * New ABI. (Multibyte size variables, return structs from functions)
 * casts
