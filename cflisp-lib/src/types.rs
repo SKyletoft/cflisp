@@ -129,6 +129,12 @@ impl<'a> From<&Type<'a>> for NativeType {
 	}
 }
 
+impl<'a> From<NativeType> for Type<'a> {
+	fn from(other: NativeType) -> Self {
+		(&other).into()
+	}
+}
+
 impl<'a> From<&NativeType> for Type<'a> {
 	fn from(other: &NativeType) -> Self {
 		match other {

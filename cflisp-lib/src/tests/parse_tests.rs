@@ -145,17 +145,17 @@ fn parse_numbers() {
 	for expected in (i8::MIN as isize)..=(u8::MAX as isize) {
 		let expected = expected as i8;
 		let as_string = format!("0x{:x}", expected);
-		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
-		if let Token::Num(n) = parsed {
+		let (parsed_hex_lo, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed_hex_lo {
 			assert_eq!(expected, n as i8);
 			assert!(rest.is_empty());
 		} else {
 			panic!();
 		}
 
-		let as_string = format!("0x{:X}", expected);
-		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
-		if let Token::Num(n) = parsed {
+		let as_string = format!("0X{:X}", expected);
+		let (parsed_hex_hi, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed_hex_hi {
 			assert_eq!(expected, n as i8);
 			assert!(rest.is_empty());
 		} else {
@@ -273,4 +273,27 @@ fn merge_comments() {
 	let case_5 = merge_comments!(&Some(Cow::Borrowed("a")), &None, &Some(Cow::Borrowed("c")));
 	let expected_5 = Some(Cow::Owned(String::from("a, c")));
 	assert_eq!(case_5, expected_5);
+}
+
+#[test]
+fn type_check() {
+	let case_1 = "int x = 5;";
+	let res_1 = type_checker::type_check(&parser::parse(case_1, false).unwrap()).unwrap();
+	assert!(res_1);
+
+	let case_2 = "int x = 'a';";
+	let res_2 = type_checker::type_check(&parser::parse(case_2, false).unwrap()).unwrap();
+	assert!(!res_2);
+
+	let case_3 = "char x = 5;";
+	let res_3 = type_checker::type_check(&parser::parse(case_3, false).unwrap()).unwrap();
+	assert!(!res_3);
+
+	let case_4 = include_str!("type_test_1.c");
+	let res_4 = type_checker::type_check(&parser::parse(case_4, false).unwrap()).unwrap();
+	assert!(res_4);
+
+	let case_5 = include_str!("type_test_2.c");
+	let res_5 = type_checker::type_check(&parser::parse(case_5, false).unwrap()).unwrap();
+	assert!(!res_5);
 }
