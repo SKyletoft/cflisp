@@ -43,15 +43,18 @@ pub(crate) fn language_element(
 
 			LanguageElement::VariableAssignment { name, value, .. } => {
 				statement_element(value, &variables, &functions, &structs)?;
-				let correct_type = variables
-					.get(name)
-					.ok_or(TypeError(line!(), "Undefined variable"))?;
+				let correct_type = variables.get(name).ok_or_else(|| {
+					dbg!(line, name);
+					TypeError(line!(), "Undefined variable")
+				})?;
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
 				let name_ref: &str = &name;
 				if correct_type != &actual_type {
+					dbg!(line, correct_type, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
 				}
 				if constants.contains(&name_ref) {
+					dbg!(line, name);
 					return Err(TypeError(line!(), "Assignement to constant"));
 				}
 			}
@@ -70,6 +73,7 @@ pub(crate) fn language_element(
 				}
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
 				if typ != &actual_type {
+					dbg!(line, typ, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
 				}
 			}
@@ -80,6 +84,7 @@ pub(crate) fn language_element(
 				let correct_type = type_of(ptr, &variables, &functions, &structs)?;
 				let actual_type = type_of(value, &variables, &functions, &structs)?;
 				if correct_type != actual_type {
+					dbg!(line, correct_type, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
 				}
 			}
@@ -141,10 +146,12 @@ pub(crate) fn language_element(
 
 			LanguageElement::StructAssignment { name, value } => {
 				let name: &str = &name;
-				let fields = structs
-					.get(name)
-					.ok_or(TypeError(line!(), "Undefined struct type"))?;
-				if !fields.len() == value.len() {
+				let fields = structs.get(name).ok_or_else(|| {
+					dbg!(line, name);
+					TypeError(line!(), "Undefined struct type")
+				})?;
+				if fields.len() != value.len() {
+					dbg!(line, fields.len(), value.len());
 					return Err(TypeError(
 						line!(),
 						"Not the correct amount of fields in struct initalisation",
@@ -168,12 +175,15 @@ pub(crate) fn language_element(
 				let struct_type = if let Type::Struct(name) = typ {
 					Ok(*name)
 				} else {
+					dbg!(line, typ);
 					Err(TypeError(line!(), "Undefined struct type"))
 				}?;
-				let fields = structs
-					.get(struct_type)
-					.ok_or(TypeError(line!(), "Undefined struct type"))?;
-				if !fields.len() == value.len() {
+				let fields = structs.get(struct_type).ok_or_else(|| {
+					dbg!(line, struct_type);
+					TypeError(line!(), "Undefined struct type")
+				})?;
+				if fields.len() != value.len() {
+					dbg!(line, fields.len(), value.len());
 					return Err(TypeError(
 						line!(),
 						"Not the correct amount of fields in struct initalisation",
@@ -181,7 +191,10 @@ pub(crate) fn language_element(
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
 					statement_element(value, &variables, &functions, &structs)?;
-					if type_of(value, &variables, &functions, &structs)? != field.typ {
+					let actual_type = type_of(value, &variables, &functions, &structs)?;
+					let correct_type = &field.typ;
+					if &actual_type != correct_type {
+						dbg!(line, actual_type, correct_type);
 						return Err(TypeError(
 							line!(),
 							"Struct field type mismatch in intialisation",
@@ -192,15 +205,22 @@ pub(crate) fn language_element(
 
 			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
 				let name: &str = &name;
-				let fields = structs
-					.get(name)
-					.ok_or(TypeError(line!(), "Undefined struct type"))?;
+				let fields = structs.get(name).ok_or_else(|| {
+					dbg!(line, name);
+					TypeError(line!(), "Undefined struct type")
+				})?;
 				let field_type = fields
 					.iter()
 					.find(|Variable { name, typ: _ }| name == field)
-					.ok_or(TypeError(line!(), "Undefined field"))?;
+					.ok_or_else(|| {
+						dbg!(line, field);
+						TypeError(line!(), "Undefined field")
+					})?;
 				statement_element(value, &variables, &functions, &structs)?;
-				if type_of(value, &variables, &functions, &structs)? != field_type.typ {
+				let actual_type = type_of(value, &variables, &functions, &structs)?;
+				let correct_type = &field_type.typ;
+				if &actual_type != correct_type {
+					dbg!(line, actual_type, correct_type);
 					return Err(TypeError(
 						line!(),
 						"Struct field type mismatch in pointer assignment",
@@ -275,6 +295,7 @@ pub(crate) fn verify_function_return_type<'a>(
 					Type::Void
 				};
 				if &actual_return != correct_return {
+					dbg!(elem, actual_return, correct_return);
 					return Err(TypeError(line!(), "Function returns wrong type"));
 				}
 			}
@@ -317,14 +338,20 @@ pub(crate) fn type_of<'a>(
 
 		StatementElement::FunctionCall { name, .. } => functions
 			.get(name)
-			.ok_or(TypeError(line!(), "Cannot resolve function!"))?
+			.ok_or_else(|| {
+				dbg!(elem, name);
+				TypeError(line!(), "Cannot resolve function!")
+			})?
 			.return_type
 			.clone()
 			.into(),
 
 		StatementElement::Var(name) => variables
 			.get(name)
-			.ok_or(TypeError(line!(), "Cannot resolve variable!"))?
+			.ok_or_else(|| {
+				dbg!(elem, name);
+				TypeError(line!(), "Cannot resolve variable!")
+			})?
 			.clone(),
 
 		StatementElement::Array(arr) => Type::ptr(
@@ -338,7 +365,10 @@ pub(crate) fn type_of<'a>(
 		StatementElement::AdrOf(name) => Type::ptr(
 			variables
 				.get(name)
-				.ok_or(TypeError(line!(), "Cannot resolve variable!"))?
+				.ok_or_else(|| {
+					dbg!(elem, name);
+					TypeError(line!(), "Cannot resolve variable!")
+				})?
 				.clone(),
 		),
 
@@ -346,6 +376,7 @@ pub(crate) fn type_of<'a>(
 			let l = type_of(lhs, variables, functions, structs)?;
 			let r = type_of(rhs, variables, functions, structs)?;
 			if l != r {
+				dbg!(elem, l, r);
 				return Err(TypeError(
 					line!(),
 					"Ternary operator doesn't return same type on both branches",
@@ -355,21 +386,29 @@ pub(crate) fn type_of<'a>(
 		}
 		StatementElement::FieldPointerAccess(name, field) => {
 			let name: &str = &name;
-			let struct_type = if let Type::Struct(struct_type) = variables
-				.get(name)
-				.ok_or(TypeError(line!(), "Cannot resolve variable"))?
-			{
+			let struct_type = if let Type::Struct(struct_type) =
+				variables.get(name).ok_or_else(|| {
+					dbg!(elem, name);
+					TypeError(line!(), "Cannot resolve variable")
+				})? {
 				Ok(struct_type)
 			} else {
+				dbg!(elem, name);
 				Err(TypeError(line!(), "Variable isn't a struct"))
 			}?;
 
 			structs
 				.get(struct_type)
-				.ok_or(TypeError(line!(), "Cannot resolve struct type"))?
+				.ok_or_else(|| {
+					dbg!(elem, struct_type);
+					TypeError(line!(), "Cannot resolve struct type")
+				})?
 				.iter()
 				.find(|f| f.name == field)
-				.ok_or(TypeError(line!(), "Cannot resolve field name"))?
+				.ok_or_else(|| {
+					dbg!(elem, field);
+					TypeError(line!(), "Cannot resolve field name")
+				})?
 				.typ
 				.clone()
 		}
@@ -387,6 +426,7 @@ pub fn statement_element(
 		StatementElement::FunctionCall { name, parametres } => {
 			if let Some(f) = functions.get(name) {
 				if f.parametres.len() != parametres.len() {
+					dbg!(elem, f.parametres.len(), parametres.len());
 					return Err(TypeError(
 						line!(),
 						"Wrong amount of arguments in function call",
@@ -397,7 +437,9 @@ pub fn statement_element(
 						.iter()
 						.map(|p| type_of(p, variables, functions, structs)),
 				) {
-					if l != &r? {
+					let r = r?;
+					if l != &r {
+						dbg!(elem, l, r);
 						return Err(TypeError(line!(), "Wrong type in function call"));
 					}
 				}
