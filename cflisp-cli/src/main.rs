@@ -111,9 +111,13 @@ fn main() {
 			.arg(flags.out)
 			.output()
 			.unwrap_or_else(|_| exit_error("Output isn't utf8?"));
-		let res = String::from_utf8(program_call.stdout)
+		let exit_status = program_call.status.code().unwrap_or_default();
+		let stdout = String::from_utf8(program_call.stdout)
 			.unwrap_or_else(|_| exit_error("Failed to call qaflisp"));
-		print!("{}", res);
+		let stderr = String::from_utf8(program_call.stderr)
+			.unwrap_or_else(|_| exit_error("Failed to call qaflisp"));
+		print!("{}\n{}", stdout, stderr);
+		process::exit(exit_status);
 	}
 }
 
