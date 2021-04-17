@@ -74,7 +74,7 @@ pub type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// Can also hold the name of a struct
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub enum Type<'a> {
 	Uint,
 	Int,
@@ -84,6 +84,22 @@ pub enum Type<'a> {
 	Struct(&'a str),
 	Ptr(Box<Type<'a>>),
 }
+
+impl PartialEq for Type<'_> {
+	fn eq(&self, other: &Self) -> bool {
+		match self {
+			Type::Ptr(_) | Type::Uint | Type::Int => {
+				matches!(other, Type::Ptr(_) | Type::Uint | Type::Int)
+			}
+			Type::Char => matches!(other, Type::Char),
+			Type::Bool => matches!(other, Type::Bool),
+			Type::Void => matches!(other, Type::Void),
+			Type::Struct(s) => matches!(other, Type::Struct(ss) if s == ss),
+		}
+	}
+}
+
+impl Eq for Type<'_> {}
 
 impl<'a> Type<'a> {
 	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
