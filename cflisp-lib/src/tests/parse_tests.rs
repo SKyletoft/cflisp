@@ -1,7 +1,7 @@
 //Clippy is broken. These are not unused imports. 1/4-21
 #![allow(unused_imports)]
 use super::super::*;
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 /*
 	Yeah, this is terrible to write. Currently done by copying the current
@@ -278,22 +278,52 @@ fn merge_comments() {
 #[test]
 fn type_check() {
 	let case_1 = "int x = 5;";
-	let res_1 = type_checker::type_check(&parser::parse(case_1, false).unwrap()).unwrap();
+	let res_1 = type_checker::language_element(
+		&parser::parse(case_1, false).unwrap(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+	)
+	.unwrap();
 	assert!(res_1);
 
 	let case_2 = "int x = 'a';";
-	let res_2 = type_checker::type_check(&parser::parse(case_2, false).unwrap()).unwrap();
+	let res_2 = type_checker::language_element(
+		&parser::parse(case_2, false).unwrap(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+	)
+	.unwrap();
 	assert!(!res_2);
 
 	let case_3 = "char x = 5;";
-	let res_3 = type_checker::type_check(&parser::parse(case_3, false).unwrap()).unwrap();
+	let res_3 = type_checker::language_element(
+		&parser::parse(case_3, false).unwrap(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+	)
+	.unwrap();
 	assert!(!res_3);
 
 	let case_4 = include_str!("type_test_1.c");
-	let res_4 = type_checker::type_check(&parser::parse(case_4, false).unwrap()).unwrap();
+	let res_4 = type_checker::language_element(
+		&parser::parse(case_4, false).unwrap(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+	)
+	.unwrap();
 	assert!(res_4);
 
 	let case_5 = include_str!("type_test_2.c");
-	let res_5 = type_checker::type_check(&parser::parse(case_5, false).unwrap()).unwrap();
+	let res_5 = type_checker::language_element(
+		&parser::parse(case_5, false).unwrap(),
+		&HashMap::new(),
+		&HashMap::new(),
+		&HashMap::new(),
+	)
+	.unwrap();
 	assert!(!res_5);
 }

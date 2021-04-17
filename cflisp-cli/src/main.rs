@@ -1,5 +1,4 @@
 use std::{
-	collections::{HashMap, HashSet},
 	env, fs,
 	path::PathBuf,
 	{process, process::Command},
@@ -49,16 +48,8 @@ fn main() {
 		dbg!(&parsed);
 	}
 	if flags.type_check {
-		let ok = type_checker::language_element(
-			&parsed,
-			&HashSet::new(),
-			&HashSet::new(),
-			&HashMap::new(),
-		)
-		.unwrap_or_else(|e| exit_error(&format!("Name error ({})", e)));
-		if !ok {
-			exit_error("Error: type check or name resolution error")
-		}
+		type_checker::type_check(&parsed)
+			.unwrap_or_else(|e| exit_error(&format!("Type check error ({})", e)));
 	}
 	let mut struct_filtered = LanguageElementStructless::from_language_elements(parsed)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));

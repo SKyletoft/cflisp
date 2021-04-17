@@ -1,12 +1,16 @@
 use crate::*;
 use std::{borrow::Cow, collections::HashMap};
 
-pub fn type_check(block: &[LanguageElement]) -> Result<bool, ParseError> {
-	language_element(block, &HashMap::new(), &HashMap::new(), &HashMap::new())
+pub fn type_check(block: &[LanguageElement]) -> Result<(), ParseError> {
+	if language_element(block, &HashMap::new(), &HashMap::new(), &HashMap::new())? {
+		Ok(())
+	} else {
+		Err(ParseError(line!(), "Mismatched types"))
+	}
 }
 
 ///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
-pub fn language_element(
+pub(crate) fn language_element(
 	block: &[LanguageElement],
 	upper_variables: &HashMap<Cow<str>, Type>,
 	outer_functions: &HashMap<Cow<str>, Function>,

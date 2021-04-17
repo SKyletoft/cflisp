@@ -5,6 +5,7 @@ use cflisp_lib::{
 	flisp::{compile_flisp, optimise_flisp, text},
 	optimise_language, parser,
 	structless::LanguageElementStructless,
+	type_checker,
 };
 
 #[wasm_bindgen]
@@ -61,6 +62,9 @@ fn compile_to_text(
 	let stripped_comments = parser::remove_comments(source);
 	let tree =
 		parser::parse(&stripped_comments, flags.debug).map_err(|err| format!("{:?}", err))?;
+	if type_check {
+		type_checker::type_check(&tree).map_err(|err| format!("{:?}", err))?;
+	}
 	let mut structless = LanguageElementStructless::from_language_elements(tree)
 		.map_err(|err| format!("{:?}", err))?;
 	if optimise >= 2 {
