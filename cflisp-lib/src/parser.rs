@@ -41,7 +41,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<LanguageElement<'a>, ParseError> {
-	//Todo patterns might be invalidated by the pointer versions
 	let element = {
 		match tokens {
 			//Struct member assignment

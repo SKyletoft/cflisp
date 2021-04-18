@@ -562,7 +562,6 @@ impl<'a> StatementElementStructless<'a> {
 			};
 		}
 
-		//Todo! Figure out macro_rules for this repetition nonsense
 		let res = match other {
 			StatementElement::Add { lhs, rhs } => bin_op!(Add, lhs, rhs),
 			StatementElement::Sub { lhs, rhs } => bin_op!(Sub, lhs, rhs),

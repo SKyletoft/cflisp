@@ -173,7 +173,6 @@ pub(crate) fn const_eval<'a>(
 			Some(StatementElementStructless::Bool(a)) => Some(StatementElementStructless::Bool(!a)),
 			_ => None,
 		},
-		// ^ todo! Implement these when they've been split into bit and bool versions
 		StatementElementStructless::FunctionCall { .. }
 		| StatementElementStructless::Var(_)
 		| StatementElementStructless::Char(_)
