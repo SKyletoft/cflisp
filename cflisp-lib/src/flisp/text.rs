@@ -51,7 +51,7 @@ pub fn instructions_to_text(
 
 ///Imports all functions for non native operations that are used by the program.
 /// Also adds init if no init function is written
-pub fn automatic_imports(instructions: &mut String, debug: bool) {
+pub fn automatic_imports(instructions: &mut String, debug: bool, kill_interrupts: bool) {
 	if instructions.contains("__mul__") {
 		instructions.push_str(include_str!("asm_deps/mul.sflisp"));
 	}
@@ -68,11 +68,20 @@ pub fn automatic_imports(instructions: &mut String, debug: bool) {
 		instructions.push_str(include_str!("asm_deps/mod.sflisp"));
 	}
 	if !instructions.contains("__init_") {
-		if debug {
-			instructions.push_str(include_str!("asm_deps/debug_init.sflisp"));
-		} else {
-			instructions.push_str(include_str!("asm_deps/init.sflisp"));
-		}
+		let interrupts = instructions.contains("interrupt");
+		let init = match (interrupts, debug, kill_interrupts) {
+			(false, true, _) => include_str!("asm_deps/debug_init.sflisp"),
+			(false, false, _) => include_str!("asm_deps/init.sflisp"),
+			(true, true, true) => include_str!("asm_deps/debug_init_kill.sflisp"),
+			(true, true, false) => include_str!("asm_deps/debug_init_continue.sflisp"),
+			(true, false, true) => include_str!("asm_deps/init_kill.sflisp"),
+			(true, false, false) => include_str!("asm_deps/init_continue.sflisp"),
+		};
+		instructions.push_str(init);
 	}
-	instructions.push_str("\n\tORG\t$FF\n\tFCB\t__init_\n");
+	if instructions.contains("interrupt") {
+		instructions.push_str("\n\tORG\t$FD\n\tFCB\tinterrupt\n\tFCB\tinterrupt\n\tFCB\t__init_\n");
+	} else {
+		instructions.push_str("\n\tORG\t$FF\n\tFCB\t__init_\n");
+	}
 }

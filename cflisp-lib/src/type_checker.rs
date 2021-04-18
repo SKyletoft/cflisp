@@ -103,6 +103,14 @@ pub(crate) fn language_element(
 						parametres: args.to_vec(),
 					},
 				);
+				if name == "interrupt" {
+					if typ != &Type::Void {
+						return Err(TypeError(line!(), "Interrupt handler does not return void"));
+					}
+					if !args.is_empty() {
+						return Err(TypeError(line!(), "Interrupt handler takes arugments"));
+					}
+				}
 
 				language_element(block, &variables, &functions, &structs, &constants)?;
 				verify_function_return_type(block, &variables, &functions, &structs, typ)?;

@@ -49,6 +49,7 @@ pub enum Instruction<'a> {
 	PSHA,
 	PULA,
 	RTS,
+	RTI,
 	JSR(Addressing<'a>),
 	Label(Cow<'a, str>),
 	FCB(Vec<isize>),
@@ -89,6 +90,7 @@ impl<'a> fmt::Display for Instruction<'a> {
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
 			Instruction::RTS => write!(f, "\tRTS\t"),
+			Instruction::RTI => write!(f, "\tRTI\t"),
 			Instruction::Label(l) => write!(f, "{}", l.strip_prefix("global::").unwrap_or(l)),
 			Instruction::FCB(bytes) => {
 				//Maybe insert a newline every eight values?
@@ -220,6 +222,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::COMA
 			| Instruction::LSLA
 			| Instruction::LSRA
+			| Instruction::RTI
 			| Instruction::RTS => 1,
 			Instruction::FCB(n) => n.len(),
 			Instruction::Label(_) => 0,
@@ -261,6 +264,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::LSLA
 			| Instruction::LSRA
 			| Instruction::RTS
+			| Instruction::RTI
 			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,
 		}
@@ -301,6 +305,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::LSLA
 			| Instruction::LSRA
 			| Instruction::RTS
+			| Instruction::RTI
 			| Instruction::FCB(_)
 			| Instruction::Label(_) => None,
 		}

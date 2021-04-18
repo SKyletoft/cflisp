@@ -19,6 +19,7 @@ async function run() {
 		const hex        = document.getElementById("hex").checked;
 		const comments   = document.getElementById("comments").checked;
 		const imports    = document.getElementById("imports").checked;
+		const interrupts = document.getElementById("interrupts").checked;
 
 		const state = {
 			source : source,
@@ -27,11 +28,13 @@ async function run() {
 			debug : debug,
 			hex : hex,
 			comments : comments,
-			imports : imports
+			imports : imports,
+			interrupts : interrupts
 		};
 
 		if (state != last_state) {
-			resultWindow.value = run_cc(source, opt, type_check, debug, hex, comments, imports);
+			resultWindow.value =
+			    run_cc(source, opt, type_check, debug, hex, comments, imports, interrupts);
 		}
 		last_state = state;
 	}

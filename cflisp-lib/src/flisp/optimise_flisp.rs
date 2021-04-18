@@ -791,6 +791,7 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 			_ => None,
 		})
 		.chain(iter::once("main".to_string()))
+		.chain(iter::once("interrupt".to_string()))
 		.collect::<HashSet<String>>();
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
@@ -800,4 +801,13 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 			true
 		}
 	});
+}
+
+pub(crate) fn make_interrupt_return(instructions: &mut Vec<CommentedInstruction>) {
+	let make_rti = |(inst, _): &mut CommentedInstruction| {
+		if let Instruction::RTS = inst {
+			*inst = Instruction::RTI
+		}
+	};
+	instructions.iter_mut().for_each(make_rti);
 }

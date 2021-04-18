@@ -306,6 +306,9 @@ fn compile_element<'a>(
 			if !matches!(function_body.last(), Some((Instruction::RTS, _))) {
 				function_body.push((Instruction::RTS, None));
 			}
+			if name == "interrupt" {
+				optimise_flisp::make_interrupt_return(&mut function_body);
+			}
 			function_body
 		}
 

@@ -71,7 +71,7 @@ fn main() {
 	}
 	let mut compiled = text::instructions_to_text(&instr, &flags)
 		.unwrap_or_else(|e| exit_error(&format!("Program too large? ({})", e)));
-	text::automatic_imports(&mut compiled, flags.debug);
+	text::automatic_imports(&mut compiled, flags.debug, flags.kill_interrupts);
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
 	}
