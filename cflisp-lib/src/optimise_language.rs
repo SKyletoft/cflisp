@@ -110,8 +110,16 @@ pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructle
 	find_variables_le(&mut used_variables, elements);
 	elements.retain(|elem| match elem {
 		LanguageElementStructless::VariableAssignment { name, .. }
-		| LanguageElementStructless::VariableDeclarationAssignment { name, .. }
-		| LanguageElementStructless::VariableDeclaration { name, .. } => {
+		| LanguageElementStructless::VariableDeclarationAssignment {
+			name,
+			is_static: false,
+			..
+		}
+		| LanguageElementStructless::VariableDeclaration {
+			name,
+			is_static: false,
+			..
+		} => {
 			let name: &str = name;
 			used_variables.contains(name)
 		}
