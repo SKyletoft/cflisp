@@ -32,10 +32,7 @@ pub enum StatementToken<'a> {
 	BitAnd,
 	FieldAccess,
 	FieldPointerAccess,
-	ArrayAccess {
-		ptr: &'a str,
-		idx: Vec<StatementToken<'a>>,
-	},
+	ArrayAccess(Vec<StatementToken<'a>>),
 	Array(Vec<Vec<StatementToken<'a>>>),
 }
 
@@ -88,20 +85,9 @@ impl<'a> StatementToken<'a> {
 					}
 				}
 				Token::UnparsedArrayAccess(b) => {
-					if let Some(StatementToken::Var(n)) = res.get(last) {
-						let idx = Token::by_byte(b)?;
-						let as_statement = StatementToken::from_tokens(&idx)?;
-						res[last] = StatementToken::ArrayAccess {
-							ptr: n,
-							idx: as_statement,
-						};
-						continue;
-					} else {
-						return Err(ParseError(
-							line!(),
-							"Not (yet?) implemented: Array access to any pointer",
-						));
-					}
+					let idx = Token::by_byte(b)?;
+					let as_statement = StatementToken::from_tokens(&idx)?;
+					StatementToken::ArrayAccess(as_statement)
 				}
 				Token::UnparsedBlock(b) => {
 					let items = b.split(',').map(|s| s.trim()).collect::<Vec<_>>();
