@@ -152,13 +152,6 @@ impl<'a> StatementElement<'a> {
 				Parsed(StatementElement::Array(elements))
 			}
 
-			StatementToken::ArrayAccess { ptr, idx } => {
-				Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
-					lhs: Box::new(StatementElement::Var(Cow::Borrowed(ptr))),
-					rhs: Box::new(StatementElement::from_statement_tokens(idx)?),
-				})))
-			}
-
 			t => Unparsed(t),
 		};
 		Ok(res)
@@ -274,8 +267,9 @@ impl<'a> StatementElement<'a> {
 		for (from, to) in ptr_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
+		do_array_access(&mut working_tokens)?;
 		for (from, to) in un_ops.iter() {
-			do_unary_operation(&mut working_tokens, from, *to)?;
+			do_unary_operation_left(&mut working_tokens, from, *to)?;
 		}
 		for (from, to) in bin_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
@@ -358,7 +352,8 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 	Ok(())
 }
 
-fn do_unary_operation<'a>(
+/// Left as in [OP] [TARGET]
+fn do_unary_operation_left<'a>(
 	tokens: &mut Vec<MaybeParsed<'a>>,
 	op_from: &MaybeParsed,
 	op_to: fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>, ParseError>,
@@ -388,6 +383,33 @@ fn do_unary_operation<'a>(
 			}
 		}
 		idx = idx.wrapping_sub(1);
+	}
+	Ok(())
+}
+
+fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
+	let mut idx = tokens.len().wrapping_sub(1);
+	//yes, stop once too early
+	while idx >= 1 && idx < tokens.len() {
+		if let Some(Unparsed(StatementToken::ArrayAccess(i))) = tokens.get(idx) {
+			let i = StatementElement::from_statement_tokens(i.clone())?;
+			let prev = tokens.remove(idx - 1);
+			if let Parsed(right) = prev {
+				tokens[idx - 1] =
+					Parsed(StatementElement::Deref(Box::new(StatementElement::Add {
+						lhs: Box::new(right),
+						rhs: Box::new(i),
+					})));
+			} else {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Element that \
+				should've been parsed first has not been parsed",
+				));
+			}
+		} else {
+			idx = idx.wrapping_sub(1);
+		}
 	}
 	Ok(())
 }
