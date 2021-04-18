@@ -114,8 +114,6 @@ impl<'a> StatementToken<'a> {
 				}
 				Token::UnparsedSource(b) => {
 					let (token, rest) = lexer::get_token(b)?;
-					eprintln!("Should be empty?");
-					dbg!(rest);
 					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
 				}
 				_ => {

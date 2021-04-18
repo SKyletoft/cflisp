@@ -307,7 +307,6 @@ fn psha(instructions: &mut Vec<CommentedInstruction>) {
 			(Instruction::PSHA, second_comment),
 		) = (&instructions[idx], &instructions[idx + 1])
 		{
-			eprintln!("HIT");
 			instructions[idx] = (
 				Instruction::STA(Addressing::SP(0)),
 				merge_comments!(first_comment, second_comment),

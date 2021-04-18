@@ -55,7 +55,7 @@ pub(crate) fn language_element(
 				}
 				if constants.contains(&name_ref) {
 					dbg!(line, name);
-					return Err(TypeError(line!(), "Assignement to constant"));
+					return Err(TypeError(line!(), "Assignment to constant"));
 				}
 			}
 
