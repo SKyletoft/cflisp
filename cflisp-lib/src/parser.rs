@@ -69,6 +69,22 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 			}
 
+			//Switch statement
+			[Switch, UnparsedParentheses(expr), UnparsedBlock(cases)] => {
+				let _expr = StatementElement::from_source_str(expr)?;
+				let _cases_parsed = parse(cases, move_first)?;
+				return Err(ParseError(line!(), "Switch statements are not supported"));
+			}
+
+			//Case
+			[Case, constant, Colon, ..] if matches!(constant, Bool(_) | Char(_) | Num(_)) => {
+				return Err(ParseError(line!(), "Switch statements are not supported"));
+			}
+
+			[Break, ..] | [Continue, ..] => {
+				return Err(ParseError(line!(), "Break and continue are not supported"));
+			}
+
 			//If else if
 			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
 				let condition_parsed = StatementElement::from_source_str(cond)?;
