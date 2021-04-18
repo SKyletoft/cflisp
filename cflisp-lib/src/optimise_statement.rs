@@ -56,7 +56,7 @@ pub(crate) fn fast_mul(elem: &mut StatementElementStructless) {
 				let a = *a as usize;
 				let mut inner = b.clone();
 				let compiler_word_size = std::usize::MAX.count_ones();
-				for bit in 0..compiler_word_size {
+				for bit in 1..compiler_word_size {
 					let set_bit = 1 << bit;
 					if a & set_bit == set_bit {
 						inner = StatementElementStructless::Add {
