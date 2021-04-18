@@ -116,7 +116,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 					));
 				}
 
-				//let condition_tokens = Token::parse_str_to_vec(split[1])?;
 				let condition = StatementElement::from_source_str(split[1])?;
 
 				let init = parse(split[0], move_first)?;

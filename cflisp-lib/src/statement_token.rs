@@ -113,7 +113,7 @@ impl<'a> StatementToken<'a> {
 					StatementToken::Array(v)
 				}
 				Token::UnparsedSource(b) => {
-					let (token, rest) = lexer::get_token(b)?;
+					let (token, _) = lexer::get_token(b)?;
 					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
 				}
 				_ => {
