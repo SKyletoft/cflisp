@@ -21,6 +21,16 @@ const QAFLISP: &str = "\\qaflisp.exe";
 //Yes, this is a horrible mess
 fn main() {
 	let args = env::args().skip(1).collect::<Vec<_>>();
+
+	if args
+		.iter()
+		.map(String::as_str)
+		.any(|s| s == "--help" || s == "-help")
+	{
+		println!(include_str!("help.txt"));
+		process::exit(0);
+	}
+
 	let flags = args.iter().collect::<Flags>();
 	let files = args
 		.iter()
