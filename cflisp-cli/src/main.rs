@@ -1,5 +1,4 @@
 use std::{
-	collections::{HashMap, HashSet},
 	env, fs,
 	path::PathBuf,
 	{process, process::Command},
@@ -22,6 +21,16 @@ const QAFLISP: &str = "\\qaflisp.exe";
 //Yes, this is a horrible mess
 fn main() {
 	let args = env::args().skip(1).collect::<Vec<_>>();
+
+	if args
+		.iter()
+		.map(String::as_str)
+		.any(|s| s == "--help" || s == "-help")
+	{
+		println!(include_str!("help.txt"));
+		process::exit(0);
+	}
+
 	let flags = args.iter().collect::<Flags>();
 	let files = args
 		.iter()
@@ -49,16 +58,8 @@ fn main() {
 		dbg!(&parsed);
 	}
 	if flags.type_check {
-		let ok = type_checker::language_element(
-			&parsed,
-			&HashSet::new(),
-			&HashSet::new(),
-			&HashMap::new(),
-		)
-		.unwrap_or_else(|e| exit_error(&format!("Name error ({})", e)));
-		if !ok {
-			exit_error("Error: type check or name resolution error")
-		}
+		type_checker::type_check(&parsed)
+			.unwrap_or_else(|e| exit_error(&format!("Type check error ({})", e)));
 	}
 	let mut struct_filtered = LanguageElementStructless::from_language_elements(parsed)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
@@ -80,7 +81,7 @@ fn main() {
 	}
 	let mut compiled = text::instructions_to_text(&instr, &flags)
 		.unwrap_or_else(|e| exit_error(&format!("Program too large? ({})", e)));
-	text::automatic_imports(&mut compiled, flags.debug);
+	text::automatic_imports(&mut compiled, flags.debug, flags.kill_interrupts);
 	if flags.debug {
 		compiled.insert_str(0, "\tORG\t$20\n");
 	}
@@ -111,9 +112,13 @@ fn main() {
 			.arg(flags.out)
 			.output()
 			.unwrap_or_else(|_| exit_error("Output isn't utf8?"));
-		let res = String::from_utf8(program_call.stdout)
+		let exit_status = program_call.status.code().unwrap_or_default();
+		let stdout = String::from_utf8(program_call.stdout)
 			.unwrap_or_else(|_| exit_error("Failed to call qaflisp"));
-		print!("{}", res);
+		let stderr = String::from_utf8(program_call.stderr)
+			.unwrap_or_else(|_| exit_error("Failed to call qaflisp"));
+		print!("{}\n{}", stdout, stderr);
+		process::exit(exit_status);
 	}
 }
 

@@ -1,7 +1,10 @@
 //Clippy is broken. These are not unused imports. 1/4-21
 #![allow(unused_imports)]
 use super::super::*;
-use std::borrow::Cow;
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
 /*
 	Yeah, this is terrible to write. Currently done by copying the current
@@ -88,12 +91,16 @@ fn init_native_variables() {
 				typ: Type::Int,
 				name: "x".into(),
 				is_static: false,
+				is_const: false,
+				is_volatile: false,
 			},
 			LanguageElement::VariableDeclarationAssignment {
 				typ: Type::Int,
 				name: "y".into(),
 				value: StatementElement::Num(5),
 				is_static: false,
+				is_const: false,
+				is_volatile: false,
 			},
 			LanguageElement::VariableDeclarationAssignment {
 				typ: Type::Int,
@@ -103,17 +110,23 @@ fn init_native_variables() {
 					rhs: Box::new(StatementElement::Num(2)),
 				},
 				is_static: false,
+				is_const: false,
+				is_volatile: false,
 			},
 			LanguageElement::VariableDeclaration {
 				typ: Type::Char,
 				name: "c".into(),
 				is_static: false,
+				is_const: false,
+				is_volatile: false,
 			},
 			LanguageElement::VariableDeclarationAssignment {
 				typ: Type::Char,
 				name: "d".into(),
 				value: StatementElement::Char('a'),
 				is_static: false,
+				is_const: false,
+				is_volatile: false,
 			},
 		],
 	}];
@@ -135,17 +148,17 @@ fn parse_numbers() {
 	for expected in (i8::MIN as isize)..=(u8::MAX as isize) {
 		let expected = expected as i8;
 		let as_string = format!("0x{:x}", expected);
-		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
-		if let Token::Num(n) = parsed {
+		let (parsed_hex_lo, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed_hex_lo {
 			assert_eq!(expected, n as i8);
 			assert!(rest.is_empty());
 		} else {
 			panic!();
 		}
 
-		let as_string = format!("0x{:X}", expected);
-		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
-		if let Token::Num(n) = parsed {
+		let as_string = format!("0X{:X}", expected);
+		let (parsed_hex_hi, rest) = lexer::get_token(&as_string).unwrap();
+		if let Token::Num(n) = parsed_hex_hi {
 			assert_eq!(expected, n as i8);
 			assert!(rest.is_empty());
 		} else {
@@ -237,4 +250,53 @@ fn negate() {
 	};
 	let res_2 = StatementElement::from_source_str(case_2).unwrap();
 	assert_eq!(res_2, expected_2);
+}
+
+#[test]
+fn merge_comments() {
+	let case_1 = merge_comments!(&Some(Cow::Borrowed("a")));
+	let expected_1 = Some(Cow::Borrowed("a"));
+	assert_eq!(case_1, expected_1);
+
+	let case_2 = merge_comments!(&None, &Some(Cow::Borrowed("a")));
+	assert_eq!(case_2, expected_1);
+
+	let case_3 = merge_comments!(&Some(Cow::Borrowed("a")), &Some(Cow::Borrowed("b")));
+	let expected_3 = Some(Cow::Owned(String::from("a, b")));
+	assert_eq!(case_3, expected_3);
+
+	let case_4 = merge_comments!(
+		&Some(Cow::Borrowed("a")),
+		&Some(Cow::Borrowed("b")),
+		&Some(Cow::Borrowed("c"))
+	);
+	let expected_4 = Some(Cow::Owned(String::from("a, b, c")));
+	assert_eq!(case_4, expected_4);
+
+	let case_5 = merge_comments!(&Some(Cow::Borrowed("a")), &None, &Some(Cow::Borrowed("c")));
+	let expected_5 = Some(Cow::Owned(String::from("a, c")));
+	assert_eq!(case_5, expected_5);
+}
+
+#[test]
+fn type_check() {
+	let case_1 = "int x = 5;";
+	let res_1 = type_checker::type_check(&parser::parse(case_1, false).unwrap());
+	assert!(res_1.is_ok());
+
+	let case_2 = "int x = 'a';";
+	let res_2 = type_checker::type_check(&parser::parse(case_2, false).unwrap());
+	assert!(res_2.is_err());
+
+	let case_3 = "char x = 5;";
+	let res_3 = type_checker::type_check(&parser::parse(case_3, false).unwrap());
+	assert!(res_3.is_err());
+
+	let case_4 = include_str!("type_test_1.c");
+	let res_4 = type_checker::type_check(&parser::parse(case_4, false).unwrap());
+	assert!(res_4.is_ok());
+
+	let case_5 = include_str!("type_test_2.c");
+	let res_5 = type_checker::type_check(&parser::parse(case_5, false).unwrap());
+	assert!(res_5.is_err());
 }

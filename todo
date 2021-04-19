@@ -1,13 +1,7 @@
-split and/or into boolAnd/bitAnd and boolOr/bitOr for the type checker
 split Num into Signed and Unsigned
 labels/gotos
 
-Rewrite typechecker
 Typechecker: Refuse void arguments
-
-Early returns don't clear the stack. (in inner scopes, i.e. for loops or if-then statements) AGAIN
-
-The ternary operator exists. Yay. HOW DO YOU EVEN PARSE THAT THING PROPERLY?!
 
 Cast to bool: Bit-and with itself and then TRF C -> A
 maybe?

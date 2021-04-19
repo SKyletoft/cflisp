@@ -10,22 +10,22 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	load_xy(instructions);
 	repeat_xy(instructions);
 	repeat_load(instructions);
+	reduce_reserves_redux(instructions)?;
 	cmp_eq_jmp(instructions);
 	cmp_neq_jmp(instructions);
 	cmp_gt_jmp(instructions);
 	cmp_gte_jmp(instructions);
-	reduce_reserves(instructions)?;
 	merge_allocs(instructions);
 	nop(instructions); //Should go AFTER reduce reserves
 	repeat_a(instructions);
 	load_a(instructions);
+	psha(instructions);
+	pula(instructions);
 	function_op_load_reduce(instructions);
 	inc(instructions);
 	inca(instructions);
 	dec(instructions);
 	deca(instructions);
-	psha(instructions);
-	pula(instructions);
 	remove_post_early_return_code(instructions);
 
 	Ok(())
@@ -35,7 +35,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 /// address load to X and write to X,0 to a write to address directly.
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(addressing), _),
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
@@ -87,7 +87,7 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 /// check if the new load is dependent on the old load
 fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
 			((Instruction::LDA(_), _), (Instruction::LDA(_), _))
@@ -104,12 +104,13 @@ fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 ///Removes repeat RTS that can occur after unused labels have been eliminated
 pub fn repeat_rts(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
 			((Instruction::RTS, _), (Instruction::RTS, _))
 		) {
 			instructions.remove(idx);
+			continue;
 		}
 		idx += 1;
 	}
@@ -230,7 +231,7 @@ fn nop(instructions: &mut Vec<CommentedInstruction>) {
 ///Simpifies some sequences of loading to A
 fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		//Load to A the address of A
 		if let (
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
@@ -244,12 +245,25 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 			instructions[idx] = (Instruction::LDX(Addressing::Data(0)), None);
 			instructions[idx + 2].0 = Instruction::LDA(Addressing::AX); //To keep the existing comment on the third instruction
 			instructions.remove(idx + 1);
+			continue;
+		}
+		//Load to A the address of A
+		if let (
+			(Instruction::STA(Addressing::SP(n)), _),
+			(Instruction::LDA(Addressing::SP(m)), _),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			if n == m {
+				instructions.remove(idx + 1);
+				continue;
+			}
 		}
 		//Remove immediate load from pushed value
 		if let ((Instruction::PSHA, _), (Instruction::LDA(Addressing::SP(0)), _)) =
 			(&instructions[idx], &instructions[idx + 1])
 		{
 			instructions.remove(idx + 1);
+			continue;
 		}
 		//Remove some unused loads
 		if let ((Instruction::LDA(_), _), (Instruction::LDA(adr), _)) =
@@ -257,6 +271,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 		{
 			if !matches!(adr, Addressing::AX | Addressing::AY) {
 				instructions.remove(idx);
+				continue;
 			}
 		}
 		idx += 1;
@@ -265,7 +280,7 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 
 fn psha(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(-1)), first_comment),
 			(Instruction::STA(Addressing::SP(0)), second_comment),
@@ -287,13 +302,25 @@ fn psha(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx + 1);
 			continue;
 		}
+		if let (
+			(Instruction::LEASP(Addressing::SP(1)), first_comment),
+			(Instruction::PSHA, second_comment),
+		) = (&instructions[idx], &instructions[idx + 1])
+		{
+			instructions[idx] = (
+				Instruction::STA(Addressing::SP(0)),
+				merge_comments!(first_comment, second_comment),
+			);
+			instructions.remove(idx + 1);
+			continue;
+		}
 		idx += 1;
 	}
 }
 
 fn pula(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LDA(Addressing::SP(0)), first_comment),
 			(Instruction::LEASP(Addressing::SP(1)), second_comment),
@@ -302,6 +329,7 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::PULA, comment);
 			instructions.remove(idx + 1);
+			idx -= 1;
 			continue;
 		}
 		if let (
@@ -312,6 +340,15 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::PULA, comment);
 			instructions.remove(idx + 1);
+			idx -= 1;
+			continue;
+		}
+		if let ((Instruction::PSHA, _), (Instruction::PULA, _)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			instructions.remove(idx);
+			instructions.remove(idx);
+			idx -= 1;
 			continue;
 		}
 		idx += 1;
@@ -320,7 +357,7 @@ fn pula(instructions: &mut Vec<CommentedInstruction>) {
 
 fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 2 && idx < instructions.len() - 2 {
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(a)), first_comment),
 			(Instruction::LEASP(Addressing::SP(b)), second_comment),
@@ -335,113 +372,6 @@ fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-/*
-	THIS IS BROKEN
-	Not sure how, but disabling it fixes the factorial program
-*/
-//For each tmp allocation, find how many unused bytes there are and reduce the allocation by that much.
-// Won't remove 0 size allocations, just run nop afterwards.
-fn reduce_reserves(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
-	let mut sp_stack: Vec<(usize, isize)> = Vec::new();
-
-	for idx in 0..instructions.len() {
-		match instructions[idx].0 {
-			Instruction::LDSP(Addressing::SP(n)) => {
-				sp_stack.push((idx, n));
-			}
-			Instruction::RTS
-			| Instruction::Label(_)
-			| Instruction::JMP(_)
-			| Instruction::BNE(_)
-			| Instruction::BEQ(_)
-			| Instruction::BGE(_)
-			| Instruction::BLT(_) => {
-				//Jump or jump target, new context. Some missed
-				// optimisations but massively reduced complexity
-				sp_stack.clear();
-			}
-			Instruction::LEASP(Addressing::SP(n)) => {
-				match n.cmp(&&mut 0) {
-					Ordering::Equal => {}
-					Ordering::Less => {
-						sp_stack.push((idx, n));
-					}
-					Ordering::Greater => {
-						if let Some((sp_index, value)) = sp_stack.pop() {
-							if matches!(instructions[sp_index], (Instruction::PSHA, _)) {
-								//We can't reduce allocation size of a PSHA, only LEASPs
-								continue;
-							}
-							if -value != n {
-								sp_stack.clear(); //Should hopefully skip to next reset by not hitting the pop?
-							}
-							let minimum_access = instructions
-								.iter()
-								.skip(sp_index + 1)
-								.take(idx - sp_index)
-								.map(|(inst, _)| {
-									if let Some(Addressing::SP(n)) = inst.get_adr() {
-										*n
-									} else {
-										isize::MAX
-									}
-								})
-								.min()
-								.unwrap_or(isize::MAX);
-							if minimum_access <= 0 {
-								continue;
-							}
-							if let Some(Addressing::SP(n)) = instructions[sp_index].0.get_adr_mut()
-							{
-								*n += minimum_access
-							}
-							if let Some(Addressing::SP(n)) = instructions[idx].0.get_adr_mut() {
-								*n -= minimum_access
-							}
-							for (inst, _) in instructions
-								.iter_mut()
-								.skip(sp_index + 1)
-								.take(idx - sp_index - 1)
-							{
-								if let Some(Addressing::SP(adr)) = inst.get_adr_mut() {
-									*adr -= minimum_access + 1;
-								}
-							}
-							/*{
-								//Because the borrow checker still can't handle indices
-								let (left, right) = instructions.split_at_mut(sp_index + 1);
-								if let (Some(Addressing::SP(start)), Some(Addressing::SP(end))) = (
-									left[sp_index].0.get_adr_mut(),
-									right[idx - (sp_index + 1)].0.get_adr_mut(),
-								) {
-									*start += minimum_access;
-									*end -= minimum_access;
-								}
-							}*/
-						}
-					}
-				}
-			}
-			Instruction::PSHA => {
-				sp_stack.push((idx, -1));
-			}
-			Instruction::PULA => {
-				if matches!(sp_stack.last(), Some((1, _))) {
-					sp_stack.pop();
-				} else {
-					return Err(CompileError(
-						line!(),
-						"Internal error: Where did the PULA even come from?",
-					));
-				}
-			}
-			_ => {}
-		}
-	}
-
-	Ok(())
-}
-
 ///Removes unreachable instructions that exist after an RTS instruction before the next label
 /// (all jumps are to labels, even jumps that are relative according to the instruction set)
 fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
@@ -449,7 +379,7 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while idx < instructions.len() {
 		match instructions[idx].0 {
-			Instruction::RTS => {
+			Instruction::RTS if !remove => {
 				remove = true;
 				idx += 1;
 				continue;
@@ -467,12 +397,118 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
+///Split instruction list into sections with no branching or jumping so
+/// `reduce_reserves_section` doesn't need to take that into account.
+fn reduce_reserves_redux(instructions: &mut [CommentedInstruction]) -> Result<(), CompileError> {
+	let mut last_instruction_split = 0;
+	while let Some((idx, _)) =
+		instructions
+			.iter()
+			.enumerate()
+			.skip(1 + last_instruction_split)
+			.find(|(_, (inst, _))| {
+				matches!(
+					inst,
+					Instruction::RTS
+						| Instruction::Label(_) | Instruction::JMP(_)
+						| Instruction::BNE(_) | Instruction::BEQ(_)
+						| Instruction::BGE(_) | Instruction::BLT(_)
+						| Instruction::LDSP(_)
+				)
+			}) {
+		let slice = &mut instructions[last_instruction_split..idx];
+		reduce_reserves_section(slice)?;
+		last_instruction_split = idx;
+	}
+	let slice = &mut instructions[last_instruction_split..];
+	reduce_reserves_section(slice)?;
+	Ok(())
+}
+
+///Reduce memory allocation in a scope so that the smallest memory access should be SP(0)
+fn reduce_reserves_section(instructions: &mut [CommentedInstruction]) -> Result<(), CompileError> {
+	let mut sp_stack = Vec::new();
+	for idx in 0..instructions.len() {
+		match instructions[idx].0 {
+			Instruction::LEASP(Addressing::SP(reduce_by)) => match reduce_by.cmp(&0) {
+				Ordering::Equal => {}
+				Ordering::Less => {
+					sp_stack.push(idx);
+				}
+				Ordering::Greater => {
+					let start = if let Some(start) = sp_stack.last() {
+						*start
+					} else {
+						continue;
+					};
+					sp_stack.pop();
+					if matches!(instructions[start], (Instruction::PSHA, _)) {
+						continue;
+					}
+					let start_value = instructions[start]
+						.0
+						.get_adr()
+						.map(|inst| {
+							if let Addressing::SP(sp) = inst {
+								*sp
+							} else {
+								1
+							}
+						})
+						.unwrap()
+						.abs();
+					let end_value = reduce_by.abs();
+
+					let minimum_value = instructions[(start + 1)..idx]
+						.iter()
+						.filter(|(inst, _)| !matches!(inst, Instruction::LEASP(_)))
+						.filter_map(|(inst, _)| {
+							if let Some(Addressing::SP(n)) = inst.get_adr() {
+								Some(*n)
+							} else {
+								None
+							}
+						})
+						.min()
+						.unwrap_or(0);
+					let minimum_to_use = minimum_value.max(0).min(end_value).min(start_value);
+					instructions[(start + 1)..idx]
+						.iter_mut()
+						.filter(|(inst, _)| !matches!(inst, Instruction::LEASP(_)))
+						.filter_map(|(inst, _)| {
+							if let Some(Addressing::SP(n)) = inst.get_adr_mut() {
+								Some(n)
+							} else {
+								None
+							}
+						})
+						.for_each(|n| *n -= minimum_to_use);
+					if let Some(Addressing::SP(n)) = instructions[start].0.get_adr_mut() {
+						*n += minimum_to_use;
+					}
+					if let Some(Addressing::SP(n)) = instructions[idx].0.get_adr_mut() {
+						*n -= minimum_to_use;
+					}
+				}
+			},
+			Instruction::PSHA => {
+				sp_stack.push(idx);
+			}
+			Instruction::PULA => {
+				sp_stack.pop();
+			}
+			_ => {}
+		}
+	}
+	Ok(())
+}
+
 ///Removes extra pushes and stack reductions that can just be a STA(SP(1))
 /// that can occur when several operations that are implemented with function
 /// calls follow each other
 fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 4 && idx < instructions.len() - 4 {
+	while instructions.len() >= 4 && idx <= instructions.len() - 4 {
 		if let (
 			(Instruction::LEASP(Addressing::SP(2)), _),
 			(Instruction::PSHA, _),
@@ -495,7 +531,7 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces subtraction by one with a DEC instruction
 fn dec(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(Addressing::Data(1)), _),
 			(Instruction::SUBA(from), _),
@@ -518,7 +554,7 @@ fn dec(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces addition by one with an INC instruction
 fn inc(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 3 && idx < instructions.len() - 3 {
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
 		if let (
 			(Instruction::LDA(from), _),
 			(Instruction::ADDA(Addressing::Data(1)), _),
@@ -575,7 +611,7 @@ fn deca(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BEQ instruction directly
 fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -617,7 +653,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BNE instruction directly
 fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 7 && idx < instructions.len() - 7 {
+	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -662,7 +698,7 @@ fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BGE instruction directly
 fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 6 && idx < instructions.len() - 6 {
+	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -704,7 +740,7 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 /// chained boolean operators with a BLT instruction directly
 fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
-	while instructions.len() >= 7 && idx < instructions.len() - 7 {
+	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
 		if let (
 			(Instruction::PSHA, Some(text)),
 			(Instruction::LDA(lhs), lhs_comment),
@@ -750,16 +786,27 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst.get_adr() {
-			Some(Addressing::Label(lbl)) => Some(lbl.clone()),
+			Some(Addressing::Label(lbl)) => Some(lbl.trim().to_string()),
 			_ => None,
 		})
 		.chain(iter::once("main".to_string()))
+		.chain(iter::once("interrupt".to_string()))
 		.collect::<HashSet<String>>();
 	instructions.retain(|(inst, _)| {
 		if let Instruction::Label(lbl) = inst {
-			jumps_to.contains(lbl)
+			let lbl: &str = lbl;
+			jumps_to.contains(lbl.trim())
 		} else {
 			true
 		}
 	});
+}
+
+pub(crate) fn make_interrupt_return(instructions: &mut Vec<CommentedInstruction>) {
+	let make_rti = |(inst, _): &mut CommentedInstruction| {
+		if let Instruction::RTS = inst {
+			*inst = Instruction::RTI
+		}
+	};
+	instructions.iter_mut().for_each(make_rti);
 }

@@ -5,6 +5,7 @@ use cflisp_lib::{
 	flisp::{compile_flisp, optimise_flisp, text},
 	optimise_language, parser,
 	structless::LanguageElementStructless,
+	type_checker,
 };
 
 #[wasm_bindgen]
@@ -21,6 +22,7 @@ pub fn run_cc(
 	hex: bool,
 	comments: bool,
 	show_imports: bool,
+	continue_interrupts: bool,
 ) -> String {
 	match compile_to_text(
 		source,
@@ -30,6 +32,7 @@ pub fn run_cc(
 		hex,
 		comments,
 		show_imports,
+		continue_interrupts,
 	) {
 		Ok(res) => res,
 		Err(res) => res,
@@ -44,6 +47,7 @@ fn compile_to_text(
 	hex: bool,
 	comments: bool,
 	show_imports: bool,
+	continue_interrupts: bool,
 ) -> Result<String, String> {
 	let flags = Flags {
 		hex,
@@ -57,10 +61,14 @@ fn compile_to_text(
 		debug,
 		optimise: optimise.min(2).max(0),
 		inline: false,
+		kill_interrupts: !continue_interrupts,
 	};
 	let stripped_comments = parser::remove_comments(source);
 	let tree =
 		parser::parse(&stripped_comments, flags.debug).map_err(|err| format!("{:?}", err))?;
+	if type_check {
+		type_checker::type_check(&tree).map_err(|err| format!("{:?}", err))?;
+	}
 	let mut structless = LanguageElementStructless::from_language_elements(tree)
 		.map_err(|err| format!("{:?}", err))?;
 	if optimise >= 2 {
@@ -78,7 +86,7 @@ fn compile_to_text(
 	}
 	let mut text = text::instructions_to_text(&inst, &flags).map_err(|err| format!("{:?}", err))?;
 	if show_imports {
-		text::automatic_imports(&mut text, debug);
+		text::automatic_imports(&mut text, debug, flags.kill_interrupts);
 	}
 	if flags.debug {
 		text.insert_str(0, "\tORG\t$20\n");

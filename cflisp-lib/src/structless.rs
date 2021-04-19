@@ -9,6 +9,8 @@ pub enum LanguageElementStructless<'a> {
 		typ: NativeType,
 		name: Cow<'a, str>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	VariableAssignment {
 		name: Cow<'a, str>,
@@ -19,6 +21,8 @@ pub enum LanguageElementStructless<'a> {
 		name: Cow<'a, str>,
 		value: StatementElementStructless<'a>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	PointerAssignment {
 		ptr: StatementElementStructless<'a>,
@@ -44,6 +48,8 @@ pub enum LanguageElementStructless<'a> {
 	StructDeclaration {
 		name: Cow<'a, str>,
 		is_static: bool,
+		is_const: bool,
+		is_volatile: bool,
 	},
 	Block {
 		block: BlockStructless<'a>,
@@ -86,6 +92,8 @@ impl<'a> LanguageElementStructless<'a> {
 					typ,
 					name,
 					is_static,
+					is_const,
+					is_volatile,
 				} => {
 					if let Some(n) = typ.get_struct_type() {
 						let fields = struct_types
@@ -95,12 +103,16 @@ impl<'a> LanguageElementStructless<'a> {
 						new_elements.push(LanguageElementStructless::StructDeclaration {
 							name: name.clone(),
 							is_static,
+							is_const,
+							is_volatile,
 						});
 						for field in fields {
 							new_elements.push(LanguageElementStructless::VariableDeclaration {
 								name: helper::merge_name_and_field(&name, field.name),
 								typ: (&field.typ).into(), //This is also such a hack
 								is_static,
+								is_const,
+								is_volatile,
 							});
 						}
 					} else {
@@ -108,6 +120,8 @@ impl<'a> LanguageElementStructless<'a> {
 							typ: typ.into(),
 							name,
 							is_static,
+							is_const,
+							is_volatile,
 						})
 					}
 				}
@@ -147,6 +161,8 @@ impl<'a> LanguageElementStructless<'a> {
 					name,
 					value,
 					is_static,
+					is_const,
+					is_volatile,
 				} => {
 					if let Some(n) = typ.get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
@@ -161,6 +177,8 @@ impl<'a> LanguageElementStructless<'a> {
 							functions,
 						)?,
 						is_static,
+						is_const,
+						is_volatile,
 					})
 				}
 				LanguageElement::StructDeclarationAssignment {
@@ -168,6 +186,8 @@ impl<'a> LanguageElementStructless<'a> {
 					name,
 					value,
 					is_static,
+					is_const,
+					is_volatile,
 				} => {
 					let struct_type = if let Type::Struct(struct_type) = typ {
 						Ok(struct_type)
@@ -183,7 +203,9 @@ impl<'a> LanguageElementStructless<'a> {
 							typ,
 							name,
 							value,
-							is_static
+							is_static,
+							is_const,
+							is_volatile,
 						});
 						dbg!(struct_types, structs_and_struct_pointers);
 						return Err(ParseError(line!(), "Undefined struct type"));
@@ -191,6 +213,8 @@ impl<'a> LanguageElementStructless<'a> {
 					new_elements.push(LanguageElementStructless::StructDeclaration {
 						name: name.clone(),
 						is_static,
+						is_const,
+						is_volatile,
 					});
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(
@@ -204,6 +228,8 @@ impl<'a> LanguageElementStructless<'a> {
 								)?,
 								typ: (&field.typ).into(), //Such a hack
 								is_static,
+								is_const,
+								is_volatile,
 							},
 						);
 					}
@@ -536,7 +562,6 @@ impl<'a> StatementElementStructless<'a> {
 			};
 		}
 
-		//Todo! Figure out macro_rules for this repetition nonsense
 		let res = match other {
 			StatementElement::Add { lhs, rhs } => bin_op!(Add, lhs, rhs),
 			StatementElement::Sub { lhs, rhs } => bin_op!(Sub, lhs, rhs),

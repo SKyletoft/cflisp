@@ -112,7 +112,6 @@ impl<'a> Token<'a> {
 	pub(crate) fn parse_statement_tokens(
 		s: &'a str,
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
-		//let res = Token::parse_str_to_vec(s)?;
 		let res = Token::by_byte(s)?;
 		if res.contains(&NewLine) {
 			return Err(ParseError(line!(), "Statement ended early?"));

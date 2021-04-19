@@ -1,7 +1,11 @@
 use crate::*;
-use std::{collections::HashSet, slice};
+use std::{
+	collections::{HashMap, HashSet},
+	slice,
+};
 
 pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
+	const_prop(elements);
 	statement_optimisation(elements)?;
 	dead_code_elimination(elements);
 	remove_unused_variables(elements);
@@ -21,7 +25,9 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 	for element in elements {
 		match element {
 			LanguageElementStructless::VariableDeclaration { .. } => {}
-			LanguageElementStructless::VariableAssignment { value, .. }
+			LanguageElementStructless::Return(Some(value))
+			| LanguageElementStructless::Statement(value)
+			| LanguageElementStructless::VariableAssignment { value, .. }
 			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
 				optimise_statement::all_optimisations(value)?;
 			}
@@ -47,8 +53,7 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 				optimise_statement::all_optimisations(condition)?;
 				single_statement_optimisation(body)?;
 			}
-			LanguageElementStructless::Return(_)
-			| LanguageElementStructless::Statement(_)
+			LanguageElementStructless::Return(None)
 			| LanguageElementStructless::StructDeclaration { .. } => {}
 			LanguageElementStructless::Block { block, .. } => {
 				all_optimisations(block)?;
@@ -104,8 +109,17 @@ pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructle
 	let mut used_variables = HashSet::new();
 	find_variables_le(&mut used_variables, elements);
 	elements.retain(|elem| match elem {
-		LanguageElementStructless::VariableDeclarationAssignment { name, .. }
-		| LanguageElementStructless::VariableDeclaration { name, .. } => {
+		LanguageElementStructless::VariableAssignment { name, .. }
+		| LanguageElementStructless::VariableDeclarationAssignment {
+			name,
+			is_static: false,
+			..
+		}
+		| LanguageElementStructless::VariableDeclaration {
+			name,
+			is_static: false,
+			..
+		} => {
 			let name: &str = name;
 			used_variables.contains(name)
 		}
@@ -119,6 +133,18 @@ fn find_variables_le<'a>(
 ) {
 	for element in elements {
 		match element {
+			LanguageElementStructless::VariableDeclaration {
+				name,
+				is_volatile: true,
+				..
+			}
+			| LanguageElementStructless::VariableDeclarationAssignment {
+				name,
+				is_volatile: true,
+				..
+			} => {
+				vars.insert(name.to_string());
+			}
 			LanguageElementStructless::VariableAssignment { value, .. }
 			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
 				find_variables_se(vars, value);
@@ -193,6 +219,58 @@ fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StatementEleme
 		}
 		StatementElementStructless::AdrOf(n) | StatementElementStructless::Var(n) => {
 			vars.insert(n.to_string());
+		}
+	}
+}
+
+pub(crate) fn const_prop(elements: &mut [LanguageElementStructless]) {
+	let mut constants = HashMap::new();
+	const_prop_inner(elements, &mut constants);
+}
+
+fn const_prop_inner<'a>(
+	elements: &mut [LanguageElementStructless<'a>],
+	constants: &mut HashMap<String, StatementElementStructless<'a>>,
+) {
+	for elem in elements.iter_mut() {
+		match elem {
+			LanguageElementStructless::VariableDeclarationAssignment {
+				name,
+				value,
+				is_const: true,
+				is_volatile: false,
+				..
+			} => {
+				optimise_statement::const_prop(value, constants);
+				constants.insert(name.to_string(), value.clone());
+			}
+			LanguageElementStructless::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => {
+				optimise_statement::const_prop(condition, constants);
+				let mut inner_scope = constants.clone();
+				const_prop_inner(slice::from_mut(then), &mut inner_scope);
+				if let Some(else_then) = else_then {
+					inner_scope = constants.clone();
+					const_prop_inner(slice::from_mut(else_then), &mut inner_scope);
+				}
+			}
+			LanguageElementStructless::Return(Some(statement))
+			| LanguageElementStructless::Statement(statement) => {
+				optimise_statement::const_prop(statement, constants);
+			}
+			LanguageElementStructless::Loop { condition, body } => {
+				optimise_statement::const_prop(condition, constants);
+				let mut inner_scope = constants.clone();
+				const_prop_inner(slice::from_mut(body), &mut inner_scope);
+			}
+			LanguageElementStructless::Block { block, .. } => {
+				let mut inner_scope = constants.clone();
+				const_prop_inner(block, &mut inner_scope);
+			}
+			_ => {}
 		}
 	}
 }

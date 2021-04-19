@@ -15,12 +15,12 @@ type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, NativeType>;
 type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [NativeVariable<'a>]>;
 
 #[derive(Debug, PartialEq)]
-struct State<'a, 'b, 'c, 'd, 'e, 'f> {
+struct State<'a, 'b, 'c, 'd, 'e> {
 	variables: Variables<'a, 'b>,
 	global_variables: GlobalVariables<'a, 'c>,
 	functions: Functions<'a, 'd>,
-	stack_size: &'f mut isize,
-	scope_name: &'e str,
+	stack_size: &'e mut isize,
+	scope_name: Cow<'a, str>,
 	line_id: usize,
 }
 
@@ -34,7 +34,7 @@ pub fn compile<'a>(
 			variables: &mut HashMap::new(),
 			global_variables: &mut HashMap::new(),
 			functions: &mut HashMap::new(),
-			scope_name: "global",
+			scope_name: Cow::Borrowed("global"),
 			stack_size: &mut 0,
 			line_id: 0,
 		},
@@ -45,18 +45,18 @@ pub fn compile<'a>(
 
 fn compile_elements<'a>(
 	block: &'a [LanguageElementStructless],
-	state: &mut State<'a, '_, '_, '_, '_, '_>,
+	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
-	let mut instructions = vec![(Instruction::Label(state.scope_name.to_string()), None)];
+	let mut instructions = vec![(Instruction::Label(state.scope_name.clone()), None)];
 	for (i, e) in block.iter().enumerate() {
 		let mut new_state = State {
 			variables: state.variables,
 			global_variables: state.global_variables,
 			functions: state.functions,
 			stack_size: state.stack_size,
-			scope_name: state.scope_name,
+			scope_name: state.scope_name.clone(),
 			line_id: i,
 		};
 		let line = &mut compile_element(e, &mut new_state, stack_base, optimise)?;
@@ -72,12 +72,14 @@ fn compile_elements<'a>(
 // by the (potentially disabled) type checker
 fn compile_element<'a>(
 	element: &'a LanguageElementStructless,
-	state: &mut State<'a, '_, '_, '_, '_, '_>,
+	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElementStructless::StructDeclaration { name, is_static } => {
+		LanguageElementStructless::StructDeclaration {
+			name, is_static, ..
+		} => {
 			if state.scope_name == "global" || *is_static {
 				if state.scope_name == "global" && !is_static {
 					return Err(CompileError(line!(), "Nonstatic global variable!"));
@@ -101,12 +103,13 @@ fn compile_element<'a>(
 					.variables
 					.insert(name.clone(), (NativeType::Void, *state.stack_size));
 			}
-			vec![(Instruction::Label(name.to_string()), None)]
+			vec![(Instruction::Label(name.clone()), None)]
 		}
 		LanguageElementStructless::VariableDeclaration {
 			typ,
 			name,
 			is_static,
+			..
 		} => {
 			if state.scope_name == "global" || *is_static {
 				if state.scope_name == "global" && !is_static {
@@ -157,6 +160,7 @@ fn compile_element<'a>(
 			name,
 			value,
 			is_static,
+			..
 		} => {
 			let global_def = |val: &StatementElementStructless| match val {
 				StatementElementStructless::Num(n) => Ok(*n),
@@ -184,7 +188,7 @@ fn compile_element<'a>(
 						.map(global_def)
 						.collect::<Result<Vec<isize>, CompileError>>()?;
 					vec![
-						(Instruction::Label(name.to_string()), None),
+						(Instruction::Label(name.clone()), None),
 						(Instruction::FCB(values), None),
 					]
 				} else {
@@ -192,7 +196,7 @@ fn compile_element<'a>(
 						.global_variables
 						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					vec![
-						(Instruction::Label(name.to_string()), None),
+						(Instruction::Label(name.clone()), None),
 						(Instruction::FCB(vec![global_def(value)?]), None),
 					]
 				}
@@ -227,7 +231,12 @@ fn compile_element<'a>(
 						(typ.clone(), *state.stack_size),
 					);
 					*state.stack_size += 1;
-					statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
+					//statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
+					statement.push((Instruction::LEASP(Addressing::SP(-1)), None));
+					statement.push((
+						Instruction::STA(Addressing::SP(0)),
+						Some(Cow::Borrowed(name.as_ref())),
+					));
 					statement
 				}
 			}
@@ -280,20 +289,26 @@ fn compile_element<'a>(
 					variables: &mut local_variables,
 					global_variables: state.global_variables,
 					functions: state.functions,
-					scope_name: name,
+					scope_name: name.clone(),
 					stack_size: &mut args_count,
 					line_id: state.line_id,
 				},
 				args_base,
 				false,
 			)?;
+			function_body.insert(0, (Instruction::Label(Cow::Borrowed("\n")), None));
 			if args_count != args_base {
 				function_body.push((
 					Instruction::LEASP(Addressing::SP(args_count - args_base)),
 					Some("Clearing variables".into()),
 				));
 			}
-			function_body.push((Instruction::RTS, None));
+			if !matches!(function_body.last(), Some((Instruction::RTS, _))) {
+				function_body.push((Instruction::RTS, None));
+			}
+			if name == "interrupt" {
+				optimise_flisp::make_interrupt_return(&mut function_body);
+			}
 			function_body
 		}
 
@@ -302,7 +317,7 @@ fn compile_element<'a>(
 			then,
 			else_then,
 		} => {
-			let else_str = format!("if_else_{}_{}", state.scope_name, state.line_id);
+			let else_str = Cow::Owned(format!("if_else_{}_{}", state.scope_name, state.line_id));
 			let end_str = format!("if_end_{}_{}", state.scope_name, state.line_id);
 			let mut cond = compile_statement(condition, state)?;
 			cond.push((Instruction::TSTA, None));
@@ -311,33 +326,45 @@ fn compile_element<'a>(
 				let mut else_block = compile_element(v, state, stack_base, optimise)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
-				cond.push((Instruction::JMP(Addressing::Label(end_str.clone())), None));
+				cond.push((
+					Instruction::JMP(Addressing::Label(Cow::Owned(end_str.clone()))),
+					None,
+				));
 				cond.append(&mut else_block);
 			} else {
-				cond.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+				cond.push((
+					Instruction::BEQ(Addressing::Label(Cow::Owned(end_str.clone()))),
+					None,
+				));
 				cond.append(&mut then_block);
 			}
-			cond.push((Instruction::Label(end_str), None));
+			cond.push((Instruction::Label(Cow::Owned(end_str)), None));
 			cond
 		}
 
 		LanguageElementStructless::Loop { condition, body } => {
 			let cond_str = format!("cond_{}", state.scope_name);
 			let end_str = format!("end_{}", state.scope_name);
-			let mut instructions = vec![(Instruction::Label(cond_str.clone()), None)];
+			let mut instructions = vec![(Instruction::Label(Cow::Owned(cond_str.clone())), None)];
 			instructions.append(&mut compile_statement(condition, state)?);
 			instructions.push((Instruction::TSTA, None));
-			instructions.push((Instruction::BEQ(Addressing::Label(end_str.clone())), None));
+			instructions.push((
+				Instruction::BEQ(Addressing::Label(Cow::Owned(end_str.clone()))),
+				None,
+			));
 			instructions.append(&mut compile_element(body, state, stack_base, optimise)?);
-			instructions.push((Instruction::JMP(Addressing::Label(cond_str)), None));
-			instructions.push((Instruction::Label(end_str), None));
+			instructions.push((
+				Instruction::JMP(Addressing::Label(Cow::Owned(cond_str))),
+				None,
+			));
+			instructions.push((Instruction::Label(Cow::Owned(end_str)), None));
 			instructions
 		}
 
 		LanguageElementStructless::Return(ret) => {
 			let stack_clear = (
 				Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
-				None,
+				Some("Clearing variables".into()),
 			);
 			if let Some(statement) = ret {
 				let mut statement = compile_statement(statement, state)?;
@@ -364,7 +391,7 @@ fn compile_element<'a>(
 				variables: &mut inner_variables,
 				global_variables: state.global_variables,
 				functions: state.functions,
-				scope_name: &scope_name,
+				scope_name: Cow::Owned(scope_name),
 				stack_size: &mut inner_stack,
 				line_id: state.line_id,
 			};
@@ -381,7 +408,7 @@ fn compile_element<'a>(
 
 fn compile_statement<'a>(
 	statement: &'a StatementElementStructless,
-	state: &mut State<'a, '_, '_, '_, '_, '_>,
+	state: &mut State<'a, '_, '_, '_, '_>,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
@@ -391,7 +418,7 @@ fn compile_statement<'a>(
 			global_variables: state.global_variables,
 			functions: state.functions,
 			stack_size: &mut (tmps + *state.stack_size),
-			scope_name: state.scope_name,
+			scope_name: state.scope_name.clone(),
 			line_id: state.line_id,
 		},
 		&mut tmps.clone(), //Will start by -1.
@@ -415,7 +442,7 @@ fn compile_statement<'a>(
 
 fn compile_statement_inner<'a>(
 	statement: &'a StatementElementStructless,
-	state: &mut State<'a, '_, '_, '_, '_, '_>,
+	state: &mut State<'a, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
@@ -444,7 +471,7 @@ fn compile_statement_inner<'a>(
 						global_variables: state.global_variables,
 						functions: state.functions,
 						stack_size: &mut (1 + *state.stack_size),
-						scope_name: state.scope_name,
+						scope_name: state.scope_name.clone(),
 						line_id: state.line_id,
 					},
 					tmps_used,
@@ -457,7 +484,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__mul__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__mul__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
@@ -466,16 +493,16 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__eq__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__eq__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElementStructless::NotCmp { .. } => {
-					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__eq__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__eq__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
@@ -529,7 +556,7 @@ fn compile_statement_inner<'a>(
 						global_variables: state.global_variables,
 						functions: state.functions,
 						stack_size: &mut (1 + *state.stack_size),
-						scope_name: state.scope_name,
+						scope_name: state.scope_name.clone(),
 						line_id: state.line_id,
 					},
 					tmps_used,
@@ -539,29 +566,29 @@ fn compile_statement_inner<'a>(
 			};
 			match statement {
 				StatementElementStructless::Div { .. } => {
-					instructions.push((Instruction::PSHA, Some("div rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("div rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__div__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__div__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElementStructless::Mod { .. } => {
-					instructions.push((Instruction::PSHA, Some("mod rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mod rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__mod__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__mod__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StatementElementStructless::GreaterThan { .. }
 				| StatementElementStructless::LessThan { .. } => {
-					instructions.push((Instruction::PSHA, Some("gt rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("gt rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__gt__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__gt__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
@@ -571,7 +598,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label("__gt__".to_string())),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed("__gt__"))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
@@ -605,13 +632,19 @@ fn compile_statement_inner<'a>(
 							Instruction::LSL(Addressing::SP(*tmps_used))
 						};
 						let mut shift_loop = vec![
-							(Instruction::Label(start_str.clone()), None),
+							(Instruction::Label(Cow::Owned(start_str.clone())), None),
 							(Instruction::TSTA, None),
-							(Instruction::BEQ(Addressing::Label(end_str.clone())), None),
+							(
+								Instruction::BEQ(Addressing::Label(Cow::Owned(end_str.clone()))),
+								None,
+							),
 							(inst, None),
 							(Instruction::DECA, None),
-							(Instruction::JMP(Addressing::Label(start_str)), None),
-							(Instruction::Label(end_str), None),
+							(
+								Instruction::JMP(Addressing::Label(Cow::Owned(start_str))),
+								None,
+							),
+							(Instruction::Label(Cow::Owned(end_str)), None),
 						];
 						instructions.push((Instruction::STA(Addressing::SP(*tmps_used)), None));
 						instructions.append(&mut right_instructions);
@@ -664,11 +697,13 @@ fn compile_statement_inner<'a>(
 					Some(helper::merge_name_and_field(name, v_name)),
 				));
 			}
-			instructions.push((Instruction::JSR(Addressing::Label(name.to_string())), None));
-			instructions.push((
-				Instruction::LEASP(Addressing::SP(parametres.len() as isize)),
-				None,
-			));
+			instructions.push((Instruction::JSR(Addressing::Label(name.clone())), None));
+			if !parametres.is_empty() {
+				instructions.push((
+					Instruction::LEASP(Addressing::SP(parametres.len() as isize)),
+					None,
+				));
+			}
 			instructions
 		}
 
@@ -801,11 +836,11 @@ fn adr_for_name<'a>(
 	variables: &HashMap<Cow<'a, str>, (NativeType, isize)>,
 	global_variables: &HashMap<Cow<'a, str>, NativeType>,
 	stack_size: isize,
-) -> Result<Addressing, CompileError> {
+) -> Result<Addressing<'a>, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {
 		Ok(Addressing::SP(stack_size - *adr - 1))
 	} else if global_variables.contains_key(name) {
-		Ok(Addressing::Label(name.to_string()))
+		Ok(Addressing::Label(Cow::Borrowed(name)))
 	} else {
 		eprintln!("Error: {}", name);
 		Err(CompileError(

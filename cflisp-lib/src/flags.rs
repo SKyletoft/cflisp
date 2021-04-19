@@ -14,6 +14,7 @@ pub struct Flags {
 	pub debug: bool,
 	pub optimise: u8,
 	pub inline: bool,
+	pub kill_interrupts: bool,
 }
 
 impl Default for Flags {
@@ -23,12 +24,13 @@ impl Default for Flags {
 			comments: true,
 			tree: false,
 			tree_structless: false,
-			type_check: false,
+			type_check: true,
 			print_result: false,
 			assemble: false,
 			debug: false,
 			optimise: 0,
 			inline: false,
+			kill_interrupts: true,
 			out: "out.sflisp".to_string(),
 		}
 	}
@@ -75,11 +77,17 @@ impl<'a> FromIterator<&'a String> for Flags {
 				if arg.contains('i') {
 					flags.inline = true;
 				}
+				if arg.contains('k') {
+					flags.kill_interrupts = false;
+				}
+				if arg.contains('O') {
+					flags.optimise = 2;
+				}
 			}
 			if arg == "-o" {
 				is_name = true;
 			}
-			if arg == "-O" || arg == "-O2" {
+			if arg == "-O2" {
 				flags.optimise = 2;
 			}
 			if arg == "-O1" {

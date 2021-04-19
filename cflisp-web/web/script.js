@@ -19,6 +19,7 @@ async function run() {
 		const hex        = document.getElementById("hex").checked;
 		const comments   = document.getElementById("comments").checked;
 		const imports    = document.getElementById("imports").checked;
+		const interrupts = document.getElementById("interrupts").checked;
 
 		const state = {
 			source : source,
@@ -27,11 +28,13 @@ async function run() {
 			debug : debug,
 			hex : hex,
 			comments : comments,
-			imports : imports
+			imports : imports,
+			interrupts : interrupts
 		};
 
 		if (state != last_state) {
-			resultWindow.value = run_cc(source, opt, type_check, debug, hex, comments, imports);
+			resultWindow.value =
+			    run_cc(source, opt, type_check, debug, hex, comments, imports, interrupts);
 		}
 		last_state = state;
 	}
@@ -43,15 +46,19 @@ run();
 
 const default_c = "//Try changing the compiler settings!\n" +
                   "int main() {\n" +
-                  "\tint x = (5 + 3) * 2;\n" +
+                  "\t/*static*/ /*volatile*/ int *y = 32;\n" +
+                  "\t/*const*/ int x = (5 + 3) * 2;\n" +
                   "\tif (x == 2) {\n" +
+                  "\t\t*y = 32;\n" +
                   "\t\treturn 0;\n" +
                   "\t} else {\n" +
+                  "\t\t*y = 46;\n" +
                   "\t\treturn -1;\n" +
                   "\t}\n" +
                   "}\n";
 editor.setValue(default_c);
 editor.clearSelection();
 
-console.log("The compiler runs in web assembly. You cannot affect it from here, sorry\n" +
-            "You can find the source here though: https://www.github.com/SKyletoft/cflisp");
+console.log(
+    "The compiler runs in web assembly, not javascript. You cannot affect it from here, sorry!\n" +
+    "You can find the source here though: https://www.github.com/SKyletoft/cflisp");

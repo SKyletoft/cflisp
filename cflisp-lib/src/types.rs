@@ -74,7 +74,7 @@ pub type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// Can also hold the name of a struct
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub enum Type<'a> {
 	Uint,
 	Int,
@@ -83,7 +83,27 @@ pub enum Type<'a> {
 	Void,
 	Struct(&'a str),
 	Ptr(Box<Type<'a>>),
+	Arr(Box<Type<'a>>),
 }
+
+impl PartialEq for Type<'_> {
+	fn eq(&self, other: &Self) -> bool {
+		match self {
+			Type::Ptr(_) | Type::Uint | Type::Int => {
+				matches!(other, Type::Ptr(_) | Type::Uint | Type::Int)
+			}
+			Type::Char => matches!(other, Type::Char),
+			Type::Bool => matches!(other, Type::Bool),
+			Type::Void => matches!(other, Type::Void),
+			Type::Struct(s) => matches!(other, Type::Struct(ss) if s == ss),
+			Type::Arr(a) => {
+				matches!(other, Type::Ptr(_)) || matches!(other, Type::Arr(b) if a == b)
+			}
+		}
+	}
+}
+
+impl Eq for Type<'_> {}
 
 impl<'a> Type<'a> {
 	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
@@ -101,6 +121,7 @@ pub enum NativeType {
 	Bool,
 	Void,
 	Ptr(Box<NativeType>),
+	Arr(Box<NativeType>),
 }
 
 impl NativeType {
@@ -125,7 +146,14 @@ impl<'a> From<&Type<'a>> for NativeType {
 			Type::Void => NativeType::Void,
 			Type::Struct(_) => NativeType::Void,
 			Type::Ptr(target) => NativeType::ptr(target.as_ref().into()),
+			Type::Arr(target) => NativeType::Arr(Box::new(target.as_ref().into())),
 		}
+	}
+}
+
+impl<'a> From<NativeType> for Type<'a> {
+	fn from(other: NativeType) -> Self {
+		(&other).into()
 	}
 }
 
@@ -138,6 +166,7 @@ impl<'a> From<&NativeType> for Type<'a> {
 			NativeType::Bool => Type::Bool,
 			NativeType::Void => Type::Void,
 			NativeType::Ptr(target) => Type::ptr((target.as_ref()).into()),
+			NativeType::Arr(target) => Type::Arr(Box::new(target.as_ref().into())),
 		}
 	}
 }
@@ -148,6 +177,7 @@ impl<'a> Type<'a> {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
 			Type::Struct(n) => Some(n),
 			Type::Ptr(inner) => inner.get_struct_type(),
+			Type::Arr(inner) => inner.get_struct_type(),
 		}
 	}
 }
@@ -163,6 +193,13 @@ impl<'a> PartialEq<Type<'a>> for NativeType {
 			Type::Struct(_) => false,
 			Type::Ptr(inner) => {
 				if let NativeType::Ptr(self_inner) = self {
+					*self_inner.as_ref() == *inner.as_ref()
+				} else {
+					false
+				}
+			}
+			Type::Arr(inner) => {
+				if let NativeType::Arr(self_inner) = self {
 					*self_inner.as_ref() == *inner.as_ref()
 				} else {
 					false

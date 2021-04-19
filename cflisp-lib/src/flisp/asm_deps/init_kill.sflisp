@@ -1,0 +1,6 @@
+__init_	LDSP	#$FB
+	ANDCC	#%11101111
+	JSR	main
+	ORCC	#%00010000
+__end__	JMP	__end__
+

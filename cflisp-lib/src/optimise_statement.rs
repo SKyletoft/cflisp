@@ -1,9 +1,49 @@
 use crate::*;
+use std::collections::HashMap;
 
 pub fn all_optimisations(element: &mut StatementElementStructless) -> Result<(), ParseError> {
 	const_eval(element);
 	fast_mul(element);
 	Ok(())
+}
+
+pub(crate) fn const_prop<'a>(
+	elem: &mut StatementElementStructless<'a>,
+	constants: &HashMap<String, StatementElementStructless<'a>>,
+) {
+	match elem {
+		StatementElementStructless::Add { lhs, rhs }
+		| StatementElementStructless::Sub { lhs, rhs }
+		| StatementElementStructless::Mul { lhs, rhs }
+		| StatementElementStructless::Div { lhs, rhs }
+		| StatementElementStructless::Mod { lhs, rhs }
+		| StatementElementStructless::LShift { lhs, rhs }
+		| StatementElementStructless::RShift { lhs, rhs }
+		| StatementElementStructless::And { lhs, rhs }
+		| StatementElementStructless::Or { lhs, rhs }
+		| StatementElementStructless::Xor { lhs, rhs }
+		| StatementElementStructless::GreaterThan { lhs, rhs }
+		| StatementElementStructless::LessThan { lhs, rhs }
+		| StatementElementStructless::GreaterThanEqual { lhs, rhs }
+		| StatementElementStructless::LessThanEqual { lhs, rhs }
+		| StatementElementStructless::Cmp { lhs, rhs }
+		| StatementElementStructless::NotCmp { lhs, rhs } => {
+			const_prop(lhs, constants);
+			const_prop(rhs, constants);
+		}
+		StatementElementStructless::FunctionCall { parametres, .. } => {
+			for param in parametres.iter_mut() {
+				const_prop(param, constants);
+			}
+		}
+		StatementElementStructless::Var(name) => {
+			let name: &str = name;
+			if let Some(val) = constants.get(name) {
+				*elem = val.clone();
+			}
+		}
+		_ => {}
+	}
 }
 
 pub(crate) fn fast_mul(elem: &mut StatementElementStructless) {
@@ -16,7 +56,7 @@ pub(crate) fn fast_mul(elem: &mut StatementElementStructless) {
 				let a = *a as usize;
 				let mut inner = b.clone();
 				let compiler_word_size = std::usize::MAX.count_ones();
-				for bit in 0..compiler_word_size {
+				for bit in 1..compiler_word_size {
 					let set_bit = 1 << bit;
 					if a & set_bit == set_bit {
 						inner = StatementElementStructless::Add {
@@ -133,7 +173,6 @@ pub(crate) fn const_eval<'a>(
 			Some(StatementElementStructless::Bool(a)) => Some(StatementElementStructless::Bool(!a)),
 			_ => None,
 		},
-		// ^ todo! Implement these when they've been split into bit and bool versions
 		StatementElementStructless::FunctionCall { .. }
 		| StatementElementStructless::Var(_)
 		| StatementElementStructless::Char(_)

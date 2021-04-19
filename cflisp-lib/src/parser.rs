@@ -41,7 +41,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	tokens: &[Token<'a>],
 	move_first: bool,
 ) -> Result<LanguageElement<'a>, ParseError> {
-	//Todo patterns might be invalidated by the pointer versions
 	let element = {
 		match tokens {
 			//Struct member assignment
@@ -68,6 +67,22 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 					name: Cow::Borrowed(n),
 					value: rhs,
 				}
+			}
+
+			//Switch statement
+			[Switch, UnparsedParentheses(expr), UnparsedBlock(cases)] => {
+				let _expr = StatementElement::from_source_str(expr)?;
+				let _cases_parsed = parse(cases, move_first)?;
+				return Err(ParseError(line!(), "Switch statements are not supported"));
+			}
+
+			//Case
+			[Case, constant, Colon, ..] if matches!(constant, Bool(_) | Char(_) | Num(_)) => {
+				return Err(ParseError(line!(), "Switch statements are not supported"));
+			}
+
+			[Break, ..] | [Continue, ..] => {
+				return Err(ParseError(line!(), "Break and continue are not supported"));
 			}
 
 			//If else if
@@ -117,7 +132,6 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 					));
 				}
 
-				//let condition_tokens = Token::parse_str_to_vec(split[1])?;
 				let condition = StatementElement::from_source_str(split[1])?;
 
 				let init = parse(split[0], move_first)?;
@@ -215,6 +229,10 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 	match &tokens[0] {
 		Static => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
 			.map(|res| res.and_then(LanguageElement::make_static)),
+		Const => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+			.map(|res| res.and_then(LanguageElement::make_const)),
+		Volatile => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+			.map(|res| res.and_then(LanguageElement::make_volatile)),
 		//	`type* name` and `type* name` =
 		Decl(t) => {
 			let mut tokens_slice = &tokens[1..];
@@ -228,6 +246,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					typ: t,
 					name: Cow::Borrowed(n),
 					is_static: false,
+					is_const: false,
+					is_volatile: false,
 				})),
 				[Name(n), Assign, ..] => {
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|statement| {
@@ -236,6 +256,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 							name: Cow::Borrowed(n),
 							value: statement,
 							is_static: false,
+							is_const: false,
+							is_volatile: false,
 						}
 					});
 					Some(res)
@@ -271,6 +293,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					typ: t,
 					name: Cow::Borrowed(n),
 					is_static: false,
+					is_const: false,
+					is_volatile: false,
 				})),
 				[Name(n), Assign, UnparsedBlock(s)] => {
 					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
@@ -283,6 +307,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 								name: Cow::Borrowed(n),
 								value: members,
 								is_static: false,
+								is_const: false,
+								is_volatile: false,
 							})
 					});
 					Some(res)
@@ -294,6 +320,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 							name: Cow::Borrowed(n),
 							value: rhs,
 							is_static: false,
+							is_const: false,
+							is_volatile: false,
 						}
 					});
 					Some(res)
