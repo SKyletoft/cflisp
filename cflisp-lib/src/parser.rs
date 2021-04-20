@@ -69,6 +69,19 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 			}
 
+			//Array assignment
+			[Token::Name(n), Token::UnparsedArrayAccess(idx), Assign, ..] => {
+				let lhs = StatementElement::from_source_str(idx)?;
+				let rhs = StatementElement::from_tokens(&tokens[3..])?;
+				LanguageElement::PointerAssignment {
+					ptr: StatementElement::Add {
+						lhs: Box::new(lhs),
+						rhs: Box::new(StatementElement::Var(Cow::Borrowed(n))),
+					},
+					value: rhs,
+				}
+			}
+
 			//Switch statement
 			[Switch, UnparsedParentheses(expr), UnparsedBlock(cases)] => {
 				let _expr = StatementElement::from_source_str(expr)?;
@@ -180,7 +193,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			[Struct, Name(name), UnparsedBlock(members)] => {
 				let members_parsed = Token::parse_struct_member_tokens(members)?;
 				LanguageElement::StructDefinition {
-					name: Cow::Borrowed(*name),
+					name: Cow::Borrowed(name),
 					members: members_parsed,
 				}
 			}
@@ -249,6 +262,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_const: false,
 					is_volatile: false,
 				})),
+				[Name(n), UnparsedArrayAccess(len)] => todo!(),
 				[Name(n), Assign, ..] => {
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|statement| {
 						LanguageElement::VariableDeclarationAssignment {
@@ -262,6 +276,26 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
+				[Name(n), UnparsedArrayAccess(len), Assign, ..] => {
+					let res = len
+						.parse::<isize>()
+						.map_err(|_| ParseError(line!(), "Array length wasn't constant"))
+						.and_then(|len| {
+							t = Type::Arr(Box::new(t), len);
+							StatementElement::from_tokens(&tokens_slice[3..]).map(|statement| {
+								LanguageElement::VariableDeclarationAssignment {
+									typ: t,
+									name: Cow::Borrowed(n),
+									value: statement,
+									is_static: false,
+									is_const: false,
+									is_volatile: false,
+								}
+							})
+						});
+					Some(res)
+				}
+				//Function
 				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
 					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
 						Token::parse_block_tokens(code).and_then(|code_tokenised| {
@@ -326,6 +360,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
+				//Function
 				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
 					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
 						Token::parse_block_tokens(code).and_then(|code_tokenised| {

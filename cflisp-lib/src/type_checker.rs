@@ -134,6 +134,7 @@ pub(crate) fn language_element(
 				post,
 				body,
 			} => {
+				todo!("Fix: pass variables defined in init into post and body");
 				statement_element(condition, &variables, &functions, &structs)?;
 				language_element(init, &variables, &functions, &structs, &constants)?;
 				language_element(post, &variables, &functions, &structs, &constants)?;
