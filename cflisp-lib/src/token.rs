@@ -67,6 +67,7 @@ pub enum Token<'a> {
 	SizeOf,
 	Static,
 	StaticAssert,
+	StringLiteral(&'a str),
 	Struct,
 	Sub,
 	Switch,

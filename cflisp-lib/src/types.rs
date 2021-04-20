@@ -83,7 +83,7 @@ pub enum Type<'a> {
 	Void,
 	Struct(&'a str),
 	Ptr(Box<Type<'a>>),
-	Arr(Box<Type<'a>>),
+	Arr(Box<Type<'a>>, isize),
 }
 
 impl PartialEq for Type<'_> {
@@ -96,8 +96,8 @@ impl PartialEq for Type<'_> {
 			Type::Bool => matches!(other, Type::Bool),
 			Type::Void => matches!(other, Type::Void),
 			Type::Struct(s) => matches!(other, Type::Struct(ss) if s == ss),
-			Type::Arr(a) => {
-				matches!(other, Type::Ptr(_)) || matches!(other, Type::Arr(b) if a == b)
+			Type::Arr(a, _) => {
+				matches!(other, Type::Ptr(_)) || matches!(other, Type::Arr(b, _) if a == b)
 			}
 		}
 	}
@@ -121,7 +121,6 @@ pub enum NativeType {
 	Bool,
 	Void,
 	Ptr(Box<NativeType>),
-	Arr(Box<NativeType>),
 }
 
 impl NativeType {
@@ -146,7 +145,7 @@ impl<'a> From<&Type<'a>> for NativeType {
 			Type::Void => NativeType::Void,
 			Type::Struct(_) => NativeType::Void,
 			Type::Ptr(target) => NativeType::ptr(target.as_ref().into()),
-			Type::Arr(target) => NativeType::Arr(Box::new(target.as_ref().into())),
+			Type::Arr(target, _) => target.as_ref().into(),
 		}
 	}
 }
@@ -166,7 +165,6 @@ impl<'a> From<&NativeType> for Type<'a> {
 			NativeType::Bool => Type::Bool,
 			NativeType::Void => Type::Void,
 			NativeType::Ptr(target) => Type::ptr((target.as_ref()).into()),
-			NativeType::Arr(target) => Type::Arr(Box::new(target.as_ref().into())),
 		}
 	}
 }
@@ -176,8 +174,7 @@ impl<'a> Type<'a> {
 		match self {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
 			Type::Struct(n) => Some(n),
-			Type::Ptr(inner) => inner.get_struct_type(),
-			Type::Arr(inner) => inner.get_struct_type(),
+			Type::Ptr(inner) | Type::Arr(inner, _) => inner.get_struct_type(),
 		}
 	}
 }
@@ -198,8 +195,8 @@ impl<'a> PartialEq<Type<'a>> for NativeType {
 					false
 				}
 			}
-			Type::Arr(inner) => {
-				if let NativeType::Arr(self_inner) = self {
+			Type::Arr(inner, _) => {
+				if let NativeType::Ptr(self_inner) = self {
 					*self_inner.as_ref() == *inner.as_ref()
 				} else {
 					false

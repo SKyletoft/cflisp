@@ -98,6 +98,10 @@ fn get_prio_section(start: char, end: char, s: &str) -> Option<(&str, &str)> {
 	Some((token, rest))
 }
 
+fn get_string_literal(s: &str) -> Option<(Token, &str)> {
+	get_prio_section('"', '"', s).map(|(a, b)| (Token::StringLiteral(a), b))
+}
+
 ///Gets a complete statement in parenthesis. Returns None on unmatched parentheses.
 /// The parentheses are not in the string in the UnparsedParentheses token
 fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
@@ -190,6 +194,7 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_block(s))
 		.or_else(|| get_array_access(s))
 		.or_else(|| get_ternary_op(s))
+		.or_else(|| get_string_literal(s))
 		.or_else(|| get_char(s))
 		.or_else(|| get_name(s))
 		.ok_or(ParseError(line!(), "Couldn't parse token"))

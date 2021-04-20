@@ -102,6 +102,11 @@ impl<'a> StatementToken<'a> {
 					let (token, _) = lexer::get_token(b)?;
 					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
 				}
+				Token::StringLiteral(s) => StatementToken::Array(
+					s.chars()
+						.map(|c| vec![StatementToken::Char(c)])
+						.collect::<Vec<_>>(),
+				),
 				_ => {
 					dbg!(tokens, token);
 					return Err(ParseError(line!(), "Token is not valid in this context"));

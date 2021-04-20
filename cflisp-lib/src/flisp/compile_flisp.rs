@@ -740,6 +740,13 @@ fn compile_statement_inner<'a>(
 						StatementElementStructless::Var(name),
 						&StatementElementStructless::Num(offset),
 					)),
+				)
+				| (
+					&StatementElementStructless::Add { .. },
+					Some((
+						&StatementElementStructless::Num(offset),
+						StatementElementStructless::Var(name),
+					)),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -756,10 +763,22 @@ fn compile_statement_inner<'a>(
 				(
 					&StatementElementStructless::Add { .. },
 					Some((StatementElementStructless::Var(name), rhs)),
-				) => {
+				)
+				| (
+					&StatementElementStructless::Add { .. },
+					Some((rhs, StatementElementStructless::Var(name))),
+				)
+				/*| (
+					&StatementElementStructless::Add { .. },
+					Some((StatementElementStructless::AdrOf(name), rhs)),
+				)
+				| (
+					&StatementElementStructless::Add { .. },
+					Some((rhs, StatementElementStructless::AdrOf(name))),
+				)*/ => {
 					let adr = adr_for_name(
 						name.as_ref(),
-						state.variables,
+						state.variables,	
 						state.global_variables,
 						*state.stack_size,
 					)?;
