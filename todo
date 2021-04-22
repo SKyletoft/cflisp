@@ -3,6 +3,8 @@ labels/gotos
 
 Typechecker: Refuse void arguments
 
+Logical and/or need to be casted to bool first.
+
 Cast to bool: Bit-and with itself and then TRF C -> A
 maybe?
 

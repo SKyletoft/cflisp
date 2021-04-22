@@ -726,6 +726,8 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElementStructless::Bool(b) => {
+			//THIS DOESN'T WORK
+			todo!("true => 0xFF, false => 0x00");
 			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
 		}
 
