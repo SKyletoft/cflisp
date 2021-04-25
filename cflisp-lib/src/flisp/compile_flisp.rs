@@ -185,6 +185,7 @@ fn compile_element<'a>(
 						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					let values = elements
 						.iter()
+						.rev() //Because the stack grows down and we don't want to invert pointer arithmetic
 						.map(global_def)
 						.collect::<Result<Vec<isize>, CompileError>>()?;
 					vec![
@@ -210,7 +211,8 @@ fn compile_element<'a>(
 				}
 				if let StatementElementStructless::Array(elements) = value {
 					let mut statement = Vec::new();
-					for element in elements {
+					//Rev because the stack grows down and we don't want to invert indexing
+					for element in elements.iter().rev() {
 						let stack_copy = *state.stack_size;
 						statement.append(&mut compile_statement(element, state)?);
 						assert_eq!(*state.stack_size, stack_copy);
@@ -219,7 +221,9 @@ fn compile_element<'a>(
 					}
 					state.variables.insert(
 						Cow::Borrowed(name.as_ref()),
-						(typ.clone(), *state.stack_size),
+						// -1 because it should go before the incrementation of stack_size, but
+						// we can't do that here due to it being in the loop.
+						(typ.clone(), *state.stack_size - 1),
 					);
 					statement
 				} else {
@@ -231,12 +235,7 @@ fn compile_element<'a>(
 						(typ.clone(), *state.stack_size),
 					);
 					*state.stack_size += 1;
-					//statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
-					statement.push((Instruction::LEASP(Addressing::SP(-1)), None));
-					statement.push((
-						Instruction::STA(Addressing::SP(0)),
-						Some(Cow::Borrowed(name.as_ref())),
-					));
+					statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
 					statement
 				}
 			}
@@ -246,20 +245,50 @@ fn compile_element<'a>(
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
-			let get_adr = compile_statement(ptr, state)?;
-			let mut value = compile_statement(value, state)?;
-			let mut statement = get_adr;
-			statement.push((
-				Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X part 1".into()),
-			));
-			statement.push((
-				Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-				Some("A to X part 2".into()),
-			));
-			statement.append(&mut value);
-			statement.push((Instruction::STA(Addressing::Xn(0)), None));
-			statement
+
+			match (ptr, ptr.internal_ref()) {
+				(
+					StatementElementStructless::Add { .. },
+					Some((
+						StatementElementStructless::Num(idx),
+						StatementElementStructless::Var(name),
+					)),
+				)
+				| (
+					StatementElementStructless::Add { .. },
+					Some((
+						StatementElementStructless::Var(name),
+						StatementElementStructless::Num(idx),
+					)),
+				) => {
+					let mut statement = compile_statement(value, state)?;
+					statement.append(&mut vec![
+						(
+							Instruction::LDX(adr_for_name(
+								name,
+								state.variables,
+								state.global_variables,
+								*state.stack_size,
+							)?),
+							None,
+						),
+						(Instruction::STA(Addressing::Xn(*idx)), Some(name.clone())),
+					]);
+					statement
+				}
+
+				_ => {
+					let mut statement = compile_statement(ptr, state)?;
+					statement.push((Instruction::PSHA, Some("A to X part 1".into())));
+					*state.stack_size += 1;
+					let mut value = compile_statement(value, state)?;
+					statement.append(&mut value);
+					statement.push((Instruction::PULX, Some("A to X part 2".into())));
+					*state.stack_size -= 1;
+					statement.push((Instruction::STA(Addressing::Xn(0)), None));
+					statement
+				}
+			}
 		}
 
 		LanguageElementStructless::FunctionDeclaration {
@@ -726,12 +755,13 @@ fn compile_statement_inner<'a>(
 		}
 
 		StatementElementStructless::Bool(b) => {
-			//THIS DOESN'T WORK
-			todo!("true => 0xFF, false => 0x00");
-			vec![(Instruction::LDA(Addressing::Data(*b as isize)), None)]
+			let val = if *b { 0xFF } else { 0 };
+			vec![(Instruction::LDA(Addressing::Data(val)), None)]
 		}
 
-		StatementElementStructless::Array(_) => return Err(CompileError(line!(), "Illegal array")),
+		StatementElementStructless::Array(_) => {
+			return Err(CompileError(line!(), "Illegal array literal"))
+		}
 
 		StatementElementStructless::Deref(adr) => {
 			match (adr.as_ref(), adr.internal_ref()) {
@@ -769,18 +799,10 @@ fn compile_statement_inner<'a>(
 				| (
 					&StatementElementStructless::Add { .. },
 					Some((rhs, StatementElementStructless::Var(name))),
-				)
-				/*| (
-					&StatementElementStructless::Add { .. },
-					Some((StatementElementStructless::AdrOf(name), rhs)),
-				)
-				| (
-					&StatementElementStructless::Add { .. },
-					Some((rhs, StatementElementStructless::AdrOf(name))),
-				)*/ => {
+				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
-						state.variables,	
+						state.variables,
 						state.global_variables,
 						*state.stack_size,
 					)?;
@@ -791,18 +813,34 @@ fn compile_statement_inner<'a>(
 					]);
 					statement
 				}
+				//General opt
+				(
+					&StatementElementStructless::Add { .. },
+					Some((StatementElementStructless::Num(idx), rhs)),
+				)
+				| (
+					&StatementElementStructless::Add { .. },
+					Some((rhs, StatementElementStructless::Num(idx))),
+				) => {
+					let mut statement = compile_statement(rhs, state)?;
+					statement.append(&mut vec![
+						(Instruction::LDY(Addressing::Data(*idx)), None),
+						(Instruction::LDA(Addressing::AY), None),
+					]);
+					statement
+				}
 				//General case
 				_ => {
 					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
 					instructions.push((
 						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to X transfer".into()),
+						Some("A to Y transfer".into()),
 					));
 					instructions.push((
-						Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to X  continued".into()),
+						Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)),
+						Some("A to Y  continued".into()),
 					));
-					instructions.push((Instruction::LDA(Addressing::Xn(0)), None));
+					instructions.push((Instruction::LDA(Addressing::Yn(0)), None));
 					instructions
 				}
 			}
@@ -819,14 +857,9 @@ fn compile_statement_inner<'a>(
 			match adr {
 				Addressing::SP(n) => {
 					vec![
-						(
-							Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)),
-							Some(Cow::Borrowed("SP -> Stack")),
-						),
-						(
-							Instruction::ADDA(Addressing::SP(n)),
-							Some(Cow::Borrowed(name.as_ref())),
-						),
+						(Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)), None),
+						(Instruction::LDA(Addressing::SP(ABOVE_STACK_OFFSET)), None),
+						(Instruction::ADDA(Addressing::Data(n)), None),
 					]
 				}
 				Addressing::Adr(n) => {

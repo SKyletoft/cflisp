@@ -45,9 +45,11 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			instructions[idx].0 = Instruction::LDX(addressing.clone());
-			instructions.remove(idx + 2); //Order matters!
-			instructions.remove(idx + 1);
+			if !matches!(addressing, Addressing::AX) {
+				instructions[idx].0 = Instruction::LDX(addressing.clone());
+				instructions.remove(idx + 2); //Order matters!
+				instructions.remove(idx + 1);
+			}
 		}
 		if let (
 			(Instruction::LDA(addressing), _),
@@ -58,9 +60,11 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 1],
 			&instructions[idx + 2],
 		) {
-			instructions[idx].0 = Instruction::LDY(addressing.clone());
-			instructions.remove(idx + 2); //Order matters!
-			instructions.remove(idx + 1);
+			if !matches!(addressing, Addressing::AY) {
+				instructions[idx].0 = Instruction::LDY(addressing.clone());
+				instructions.remove(idx + 2); //Order matters!
+				instructions.remove(idx + 1);
+			}
 		}
 		if let (
 			(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
@@ -83,17 +87,26 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-///Removes loads (not to A) that are immediately overwritten. May be unsound as it doesn't
-/// check if the new load is dependent on the old load
+///Removes loads (not to A) that are immediately overwritten.
 fn repeat_load(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if matches!(
 			(&instructions[idx], &instructions[idx + 1]),
-			((Instruction::LDA(_), _), (Instruction::LDA(_), _))
-				| ((Instruction::LDX(_), _), (Instruction::LDX(_), _))
-				| ((Instruction::LDY(_), _), (Instruction::LDY(_), _))
-				| ((Instruction::LDSP(_), _), (Instruction::LDSP(_), _))
+			((Instruction::LDA(_), _), (Instruction::LDA(adr), _))
+			if !matches!(adr, Addressing::AX | Addressing::AY)
+		) || matches!(
+			(&instructions[idx], &instructions[idx + 1]),
+			((Instruction::LDX(_), _), (Instruction::LDX(adr), _))
+			if !matches!(adr, Addressing::AX | Addressing::Xn(_))
+		) || matches!(
+			(&instructions[idx], &instructions[idx + 1]),
+			((Instruction::LDY(_), _), (Instruction::LDY(adr), _))
+			if !matches!(adr, Addressing::AY | Addressing::Yn(_))
+		) || matches!(
+			(&instructions[idx], &instructions[idx + 1]),
+			((Instruction::LDSP(_), _), (Instruction::LDSP(adr), _))
+			if !matches!(adr, Addressing::SP(_))
 		) {
 			instructions.remove(idx);
 		}
@@ -257,6 +270,20 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 1);
 				continue;
 			}
+		}
+		//Load to A from SP (Array initialisation)
+		if let (
+			(Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::LDA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::PSHA, _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			instructions[idx + 2].0 = Instruction::LEASP(Addressing::SP(-1)); //To keep the existing comment on the third instruction
+			instructions.remove(idx + 1);
+			continue;
 		}
 		//Remove immediate load from pushed value
 		if let ((Instruction::PSHA, _), (Instruction::LDA(Addressing::SP(0)), _)) =
@@ -445,6 +472,7 @@ fn reduce_reserves_section(instructions: &mut [CommentedInstruction]) -> Result<
 					if matches!(instructions[start], (Instruction::PSHA, _)) {
 						continue;
 					}
+
 					let start_value = instructions[start]
 						.0
 						.get_adr()
@@ -470,8 +498,9 @@ fn reduce_reserves_section(instructions: &mut [CommentedInstruction]) -> Result<
 							}
 						})
 						.min()
-						.unwrap_or(0);
+						.unwrap_or(isize::MAX);
 					let minimum_to_use = minimum_value.max(0).min(end_value).min(start_value);
+
 					instructions[(start + 1)..idx]
 						.iter_mut()
 						.filter(|(inst, _)| !matches!(inst, Instruction::LEASP(_)))

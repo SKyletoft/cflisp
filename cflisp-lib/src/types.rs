@@ -145,7 +145,7 @@ impl<'a> From<&Type<'a>> for NativeType {
 			Type::Void => NativeType::Void,
 			Type::Struct(_) => NativeType::Void,
 			Type::Ptr(target) => NativeType::ptr(target.as_ref().into()),
-			Type::Arr(target, _) => target.as_ref().into(),
+			Type::Arr(target, _) => NativeType::ptr(target.as_ref().into()),
 		}
 	}
 }

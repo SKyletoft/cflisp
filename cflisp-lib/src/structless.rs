@@ -1,8 +1,5 @@
 use crate::*;
-use std::{
-	borrow::Cow,
-	collections::{HashMap, HashSet},
-};
+use std::{borrow::Cow, collections::HashMap};
 
 ///Simplified internal representation of a program.
 /// Doesn't contain structs or for loops
@@ -65,13 +62,11 @@ impl<'a> LanguageElementStructless<'a> {
 	pub fn from_language_elements(
 		elements: Vec<LanguageElement<'a>>,
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
-		let mut arrays = HashSet::new();
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
 		let mut functions = HashMap::new();
 		LanguageElementStructless::from_language_elements_internal(
 			elements,
-			&mut arrays,
 			&mut struct_types,
 			&mut structs_and_struct_pointers,
 			&mut functions,
@@ -80,7 +75,6 @@ impl<'a> LanguageElementStructless<'a> {
 
 	fn from_language_elements_internal(
 		elements: Vec<LanguageElement<'a>>,
-		arrays: &mut HashSet<Cow<'a, str>>,
 		struct_types: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		structs_and_struct_pointers: &mut HashMap<Cow<'a, str>, &'a str>,
 		functions: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
@@ -92,6 +86,7 @@ impl<'a> LanguageElementStructless<'a> {
 				LanguageElement::StructDefinition { name, members } => {
 					struct_types.insert(name, members);
 				}
+
 				LanguageElement::VariableDeclaration {
 					typ,
 					name,
@@ -119,31 +114,51 @@ impl<'a> LanguageElementStructless<'a> {
 								is_volatile,
 							});
 						}
-					} else {
-						if matches!(typ, Type::Arr(_, _)) {
-							arrays.insert(name.clone());
+					} else if let Type::Arr(t, len) = typ {
+						let t = t.as_ref();
+						for idx in (0..len).rev() {
+							new_elements.push(LanguageElementStructless::VariableDeclaration {
+								typ: t.into(),
+								name: Cow::Owned(format!("{}[{}]", &name, idx)),
+								is_static,
+								is_const,
+								is_volatile,
+							});
 						}
+						let target_name = Cow::Owned(format!("{}[0]", &name));
+						new_elements.push(
+							LanguageElementStructless::VariableDeclarationAssignment {
+								typ: NativeType::ptr(t.into()),
+								name,
+								value: StatementElementStructless::AdrOf(target_name),
+								is_static,
+								is_const,
+								is_volatile,
+							},
+						)
+					} else {
 						new_elements.push(LanguageElementStructless::VariableDeclaration {
 							typ: typ.into(),
 							name,
 							is_static,
 							is_const,
 							is_volatile,
-						})
+						});
 					}
 				}
+
 				LanguageElement::VariableAssignment { name, value } => {
 					new_elements.push(LanguageElementStructless::VariableAssignment {
 						name,
 						value: StatementElementStructless::from(
 							&value,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
 					})
 				}
+
 				LanguageElement::StructAssignment { name, value } => {
 					let name: &str = &name;
 					let struct_type = structs
@@ -157,7 +172,6 @@ impl<'a> LanguageElementStructless<'a> {
 							name: helper::merge_name_and_field(name, field.name),
 							value: StatementElementStructless::from(
 								&val,
-								arrays,
 								struct_types,
 								structs_and_struct_pointers,
 								functions,
@@ -165,6 +179,7 @@ impl<'a> LanguageElementStructless<'a> {
 						});
 					}
 				}
+
 				LanguageElement::VariableDeclarationAssignment {
 					typ,
 					name,
@@ -173,27 +188,51 @@ impl<'a> LanguageElementStructless<'a> {
 					is_const,
 					is_volatile,
 				} => {
+					let value = StatementElementStructless::from(
+						&value,
+						struct_types,
+						structs_and_struct_pointers,
+						functions,
+					)?;
 					if let Some(n) = typ.get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
+					} else if let Type::Arr(t, _) = typ {
+						let t = t.as_ref();
+						let alloc_name: Cow<'a, str> = Cow::Owned(name.to_string() + "_alloc");
+						new_elements.push(
+							LanguageElementStructless::VariableDeclarationAssignment {
+								typ: t.into(),
+								name: alloc_name.clone(),
+								value,
+								is_static,
+								is_const,
+								is_volatile,
+							},
+						);
+						new_elements.push(
+							LanguageElementStructless::VariableDeclarationAssignment {
+								typ: NativeType::ptr(t.into()),
+								name,
+								value: StatementElementStructless::AdrOf(alloc_name),
+								is_static,
+								is_const,
+								is_volatile,
+							},
+						)
+					} else {
+						new_elements.push(
+							LanguageElementStructless::VariableDeclarationAssignment {
+								typ: typ.into(),
+								name,
+								value,
+								is_static,
+								is_const,
+								is_volatile,
+							},
+						);
 					}
-					if matches!(typ, Type::Arr(_, _)) {
-						arrays.insert(name.clone());
-					}
-					new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
-						typ: typ.into(),
-						name,
-						value: StatementElementStructless::from(
-							&value,
-							arrays,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-						)?,
-						is_static,
-						is_const,
-						is_volatile,
-					})
 				}
+
 				LanguageElement::StructDeclarationAssignment {
 					typ,
 					name,
@@ -235,7 +274,6 @@ impl<'a> LanguageElementStructless<'a> {
 								name: helper::merge_name_and_field(&name, field.name),
 								value: StatementElementStructless::from(
 									&val,
-									arrays,
 									struct_types,
 									structs_and_struct_pointers,
 									functions,
@@ -249,24 +287,24 @@ impl<'a> LanguageElementStructless<'a> {
 					}
 					structs.insert(name, Cow::Borrowed(struct_type));
 				}
+
 				LanguageElement::PointerAssignment { ptr, value } => {
 					new_elements.push(LanguageElementStructless::PointerAssignment {
 						ptr: StatementElementStructless::from(
 							&ptr,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
 						value: StatementElementStructless::from(
 							&value,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
 					})
 				}
+
 				LanguageElement::StructFieldPointerAssignment { name, field, value } => {
 					let name_borrowed: &str = &name;
 					let struct_type_name =
@@ -295,13 +333,13 @@ impl<'a> LanguageElementStructless<'a> {
 						ptr: new_ptr,
 						value: StatementElementStructless::from(
 							&value,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
 					});
 				}
+
 				LanguageElement::FunctionDeclaration {
 					typ,
 					name,
@@ -329,13 +367,13 @@ impl<'a> LanguageElementStructless<'a> {
 						args: new_args,
 						block: LanguageElementStructless::from_language_elements_internal(
 							block,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?,
 					})
 				}
+
 				LanguageElement::IfStatement {
 					condition,
 					then,
@@ -343,7 +381,6 @@ impl<'a> LanguageElementStructless<'a> {
 				} => new_elements.push(LanguageElementStructless::IfStatement {
 					condition: StatementElementStructless::from(
 						&condition,
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
@@ -351,7 +388,6 @@ impl<'a> LanguageElementStructless<'a> {
 					then: Box::new(LanguageElementStructless::Block {
 						block: LanguageElementStructless::from_language_elements_internal(
 							then,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
@@ -363,7 +399,6 @@ impl<'a> LanguageElementStructless<'a> {
 						Some(Box::new(LanguageElementStructless::Block {
 							block: LanguageElementStructless::from_language_elements_internal(
 								else_then,
-								arrays,
 								struct_types,
 								structs_and_struct_pointers,
 								functions,
@@ -374,6 +409,7 @@ impl<'a> LanguageElementStructless<'a> {
 						None
 					},
 				}),
+
 				LanguageElement::For {
 					init,
 					condition,
@@ -383,28 +419,24 @@ impl<'a> LanguageElementStructless<'a> {
 					let mut init_block =
 						LanguageElementStructless::from_language_elements_internal(
 							init,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
 						)?;
 					let condition = StatementElementStructless::from(
 						&condition,
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
 					)?;
 					let mut body = LanguageElementStructless::from_language_elements_internal(
 						body,
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
 					)?;
 					let mut post = LanguageElementStructless::from_language_elements_internal(
 						post,
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
@@ -424,11 +456,11 @@ impl<'a> LanguageElementStructless<'a> {
 						block: init_block,
 					})
 				}
+
 				LanguageElement::While { condition, body } => {
 					new_elements.push(LanguageElementStructless::Loop {
 						condition: StatementElementStructless::from(
 							&condition,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
@@ -436,7 +468,6 @@ impl<'a> LanguageElementStructless<'a> {
 						body: Box::new(LanguageElementStructless::Block {
 							block: LanguageElementStructless::from_language_elements_internal(
 								body,
-								arrays,
 								struct_types,
 								structs_and_struct_pointers,
 								functions,
@@ -445,11 +476,11 @@ impl<'a> LanguageElementStructless<'a> {
 						}),
 					})
 				}
+
 				LanguageElement::Return(ret) => {
 					let ret = if let Some(value) = ret {
 						Some(StatementElementStructless::from(
 							&value,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
@@ -459,10 +490,10 @@ impl<'a> LanguageElementStructless<'a> {
 					};
 					new_elements.push(LanguageElementStructless::Return(ret))
 				}
+
 				LanguageElement::Statement(stat) => new_elements.push(
 					LanguageElementStructless::Statement(StatementElementStructless::from(
 						&stat,
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
@@ -558,7 +589,6 @@ pub enum StatementElementStructless<'a> {
 impl<'a> StatementElementStructless<'a> {
 	fn from(
 		other: &StatementElement<'a>,
-		arrays: &HashSet<Cow<'a, str>>,
 		struct_types: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		structs_and_struct_pointers: &HashMap<Cow<'a, str>, &'a str>,
 		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
@@ -568,14 +598,12 @@ impl<'a> StatementElementStructless<'a> {
 				StatementElementStructless::$i {
 					lhs: Box::new(StatementElementStructless::from(
 						$lhs.as_ref(),
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
 					)?),
 					rhs: Box::new(StatementElementStructless::from(
 						$rhs.as_ref(),
-						arrays,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
@@ -587,7 +615,6 @@ impl<'a> StatementElementStructless<'a> {
 			($i:ident, $lhs:expr) => {
 				StatementElementStructless::$i(Box::new(StatementElementStructless::from(
 					$lhs.as_ref(),
-					arrays,
 					struct_types,
 					structs_and_struct_pointers,
 					functions,
@@ -642,7 +669,6 @@ impl<'a> StatementElementStructless<'a> {
 					} else {
 						new_parametres.push(StatementElementStructless::from(
 							param,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
@@ -654,13 +680,7 @@ impl<'a> StatementElementStructless<'a> {
 					parametres: new_parametres,
 				}
 			}
-			StatementElement::Var(v) => {
-				if arrays.contains(v as &str) {
-					StatementElementStructless::AdrOf(v.clone())
-				} else {
-					StatementElementStructless::Var(v.clone())
-				}
-			}
+			StatementElement::Var(v) => StatementElementStructless::Var(v.clone()),
 			StatementElement::Num(n) => StatementElementStructless::Num(*n),
 			StatementElement::Char(c) => StatementElementStructless::Char(*c),
 			StatementElement::Bool(b) => StatementElementStructless::Bool(*b),
@@ -669,7 +689,6 @@ impl<'a> StatementElementStructless<'a> {
 					.map(|parametre| {
 						StatementElementStructless::from(
 							parametre,
-							arrays,
 							struct_types,
 							structs_and_struct_pointers,
 							functions,

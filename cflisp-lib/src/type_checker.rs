@@ -7,26 +7,21 @@ use std::{
 pub fn type_check(block: &[LanguageElement]) -> Result<(), TypeError> {
 	language_element(
 		block,
-		&HashMap::new(),
-		&HashMap::new(),
-		&HashMap::new(),
-		&HashSet::new(),
+		&mut HashMap::new(),
+		&mut HashMap::new(),
+		&mut HashMap::new(),
+		&mut HashSet::new(),
 	)
 }
 
-///Mostly broken type check. While this is technically correct, it relies on a very broken type check for statements
-pub(crate) fn language_element(
-	block: &[LanguageElement],
-	upper_variables: &HashMap<Cow<str>, Type>,
-	outer_functions: &HashMap<Cow<str>, Function>,
-	structs: &HashMap<&str, Vec<Variable>>,
-	constants: &HashSet<&str>,
+///The maps are out parametres because of loops
+pub(crate) fn language_element<'a>(
+	block: &'a [LanguageElement<'a>],
+	variables: &mut HashMap<Cow<'a, str>, Type<'a>>,
+	functions: &mut HashMap<Cow<'a, str>, Function<'a>>,
+	structs: &mut HashMap<&'a str, Vec<Variable<'a>>>,
+	constants: &mut HashSet<&'a str>,
 ) -> Result<(), TypeError> {
-	let mut variables = upper_variables.clone();
-	let mut functions = outer_functions.clone();
-	let mut structs = structs.clone();
-	let mut constants = constants.clone();
-
 	for line in block {
 		match line {
 			LanguageElement::VariableDeclaration {
@@ -112,7 +107,17 @@ pub(crate) fn language_element(
 					}
 				}
 
-				language_element(block, &variables, &functions, &structs, &constants)?;
+				let mut inner_variables = variables.clone();
+				let mut inner_functions = functions.clone();
+				let mut inner_structs = structs.clone();
+				let mut inner_constants = constants.clone();
+				language_element(
+					block,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
 				verify_function_return_type(block, &variables, &functions, &structs, typ)?;
 			}
 
@@ -122,9 +127,29 @@ pub(crate) fn language_element(
 				else_then,
 			} => {
 				statement_element(condition, &variables, &functions, &structs)?;
-				language_element(then, &variables, &functions, &structs, &constants)?;
+				let mut inner_variables = variables.clone();
+				let mut inner_functions = functions.clone();
+				let mut inner_structs = structs.clone();
+				let mut inner_constants = constants.clone();
+				language_element(
+					then,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
 				if let Some(else_then) = else_then {
-					language_element(else_then, &variables, &functions, &structs, &constants)?;
+					let mut inner_variables = variables.clone();
+					let mut inner_functions = functions.clone();
+					let mut inner_structs = structs.clone();
+					let mut inner_constants = constants.clone();
+					language_element(
+						else_then,
+						&mut inner_variables,
+						&mut inner_functions,
+						&mut inner_structs,
+						&mut inner_constants,
+					)?;
 				}
 			}
 
@@ -134,16 +159,52 @@ pub(crate) fn language_element(
 				post,
 				body,
 			} => {
-				todo!("Fix: pass variables defined in init into post and body");
-				statement_element(condition, &variables, &functions, &structs)?;
-				language_element(init, &variables, &functions, &structs, &constants)?;
-				language_element(post, &variables, &functions, &structs, &constants)?;
-				language_element(body, &variables, &functions, &structs, &constants)?;
+				let mut inner_variables = variables.clone();
+				let mut inner_functions = functions.clone();
+				let mut inner_structs = structs.clone();
+				let mut inner_constants = constants.clone();
+				language_element(
+					init,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
+				statement_element(
+					condition,
+					&inner_variables,
+					&inner_functions,
+					&inner_structs,
+				)?;
+				language_element(
+					post,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
+				language_element(
+					body,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
 			}
 
 			LanguageElement::While { condition, body } => {
 				statement_element(condition, &variables, &functions, &structs)?;
-				language_element(body, &variables, &functions, &structs, &constants)?;
+				let mut inner_variables = variables.clone();
+				let mut inner_functions = functions.clone();
+				let mut inner_structs = structs.clone();
+				let mut inner_constants = constants.clone();
+				language_element(
+					body,
+					&mut inner_variables,
+					&mut inner_functions,
+					&mut inner_structs,
+					&mut inner_constants,
+				)?;
 			}
 
 			//Is handled by function def instead

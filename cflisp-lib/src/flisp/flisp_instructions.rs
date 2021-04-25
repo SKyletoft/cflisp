@@ -48,6 +48,7 @@ pub enum Instruction<'a> {
 
 	PSHA,
 	PULA,
+	PULX,
 	RTS,
 	RTI,
 	JSR(Addressing<'a>),
@@ -87,6 +88,7 @@ impl<'a> fmt::Display for Instruction<'a> {
 			Instruction::DECA => write!(f, "\tDECA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
+			Instruction::PULX => write!(f, "\tPULX\t"),
 			Instruction::TSTA => write!(f, "\tTSTA\t"),
 			Instruction::COMA => write!(f, "\tCOMA\t"),
 			Instruction::RTS => write!(f, "\tRTS\t"),
@@ -216,6 +218,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::LEASP(a) => a.size() + 1,
 			Instruction::PSHA
 			| Instruction::PULA
+			| Instruction::PULX
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA
@@ -257,6 +260,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::LEASP(a) => Some(a),
 			Instruction::PSHA
 			| Instruction::PULA
+			| Instruction::PULX
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA
@@ -298,6 +302,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::LEASP(a) => Some(a),
 			Instruction::PSHA
 			| Instruction::PULA
+			| Instruction::PULX
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA

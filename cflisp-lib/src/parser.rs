@@ -262,7 +262,22 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_const: false,
 					is_volatile: false,
 				})),
-				[Name(n), UnparsedArrayAccess(len)] => todo!(),
+				[Name(n), UnparsedArrayAccess(len)] => {
+					let res = len
+						.parse::<isize>()
+						.map_err(|_| ParseError(line!(), "Array length wasn't constant"))
+						.map(|len| {
+							t = Type::Arr(Box::new(t), len);
+							LanguageElement::VariableDeclaration {
+								typ: t,
+								name: Cow::Borrowed(n),
+								is_static: false,
+								is_const: false,
+								is_volatile: false,
+							}
+						});
+					Some(res)
+				}
 				[Name(n), Assign, ..] => {
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|statement| {
 						LanguageElement::VariableDeclarationAssignment {
