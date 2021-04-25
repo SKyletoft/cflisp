@@ -29,6 +29,7 @@ pub enum Instruction<'a> {
 	CMPA(Addressing<'a>),
 	INCA,
 	DECA,
+	CLRA,
 
 	TSTA,
 	COMA,
@@ -45,6 +46,7 @@ pub enum Instruction<'a> {
 	DEC(Addressing<'a>),
 	LSL(Addressing<'a>),
 	LSR(Addressing<'a>),
+	CLR(Addressing<'a>),
 
 	PSHA,
 	PULA,
@@ -82,10 +84,12 @@ impl<'a> fmt::Display for Instruction<'a> {
 			Instruction::DEC(a) => write!(f, "\tDEC\t{}", *a),
 			Instruction::LSL(a) => write!(f, "\tLSL\t{}", *a),
 			Instruction::LSR(a) => write!(f, "\tLSR\t{}", *a),
+			Instruction::CLR(a) => write!(f, "\tCLR\t{}", *a),
 			Instruction::LSLA => write!(f, "\tLSLA\t"),
 			Instruction::LSRA => write!(f, "\tLSRA\t"),
 			Instruction::INCA => write!(f, "\tINCA\t"),
 			Instruction::DECA => write!(f, "\tDECA\t"),
+			Instruction::CLRA => write!(f, "\tCLRA\t"),
 			Instruction::PSHA => write!(f, "\tPSHA\t"),
 			Instruction::PULA => write!(f, "\tPULA\t"),
 			Instruction::PULX => write!(f, "\tPULX\t"),
@@ -213,6 +217,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::CLR(a)
 			| Instruction::LSL(a)
 			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => a.size() + 1,
@@ -222,6 +227,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA
+			| Instruction::CLRA
 			| Instruction::COMA
 			| Instruction::LSLA
 			| Instruction::LSRA
@@ -255,6 +261,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::CLR(a)
 			| Instruction::LSL(a)
 			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => Some(a),
@@ -264,6 +271,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA
+			| Instruction::CLRA
 			| Instruction::COMA
 			| Instruction::LSLA
 			| Instruction::LSRA
@@ -297,6 +305,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
 			| Instruction::DEC(a)
+			| Instruction::CLR(a)
 			| Instruction::LSL(a)
 			| Instruction::LSR(a)
 			| Instruction::LEASP(a) => Some(a),
@@ -306,6 +315,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::TSTA
 			| Instruction::INCA
 			| Instruction::DECA
+			| Instruction::CLRA
 			| Instruction::COMA
 			| Instruction::LSLA
 			| Instruction::LSRA

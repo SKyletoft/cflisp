@@ -26,6 +26,8 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	inca(instructions);
 	dec(instructions);
 	deca(instructions);
+	clr(instructions);
+	clra(instructions);
 	remove_post_early_return_code(instructions);
 
 	Ok(())
@@ -552,6 +554,45 @@ fn function_op_load_reduce(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx);
 			instructions.remove(idx);
 			instructions[idx + 1] = (Instruction::STA(Addressing::SP(1)), None);
+		}
+		idx += 1;
+	}
+}
+
+///Replaces load 0 with a CLR instruction
+fn clr(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
+		if let ((Instruction::LDA(Addressing::Data(0)), _), (Instruction::STA(to), _)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			instructions[idx].0 = Instruction::CLR(to.clone());
+			instructions.remove(idx + 1);
+		}
+		if let (
+			(Instruction::LDA(Addressing::Data(0)), _),
+			(Instruction::LDX(_), _),
+			(Instruction::STA(adr), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if matches!(adr, Addressing::Xn(_)) {
+				instructions[idx + 2].0 = Instruction::CLR(adr.clone());
+				instructions.remove(idx);
+			}
+		}
+		idx += 1;
+	}
+}
+
+///Replaces load 0 with a CLR instruction
+fn clra(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while !instructions.is_empty() && idx < instructions.len() {
+		if let (Instruction::LDA(Addressing::Data(0)), _) = &instructions[idx] {
+			instructions[idx].0 = Instruction::CLRA;
 		}
 		idx += 1;
 	}
