@@ -382,6 +382,14 @@ pub(crate) fn type_of<'a>(
 	structs: &'a HashMap<&'a str, Vec<Variable<'a>>>,
 ) -> Result<Type<'a>, TypeError> {
 	let res = match elem {
+		StatementElement::Xor { lhs, rhs } => {
+			let lhs = type_of(lhs, variables, functions, structs)?;
+			let rhs = type_of(rhs, variables, functions, structs)?;
+			if lhs != rhs {
+				return Err(TypeError(line!(), "Xor has arguments of different types"));
+			}
+			lhs
+		}
 		StatementElement::Char(_) => Type::Char,
 		StatementElement::Num(_)
 		| StatementElement::Add { .. }
@@ -397,7 +405,6 @@ pub(crate) fn type_of<'a>(
 		StatementElement::Bool(_)
 		| StatementElement::BoolAnd { .. }
 		| StatementElement::BoolOr { .. }
-		| StatementElement::Xor { .. }
 		| StatementElement::BoolNot(_)
 		| StatementElement::GreaterThan { .. }
 		| StatementElement::LessThan { .. }
@@ -525,7 +532,6 @@ pub fn statement_element(
 		| StatementElement::RShift { lhs, rhs }
 		| StatementElement::BoolAnd { lhs, rhs }
 		| StatementElement::BoolOr { lhs, rhs }
-		| StatementElement::Xor { lhs, rhs }
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
