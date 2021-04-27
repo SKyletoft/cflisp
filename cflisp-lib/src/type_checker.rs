@@ -385,7 +385,7 @@ pub(crate) fn type_of<'a>(
 		StatementElement::Xor { lhs, rhs } => {
 			let lhs = type_of(lhs, variables, functions, structs)?;
 			let rhs = type_of(rhs, variables, functions, structs)?;
-			if lhs != rhs {
+			if lhs != rhs || !(lhs == Type::Int || lhs == Type::Bool) {
 				return Err(TypeError(line!(), "Xor has arguments of different types"));
 			}
 			lhs
