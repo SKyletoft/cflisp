@@ -173,3 +173,45 @@ fn const_prop() {
 	optimise_language::all_optimisations(&mut case_1).unwrap();
 	assert_eq!(case_1, expected_1_end);
 }
+
+#[test]
+fn extract_statics() {
+	let case_1 = vec![LanguageElement::FunctionDeclaration {
+		typ: Type::Int,
+		name: Cow::Borrowed("main"),
+		args: vec![],
+		block: vec![
+			LanguageElement::VariableDeclaration {
+				typ: Type::Int,
+				name: Cow::Borrowed("alpha_beta_gamma"),
+				is_static: true,
+				is_const: false,
+				is_volatile: false,
+			},
+			LanguageElement::VariableAssignment {
+				name: Cow::Borrowed("alpha_beta_gamma"),
+				value: StatementElement::Num(3),
+			},
+		],
+	}];
+	let expected_1 = vec![
+		LanguageElementStructless::VariableDeclaration {
+			typ: NativeType::Int,
+			name: Cow::Borrowed("main::alpha_beta_gamma"),
+			is_static: true,
+			is_const: false,
+			is_volatile: false,
+		},
+		LanguageElementStructless::FunctionDeclaration {
+			typ: NativeType::Int,
+			name: Cow::Borrowed("main"),
+			args: vec![],
+			block: vec![LanguageElementStructless::VariableAssignment {
+				name: Cow::Borrowed("main::alpha_beta_gamma"),
+				value: StatementElementStructless::Num(3),
+			}],
+		},
+	];
+	let res_1 = LanguageElementStructless::from_language_elements(case_1).unwrap();
+	assert_eq!(expected_1, res_1);
+}

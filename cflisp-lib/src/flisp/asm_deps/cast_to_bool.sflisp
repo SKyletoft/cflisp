@@ -1,0 +1,5 @@
+__tb__	CMPA	#$00	; Casts A to bool
+	BNE	__tb_1	; (true: 0xFF, false: 0x00)
+	LDA	#$FF
+__tb_1	RTS
+

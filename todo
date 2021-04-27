@@ -11,3 +11,5 @@ maybe?
 Optimisation: copy out a single calculation of address when array is used a lot
 Optimisation: Calculate offset directly for constant indexes
 Optimisation: flip lhs and rhs in add in pointer read/write so that if either, lhs is the constant
+
+Move static variables out of functions

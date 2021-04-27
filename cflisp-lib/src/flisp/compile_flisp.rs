@@ -119,8 +119,13 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				state.global_variables.insert(name.clone(), typ.clone());
-				vec![]
+				state
+					.global_variables
+					.insert(Cow::Borrowed(name.as_ref()), typ.clone());
+				vec![
+					(Instruction::Label(name.clone()), None),
+					(Instruction::FCB(vec![0]), None),
+				]
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
@@ -166,10 +171,13 @@ fn compile_element<'a>(
 				StatementElementStructless::Num(n) => Ok(*n),
 				StatementElementStructless::Char(c) => Ok(*c as isize),
 				StatementElementStructless::Bool(b) => Ok(*b as isize),
-				_ => Err(CompileError(
-					line!(),
-					"Non constant in array initialisation",
-				)),
+				_ => {
+					dbg!(val);
+					Err(CompileError(
+						line!(),
+						"Non constant in constant initialisation",
+					))
+				}
 			};
 			if state.scope_name == "global" || *is_static {
 				if state.scope_name == "global" && !is_static {
@@ -185,7 +193,6 @@ fn compile_element<'a>(
 						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					let values = elements
 						.iter()
-						.rev() //Because the stack grows down and we don't want to invert pointer arithmetic
 						.map(global_def)
 						.collect::<Result<Vec<isize>, CompileError>>()?;
 					vec![

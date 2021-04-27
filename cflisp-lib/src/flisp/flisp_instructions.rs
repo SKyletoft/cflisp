@@ -56,11 +56,13 @@ pub enum Instruction<'a> {
 	JSR(Addressing<'a>),
 	Label(Cow<'a, str>),
 	FCB(Vec<isize>),
+	EQU(Cow<'a, str>, isize),
 }
 
 impl<'a> fmt::Display for Instruction<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
+			Instruction::EQU(lbl, val) => write!(f, "{}\tEQU\t{:03}", lbl, val),
 			Instruction::LDA(a) => write!(f, "\tLDA\t{}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{}", *a),
 			Instruction::LDY(a) => write!(f, "\tLDY\t{}", *a),
@@ -113,6 +115,7 @@ impl<'a> fmt::Display for Instruction<'a> {
 impl<'a> fmt::UpperHex for Instruction<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
+			Instruction::EQU(lbl, val) => write!(f, "{}\tEQU\t${:03X}", lbl, val),
 			Instruction::LDA(a) => write!(f, "\tLDA\t{:X}", *a),
 			Instruction::LDX(a) => write!(f, "\tLDX\t{:X}", *a),
 			Instruction::LDY(a) => write!(f, "\tLDY\t{:X}", *a),
@@ -234,7 +237,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTI
 			| Instruction::RTS => 1,
 			Instruction::FCB(n) => n.len(),
-			Instruction::Label(_) => 0,
+			Instruction::EQU(_, _) | Instruction::Label(_) => 0,
 		}
 	}
 
@@ -278,6 +281,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTS
 			| Instruction::RTI
 			| Instruction::FCB(_)
+			| Instruction::EQU(_, _)
 			| Instruction::Label(_) => None,
 		}
 	}
@@ -322,6 +326,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTS
 			| Instruction::RTI
 			| Instruction::FCB(_)
+			| Instruction::EQU(_, _)
 			| Instruction::Label(_) => None,
 		}
 	}

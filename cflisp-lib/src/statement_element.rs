@@ -268,6 +268,7 @@ impl<'a> StatementElement<'a> {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
 		do_array_access(&mut working_tokens)?;
+
 		for (from, to) in un_ops.iter() {
 			do_unary_operation_left(&mut working_tokens, from, *to)?;
 		}
@@ -315,6 +316,7 @@ fn do_binary_operation<'a>(
 			//The removal of the left item offset the index by one
 			tokens[idx - 1] = Parsed(op_to(lhs, rhs)?);
 		} else {
+			dbg!(tokens);
 			return Err(ParseError(
 				line!(),
 				"Couldn't construct tree from statement. Element that \
@@ -390,7 +392,7 @@ fn do_unary_operation_left<'a>(
 fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	//yes, stop once too early
-	while idx >= 1 && idx < tokens.len() {
+	while idx < tokens.len() {
 		if let Some(Unparsed(StatementToken::ArrayAccess(i))) = tokens.get(idx) {
 			let i = StatementElement::from_statement_tokens(i.clone())?;
 			let prev = tokens.remove(idx - 1);
@@ -404,12 +406,11 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 				return Err(ParseError(
 					line!(),
 					"Couldn't construct tree from statement. Element that \
-				should've been parsed first has not been parsed",
+					should've been parsed first has not been parsed",
 				));
 			}
-		} else {
-			idx = idx.wrapping_sub(1);
 		}
+		idx = idx.wrapping_sub(1);
 	}
 	Ok(())
 }

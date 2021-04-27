@@ -170,6 +170,7 @@ impl<'a> From<&NativeType> for Type<'a> {
 }
 
 impl<'a> Type<'a> {
+	///Get struct type name, even when nested in a pointer or array
 	pub(crate) fn get_struct_type(&self) -> Option<&'a str> {
 		match self {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,

@@ -94,56 +94,60 @@ impl<'a> LanguageElementStructless<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					if let Some(n) = typ.get_struct_type() {
-						let fields = struct_types
-							.get(n)
-							.ok_or(ParseError(line!(), "Undefined struct type"))?;
-						structs_and_struct_pointers.insert(name.clone(), n);
-						new_elements.push(LanguageElementStructless::StructDeclaration {
-							name: name.clone(),
-							is_static,
-							is_const,
-							is_volatile,
-						});
-						for field in fields {
-							new_elements.push(LanguageElementStructless::VariableDeclaration {
-								name: helper::merge_name_and_field(&name, field.name),
-								typ: (&field.typ).into(), //This is also such a hack
+					match typ {
+						Type::Struct(n) => {
+							let fields = struct_types
+								.get(n)
+								.ok_or(ParseError(line!(), "Undefined struct type"))?;
+							structs_and_struct_pointers.insert(name.clone(), n);
+							new_elements.push(LanguageElementStructless::StructDeclaration {
+								name: name.clone(),
 								is_static,
 								is_const,
 								is_volatile,
 							});
+							for field in fields {
+								new_elements.push(LanguageElementStructless::VariableDeclaration {
+									name: helper::merge_name_and_field(&name, field.name),
+									typ: (&field.typ).into(), //This is also such a hack
+									is_static,
+									is_const,
+									is_volatile,
+								});
+							}
 						}
-					} else if let Type::Arr(t, len) = typ {
-						let t = t.as_ref();
-						for idx in (0..len).rev() {
+						Type::Arr(t, len) => {
+							let t = t.as_ref();
+							for idx in (0..len).rev() {
+								new_elements.push(LanguageElementStructless::VariableDeclaration {
+									typ: t.into(),
+									name: Cow::Owned(format!("{}[{}]", &name, idx)),
+									is_static,
+									is_const,
+									is_volatile,
+								});
+							}
+							let target_name = Cow::Owned(format!("{}[0]", &name));
+							new_elements.push(
+								LanguageElementStructless::VariableDeclarationAssignment {
+									typ: NativeType::ptr(t.into()),
+									name,
+									value: StatementElementStructless::AdrOf(target_name),
+									is_static,
+									is_const,
+									is_volatile,
+								},
+							)
+						}
+						_ => {
 							new_elements.push(LanguageElementStructless::VariableDeclaration {
-								typ: t.into(),
-								name: Cow::Owned(format!("{}[{}]", &name, idx)),
-								is_static,
-								is_const,
-								is_volatile,
-							});
-						}
-						let target_name = Cow::Owned(format!("{}[0]", &name));
-						new_elements.push(
-							LanguageElementStructless::VariableDeclarationAssignment {
-								typ: NativeType::ptr(t.into()),
+								typ: typ.into(),
 								name,
-								value: StatementElementStructless::AdrOf(target_name),
 								is_static,
 								is_const,
 								is_volatile,
-							},
-						)
-					} else {
-						new_elements.push(LanguageElementStructless::VariableDeclaration {
-							typ: typ.into(),
-							name,
-							is_static,
-							is_const,
-							is_volatile,
-						});
+							});
+						}
 					}
 				}
 
@@ -181,6 +185,29 @@ impl<'a> LanguageElementStructless<'a> {
 				}
 
 				LanguageElement::VariableDeclarationAssignment {
+					typ: Type::Arr(t, _),
+					name,
+					value: StatementElement::Array(arr),
+					is_static: true,
+					is_const,
+					is_volatile,
+				} => {
+					new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
+						typ: t.as_ref().into(),
+						name,
+						value: StatementElementStructless::from(
+							&StatementElement::Array(arr),
+							struct_types,
+							structs_and_struct_pointers,
+							functions,
+						)?,
+						is_static: true,
+						is_const,
+						is_volatile,
+					});
+				}
+
+				LanguageElement::VariableDeclarationAssignment {
 					typ,
 					name,
 					value,
@@ -196,7 +223,8 @@ impl<'a> LanguageElementStructless<'a> {
 					)?;
 					if let Some(n) = typ.get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
-					} else if let Type::Arr(t, _) = typ {
+					}
+					if let Type::Arr(t, _) = typ {
 						let t = t.as_ref();
 						let alloc_name: Cow<'a, str> = Cow::Owned(name.to_string() + "_alloc");
 						new_elements.push(
@@ -307,13 +335,13 @@ impl<'a> LanguageElementStructless<'a> {
 
 				LanguageElement::StructFieldPointerAssignment { name, field, value } => {
 					let name_borrowed: &str = &name;
-					let struct_type_name =
-						*structs_and_struct_pointers
-							.get(name_borrowed)
-							.ok_or(ParseError(
-								line!(),
-								"Variable wasn't of struct or struct pointer type",
-							))?;
+					let struct_type_name = *structs_and_struct_pointers
+						.get(name_borrowed)
+						.ok_or_else(|| {
+							eprintln!("{}->{} = {:?}", name, field, value);
+							dbg!(name_borrowed, &structs_and_struct_pointers);
+							ParseError(line!(), "Variable wasn't of struct or struct pointer type")
+						})?;
 					let fields = struct_types
 						.get(struct_type_name)
 						.ok_or(ParseError(line!(), "Undefined struct type"))?;
