@@ -65,12 +65,19 @@ impl<'a> LanguageElementStructless<'a> {
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
 		let mut functions = HashMap::new();
-		LanguageElementStructless::from_language_elements_internal(
+
+		let mut upper = Vec::new();
+
+		let mut res = LanguageElementStructless::from_language_elements_internal(
 			elements,
 			&mut struct_types,
 			&mut structs_and_struct_pointers,
 			&mut functions,
-		)
+			&mut upper,
+		)?;
+
+		upper.append(&mut res);
+		Ok(upper)
 	}
 
 	fn from_language_elements_internal(
@@ -78,6 +85,7 @@ impl<'a> LanguageElementStructless<'a> {
 		struct_types: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		structs_and_struct_pointers: &mut HashMap<Cow<'a, str>, &'a str>,
 		functions: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
+		upper: &mut Vec<LanguageElementStructless<'a>>,
 	) -> Result<Vec<LanguageElementStructless<'a>>, ParseError> {
 		let mut new_elements = Vec::new();
 		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
@@ -100,53 +108,76 @@ impl<'a> LanguageElementStructless<'a> {
 								.get(n)
 								.ok_or(ParseError(line!(), "Undefined struct type"))?;
 							structs_and_struct_pointers.insert(name.clone(), n);
-							new_elements.push(LanguageElementStructless::StructDeclaration {
+							let decl = LanguageElementStructless::StructDeclaration {
 								name: name.clone(),
 								is_static,
 								is_const,
 								is_volatile,
-							});
+							};
+							if is_static {
+								upper.push(decl);
+							} else {
+								new_elements.push(decl);
+							}
 							for field in fields {
-								new_elements.push(LanguageElementStructless::VariableDeclaration {
+								let next = LanguageElementStructless::VariableDeclaration {
 									name: helper::merge_name_and_field(&name, field.name),
 									typ: (&field.typ).into(), //This is also such a hack
 									is_static,
 									is_const,
 									is_volatile,
-								});
+								};
+								if is_static {
+									upper.push(next);
+								} else {
+									new_elements.push(next);
+								}
 							}
 						}
 						Type::Arr(t, len) => {
 							let t = t.as_ref();
 							for idx in (0..len).rev() {
-								new_elements.push(LanguageElementStructless::VariableDeclaration {
+								let next = LanguageElementStructless::VariableDeclaration {
 									typ: t.into(),
 									name: Cow::Owned(format!("{}[{}]", &name, idx)),
 									is_static,
 									is_const,
 									is_volatile,
-								});
+								};
+								if is_static {
+									upper.push(next);
+								} else {
+									new_elements.push(next);
+								}
 							}
 							let target_name = Cow::Owned(format!("{}[0]", &name));
-							new_elements.push(
-								LanguageElementStructless::VariableDeclarationAssignment {
-									typ: NativeType::ptr(t.into()),
-									name,
-									value: StatementElementStructless::AdrOf(target_name),
-									is_static,
-									is_const,
-									is_volatile,
-								},
-							)
+							let next = LanguageElementStructless::VariableDeclarationAssignment {
+								typ: NativeType::ptr(t.into()),
+								name,
+								value: StatementElementStructless::AdrOf(target_name),
+								is_static,
+								is_const,
+								is_volatile,
+							};
+							if is_static {
+								upper.push(next);
+							} else {
+								new_elements.push(next);
+							}
 						}
 						_ => {
-							new_elements.push(LanguageElementStructless::VariableDeclaration {
+							let next = LanguageElementStructless::VariableDeclaration {
 								typ: typ.into(),
 								name,
 								is_static,
 								is_const,
 								is_volatile,
-							});
+							};
+							if is_static {
+								upper.push(next);
+							} else {
+								new_elements.push(next);
+							}
 						}
 					}
 				}
@@ -192,7 +223,7 @@ impl<'a> LanguageElementStructless<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					new_elements.push(LanguageElementStructless::VariableDeclarationAssignment {
+					upper.push(LanguageElementStructless::VariableDeclarationAssignment {
 						typ: t.as_ref().into(),
 						name,
 						value: StatementElementStructless::from(
@@ -227,17 +258,15 @@ impl<'a> LanguageElementStructless<'a> {
 					if let Type::Arr(t, _) = typ {
 						let t = t.as_ref();
 						let alloc_name: Cow<'a, str> = Cow::Owned(name.to_string() + "_alloc");
-						new_elements.push(
-							LanguageElementStructless::VariableDeclarationAssignment {
-								typ: t.into(),
-								name: alloc_name.clone(),
-								value,
-								is_static,
-								is_const,
-								is_volatile,
-							},
-						);
-						new_elements.push(
+						let allocation = LanguageElementStructless::VariableDeclarationAssignment {
+							typ: t.into(),
+							name: alloc_name.clone(),
+							value,
+							is_static,
+							is_const,
+							is_volatile,
+						};
+						let name_binding =
 							LanguageElementStructless::VariableDeclarationAssignment {
 								typ: NativeType::ptr(t.into()),
 								name,
@@ -245,19 +274,28 @@ impl<'a> LanguageElementStructless<'a> {
 								is_static,
 								is_const,
 								is_volatile,
-							},
-						)
+							};
+						if is_static {
+							upper.push(allocation);
+							upper.push(name_binding);
+						} else {
+							new_elements.push(allocation);
+							new_elements.push(name_binding);
+						}
 					} else {
-						new_elements.push(
-							LanguageElementStructless::VariableDeclarationAssignment {
-								typ: typ.into(),
-								name,
-								value,
-								is_static,
-								is_const,
-								is_volatile,
-							},
-						);
+						let next = LanguageElementStructless::VariableDeclarationAssignment {
+							typ: typ.into(),
+							name,
+							value,
+							is_static,
+							is_const,
+							is_volatile,
+						};
+						if is_static {
+							upper.push(next);
+						} else {
+							new_elements.push(next);
+						}
 					}
 				}
 
@@ -290,28 +328,36 @@ impl<'a> LanguageElementStructless<'a> {
 						dbg!(struct_types, structs_and_struct_pointers);
 						return Err(ParseError(line!(), "Undefined struct type"));
 					};
-					new_elements.push(LanguageElementStructless::StructDeclaration {
+					let decl = LanguageElementStructless::StructDeclaration {
 						name: name.clone(),
 						is_static,
 						is_const,
 						is_volatile,
-					});
+					};
+					if is_static {
+						upper.push(decl);
+					} else {
+						new_elements.push(decl);
+					}
 					for (val, field) in value.into_iter().zip(fields.iter()) {
-						new_elements.push(
-							LanguageElementStructless::VariableDeclarationAssignment {
-								name: helper::merge_name_and_field(&name, field.name),
-								value: StatementElementStructless::from(
-									&val,
-									struct_types,
-									structs_and_struct_pointers,
-									functions,
-								)?,
-								typ: (&field.typ).into(), //Such a hack
-								is_static,
-								is_const,
-								is_volatile,
-							},
-						);
+						let next = LanguageElementStructless::VariableDeclarationAssignment {
+							name: helper::merge_name_and_field(&name, field.name),
+							value: StatementElementStructless::from(
+								&val,
+								struct_types,
+								structs_and_struct_pointers,
+								functions,
+							)?,
+							typ: (&field.typ).into(), //Such a hack
+							is_static,
+							is_const,
+							is_volatile,
+						};
+						if is_static {
+							upper.push(next);
+						} else {
+							new_elements.push(next);
+						}
 					}
 					structs.insert(name, Cow::Borrowed(struct_type));
 				}
@@ -398,6 +444,7 @@ impl<'a> LanguageElementStructless<'a> {
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
+							upper,
 						)?,
 					})
 				}
@@ -419,6 +466,7 @@ impl<'a> LanguageElementStructless<'a> {
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
+							upper,
 						)?,
 						scope_name: Cow::Borrowed("if_then"),
 					}),
@@ -430,6 +478,7 @@ impl<'a> LanguageElementStructless<'a> {
 								struct_types,
 								structs_and_struct_pointers,
 								functions,
+								upper,
 							)?,
 							scope_name: Cow::Borrowed("if_else"),
 						}))
@@ -450,6 +499,7 @@ impl<'a> LanguageElementStructless<'a> {
 							struct_types,
 							structs_and_struct_pointers,
 							functions,
+							upper,
 						)?;
 					let condition = StatementElementStructless::from(
 						&condition,
@@ -462,12 +512,14 @@ impl<'a> LanguageElementStructless<'a> {
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
+						upper,
 					)?;
 					let mut post = LanguageElementStructless::from_language_elements_internal(
 						post,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
+						upper,
 					)?;
 
 					body.append(&mut post);
@@ -499,6 +551,7 @@ impl<'a> LanguageElementStructless<'a> {
 								struct_types,
 								structs_and_struct_pointers,
 								functions,
+								upper,
 							)?,
 							scope_name: Cow::Borrowed("while_body"),
 						}),
@@ -815,5 +868,13 @@ impl<'a> StatementElementStructless<'a> {
 			| StatementElementStructless::Deref(_)
 			| StatementElementStructless::AdrOf(_) => None,
 		}
+	}
+}
+
+fn push_to<T>(condition: bool, lhs: &mut Vec<T>, rhs: &mut Vec<T>, elem: T) {
+	if condition {
+		lhs.push(elem);
+	} else {
+		rhs.push(elem);
 	}
 }
