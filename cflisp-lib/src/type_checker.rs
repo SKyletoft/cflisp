@@ -98,6 +98,12 @@ pub(crate) fn language_element<'a>(
 						parametres: args.to_vec(),
 					},
 				);
+				if args
+					.iter()
+					.any(|Variable { typ, name: _ }| typ == &Type::Void)
+				{
+					return Err(TypeError(line!(), "Function has void argument"));
+				}
 				if name == "interrupt" {
 					if typ != &Type::Void {
 						return Err(TypeError(line!(), "Interrupt handler does not return void"));
