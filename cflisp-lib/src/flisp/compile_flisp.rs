@@ -270,15 +270,19 @@ fn compile_element<'a>(
 				}
 
 				_ => {
-					let mut statement = compile_statement(ptr, state)?;
-					statement.push((Instruction::PSHA, Some("A to X part 1".into())));
-					*state.stack_size += 1;
 					let mut value = compile_statement(value, state)?;
-					statement.append(&mut value);
-					statement.push((Instruction::PULX, Some("A to X part 2".into())));
-					*state.stack_size -= 1;
-					statement.push((Instruction::STA(Addressing::Xn(0)), None));
-					statement
+					let mut load_ptr = compile_statement(ptr, state)?;
+					value.append(&mut load_ptr);
+					value.push((
+						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
+						Some(Cow::Borrowed("A to X part 1")),
+					));
+					value.push((
+						Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
+						Some(Cow::Borrowed("A to X part 2")),
+					));
+					value.push((Instruction::STA(Addressing::Xn(0)), None));
+					value
 				}
 			}
 		}
@@ -321,7 +325,7 @@ fn compile_element<'a>(
 			if args_count != args_base {
 				function_body.push((
 					Instruction::LEASP(Addressing::SP(args_count - args_base)),
-					Some("Clearing variables".into()),
+					Some(Cow::Borrowed("Clearing variables")),
 				));
 			}
 			if !matches!(function_body.last(), Some((Instruction::RTS, _))) {
@@ -385,7 +389,7 @@ fn compile_element<'a>(
 		StructlessLanguage::Return(ret) => {
 			let stack_clear = (
 				Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
-				Some("Clearing variables".into()),
+				Some(Cow::Borrowed("Clearing variables")),
 			);
 			if let Some(statement) = ret {
 				let mut statement = compile_statement(statement, state)?;
@@ -511,7 +515,7 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StructlessStatement::Cmp { .. } => {
-					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label(Cow::Borrowed("__eq__"))),
@@ -615,7 +619,7 @@ fn compile_statement_inner<'a>(
 				}
 				StructlessStatement::LessThanEqual { .. }
 				| StructlessStatement::GreaterThanEqual { .. } => {
-					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("lte rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
 						Instruction::JSR(Addressing::Label(Cow::Borrowed("__gt__"))),
@@ -804,11 +808,11 @@ fn compile_statement_inner<'a>(
 					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
 					instructions.push((
 						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to Y transfer".into()),
+						Some(Cow::Borrowed("A to Y transfer")),
 					));
 					instructions.push((
 						Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some("A to Y  continued".into()),
+						Some(Cow::Borrowed("A to Y  continued")),
 					));
 					instructions.push((Instruction::LDA(Addressing::Yn(0)), None));
 					instructions
