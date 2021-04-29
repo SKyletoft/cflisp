@@ -126,6 +126,67 @@ impl<'a> MaybeParsed<'a> {
 }
 
 impl<'a> StatementElement<'a> {
+	pub(crate) fn rename(&mut self, from: &str, to: &str) {
+		match self {
+			StatementElement::Add { lhs, rhs }
+			| StatementElement::Sub { lhs, rhs }
+			| StatementElement::Mul { lhs, rhs }
+			| StatementElement::Div { lhs, rhs }
+			| StatementElement::Mod { lhs, rhs }
+			| StatementElement::LShift { lhs, rhs }
+			| StatementElement::RShift { lhs, rhs }
+			| StatementElement::BitAnd { lhs, rhs }
+			| StatementElement::BitOr { lhs, rhs }
+			| StatementElement::BoolAnd { lhs, rhs }
+			| StatementElement::BoolOr { lhs, rhs }
+			| StatementElement::Xor { lhs, rhs }
+			| StatementElement::GreaterThan { lhs, rhs }
+			| StatementElement::LessThan { lhs, rhs }
+			| StatementElement::GreaterThanEqual { lhs, rhs }
+			| StatementElement::LessThanEqual { lhs, rhs }
+			| StatementElement::Cmp { lhs, rhs }
+			| StatementElement::NotCmp { lhs, rhs } => {
+				lhs.rename(from, to);
+				rhs.rename(from, to);
+			}
+
+			StatementElement::Ternary { cond, lhs, rhs } => {
+				cond.rename(from, to);
+				lhs.rename(from, to);
+				rhs.rename(from, to);
+			}
+			StatementElement::FunctionCall { name, parametres } => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+				parametres
+					.iter_mut()
+					.for_each(|parametre| parametre.rename(from, to));
+			}
+
+			StatementElement::BitNot(lhs)
+			| StatementElement::BoolNot(lhs)
+			| StatementElement::Deref(lhs) => {
+				lhs.rename(from, to);
+			}
+
+			StatementElement::Array(arr) => {
+				arr.iter_mut()
+					.for_each(|parametre| parametre.rename(from, to));
+			}
+
+			StatementElement::Var(name)
+			| StatementElement::AdrOf(name)
+			| StatementElement::FieldPointerAccess(name, _) => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+			}
+
+			_ => {}
+		}
+	}
+
 	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {
 		let res = match token {
 			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),

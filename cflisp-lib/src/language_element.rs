@@ -137,4 +137,109 @@ impl<'a> LanguageElement<'a> {
 		}
 		Ok(self)
 	}
+
+	//If we are renaming, it's guaranteed that the new name is an Owned variant.
+	// We therefore don't need to care about keeping the &'a str reference alive
+	// and have to allocate new Strings everywhere
+	pub(crate) fn rename(&mut self, from: &str, to: &str) {
+		match self {
+			LanguageElement::VariableDeclaration { name, .. } => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+			}
+			LanguageElement::VariableAssignment {
+				name,
+				value: statement,
+				..
+			}
+			| LanguageElement::VariableDeclarationAssignment {
+				name,
+				value: statement,
+				..
+			}
+			| LanguageElement::StructFieldPointerAssignment {
+				name,
+				value: statement,
+				..
+			} => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+				statement.rename(from, to);
+			}
+			LanguageElement::FunctionDeclaration {
+				name,
+				block: statements,
+				..
+			} => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+				rename_many(statements, from, to);
+			}
+			LanguageElement::StructAssignment {
+				name,
+				value: statements,
+				..
+			}
+			| LanguageElement::StructDeclarationAssignment {
+				name,
+				value: statements,
+				..
+			} => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+				statements
+					.iter_mut()
+					.for_each(|statement| statement.rename(from, to));
+			}
+			LanguageElement::PointerAssignment { ptr, value } => {
+				ptr.rename(from, to);
+				value.rename(from, to);
+			}
+			LanguageElement::StructDefinition { name, .. } => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
+			}
+			LanguageElement::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => {
+				condition.rename(from, to);
+				rename_many(then, from, to);
+				if let Some(else_then) = else_then {
+					rename_many(else_then, from, to);
+				}
+			}
+			LanguageElement::For {
+				init,
+				condition,
+				post,
+				body,
+			} => {
+				condition.rename(from, to);
+				rename_many(init, from, to);
+				rename_many(post, from, to);
+				rename_many(body, from, to);
+			}
+			LanguageElement::While { condition, body } => {
+				condition.rename(from, to);
+				rename_many(body, from, to);
+			}
+			LanguageElement::Return(Some(statement)) | LanguageElement::Statement(statement) => {
+				statement.rename(from, to);
+			}
+			LanguageElement::Return(None) => {}
+		}
+	}
+}
+
+fn rename_many(elements: &mut [LanguageElement], from: &str, to: &str) {
+	for element in elements {
+		element.rename(from, to);
+	}
 }
