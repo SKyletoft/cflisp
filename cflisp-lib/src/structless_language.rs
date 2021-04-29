@@ -45,7 +45,7 @@ pub enum StructlessLanguage<'a> {
 	},
 	Return(Option<StructlessStatement<'a>>),
 	Statement(StructlessStatement<'a>),
-	StructDeclaration {
+	VariableLabelTag {
 		name: Cow<'a, str>,
 		is_static: bool,
 		is_const: bool,
@@ -65,6 +65,8 @@ impl<'a> StructlessLanguage<'a> {
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
 		let mut functions = HashMap::new();
+		let mut rename_map = HashMap::new();
+		let scope = Cow::Borrowed("global");
 
 		let mut upper = Vec::new();
 
@@ -74,8 +76,8 @@ impl<'a> StructlessLanguage<'a> {
 			&mut structs_and_struct_pointers,
 			&mut functions,
 			&mut upper,
-			Cow::Borrowed("global"),
-			&mut HashMap::new(),
+			scope,
+			&mut rename_map,
 		)?;
 
 		upper.append(&mut res);
@@ -115,7 +117,7 @@ impl<'a> StructlessLanguage<'a> {
 					let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 					rename_map.insert(name.to_string(), new_name.to_string());
 					structs_and_struct_pointers.insert(new_name.clone(), n);
-					upper.push(StructlessLanguage::StructDeclaration {
+					upper.push(StructlessLanguage::VariableLabelTag {
 						name: new_name,
 						is_static: true,
 						is_const,
@@ -146,7 +148,7 @@ impl<'a> StructlessLanguage<'a> {
 						.get(n)
 						.ok_or(ParseError(line!(), "Undefined struct type"))?;
 					structs_and_struct_pointers.insert(name.clone(), n);
-					new_elements.push(StructlessLanguage::StructDeclaration {
+					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
 						is_static: false,
 						is_const,
@@ -173,7 +175,7 @@ impl<'a> StructlessLanguage<'a> {
 					let new_name = format!("{}::{}", &scope, &name);
 					rename_map.insert(name.to_string(), new_name.clone());
 					let t = t.as_ref();
-					upper.push(StructlessLanguage::StructDeclaration {
+					upper.push(StructlessLanguage::VariableLabelTag {
 						name: Cow::Owned(new_name),
 						is_static: true,
 						is_const,
@@ -453,7 +455,7 @@ impl<'a> StructlessLanguage<'a> {
 						dbg!(struct_types, structs_and_struct_pointers);
 						return Err(ParseError(line!(), "Undefined struct type"));
 					};
-					upper.push(StructlessLanguage::StructDeclaration {
+					upper.push(StructlessLanguage::VariableLabelTag {
 						name: new_name.clone(),
 						is_static: true,
 						is_const,
@@ -506,7 +508,7 @@ impl<'a> StructlessLanguage<'a> {
 						dbg!(struct_types, structs_and_struct_pointers);
 						return Err(ParseError(line!(), "Undefined struct type"));
 					};
-					new_elements.push(StructlessLanguage::StructDeclaration {
+					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
 						is_static: false,
 						is_const,

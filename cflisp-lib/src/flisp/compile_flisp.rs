@@ -77,7 +77,7 @@ fn compile_element<'a>(
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		StructlessLanguage::StructDeclaration {
+		StructlessLanguage::VariableLabelTag {
 			name, is_static, ..
 		} => {
 			if state.scope_name == "global" || *is_static {

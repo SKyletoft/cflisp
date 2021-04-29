@@ -95,4 +95,3 @@ k|kill_interrupts|Disables interrupts after main has exited
 * Implement own flisp simulator (16 bit addressing?)
 * New ABI. (Multibyte size variables, return structs from functions)
 * casts
-* Arrays maybe, some day

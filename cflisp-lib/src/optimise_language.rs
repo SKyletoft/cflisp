@@ -51,7 +51,7 @@ fn statement_optimisation(elements: &mut Vec<StructlessLanguage>) -> Result<(), 
 				optimise_statement::all_optimisations(condition)?;
 				single_statement_optimisation(body)?;
 			}
-			StructlessLanguage::Return(None) | StructlessLanguage::StructDeclaration { .. } => {}
+			StructlessLanguage::Return(None) | StructlessLanguage::VariableLabelTag { .. } => {}
 			StructlessLanguage::Block { block, .. } => {
 				all_optimisations(block)?;
 			}
