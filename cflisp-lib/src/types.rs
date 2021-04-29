@@ -70,7 +70,7 @@ pub type Statement<'a> = Vec<StatementToken<'a>>;
 ///A block is a list of valid LanguageElements
 pub type Block<'a> = Vec<LanguageElement<'a>>;
 ///A block is a list of valid LanguageElementsStructless
-pub type BlockStructless<'a> = Vec<LanguageElementStructless<'a>>;
+pub type BlockStructless<'a> = Vec<StructlessLanguage<'a>>;
 
 ///The types that are currently supported by the compiler and their pointer types.
 /// Can also hold the name of a struct

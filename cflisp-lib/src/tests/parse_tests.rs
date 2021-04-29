@@ -30,7 +30,7 @@ fn legacy_dont_crash() {
 		let flags = Flags::default();
 		let no_comments = parser::remove_comments(file);
 		let parsed = parser::parse(&no_comments, false).unwrap();
-		let no_structs = LanguageElementStructless::from_language_elements(parsed).unwrap();
+		let no_structs = StructlessLanguage::from_language_elements(parsed).unwrap();
 		let asm = flisp::compile_flisp::compile(&no_structs, &flags).unwrap();
 		let text = flisp::text::instructions_to_text(&asm, &flags).unwrap();
 		assert!(!text.is_empty());

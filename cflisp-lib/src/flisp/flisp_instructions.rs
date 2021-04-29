@@ -154,40 +154,40 @@ impl<'a> fmt::UpperHex for Instruction<'a> {
 impl<'a> Instruction<'a> {
 	///Returns the corresponding instruction for the root element of the tree. Ignores branches.
 	pub(crate) fn from_statement_element_structless(
-		elem: &StatementElementStructless<'a>,
+		elem: &StructlessStatement<'a>,
 		adr: Addressing<'a>,
 	) -> Result<Instruction<'a>, CompileError> {
 		let res = match elem {
-			StatementElementStructless::Add { .. } => Instruction::ADDA(adr),
-			StatementElementStructless::Sub { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::Mul { .. }
-			| StatementElementStructless::Div { .. }
-			| StatementElementStructless::Mod { .. } => {
+			StructlessStatement::Add { .. } => Instruction::ADDA(adr),
+			StructlessStatement::Sub { .. } => Instruction::SUBA(adr),
+			StructlessStatement::Mul { .. }
+			| StructlessStatement::Div { .. }
+			| StructlessStatement::Mod { .. } => {
 				return Err(CompileError(
 					line!(),
 					"Internal error: function call, not instruction?",
 				));
 			}
-			StatementElementStructless::LShift { .. } => Instruction::LSLA,
-			StatementElementStructless::RShift { .. } => Instruction::LSRA,
-			StatementElementStructless::And { .. } => Instruction::ANDA(adr),
-			StatementElementStructless::Or { .. } => Instruction::ORA(adr),
-			StatementElementStructless::Xor { .. } => Instruction::EORA(adr),
-			StatementElementStructless::Not(_) => Instruction::COMA,
-			StatementElementStructless::GreaterThan { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::LessThan { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::GreaterThanEqual { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::LessThanEqual { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::Cmp { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::NotCmp { .. } => Instruction::SUBA(adr),
-			StatementElementStructless::Var(_)
-			| StatementElementStructless::Num(_)
-			| StatementElementStructless::Char(_)
-			| StatementElementStructless::Bool(_)
-			| StatementElementStructless::Array(_)
-			| StatementElementStructless::Deref(_)
-			| StatementElementStructless::AdrOf(_)
-			| StatementElementStructless::FunctionCall { .. } => {
+			StructlessStatement::LShift { .. } => Instruction::LSLA,
+			StructlessStatement::RShift { .. } => Instruction::LSRA,
+			StructlessStatement::And { .. } => Instruction::ANDA(adr),
+			StructlessStatement::Or { .. } => Instruction::ORA(adr),
+			StructlessStatement::Xor { .. } => Instruction::EORA(adr),
+			StructlessStatement::Not(_) => Instruction::COMA,
+			StructlessStatement::GreaterThan { .. } => Instruction::SUBA(adr),
+			StructlessStatement::LessThan { .. } => Instruction::SUBA(adr),
+			StructlessStatement::GreaterThanEqual { .. } => Instruction::SUBA(adr),
+			StructlessStatement::LessThanEqual { .. } => Instruction::SUBA(adr),
+			StructlessStatement::Cmp { .. } => Instruction::SUBA(adr),
+			StructlessStatement::NotCmp { .. } => Instruction::SUBA(adr),
+			StructlessStatement::Var(_)
+			| StructlessStatement::Num(_)
+			| StructlessStatement::Char(_)
+			| StructlessStatement::Bool(_)
+			| StructlessStatement::Array(_)
+			| StructlessStatement::Deref(_)
+			| StructlessStatement::AdrOf(_)
+			| StructlessStatement::FunctionCall { .. } => {
 				return Err(CompileError(
 					line!(),
 					"Internal error: special cases and literals, not instructions?",

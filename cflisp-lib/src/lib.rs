@@ -10,7 +10,8 @@ pub mod optimise_statement;
 pub mod parser;
 pub mod statement_element;
 pub mod statement_token;
-pub mod structless;
+pub mod structless_language;
+pub mod structless_statement;
 pub mod tests;
 pub mod token;
 pub mod type_checker;
@@ -22,7 +23,8 @@ use flisp::flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use language_element::LanguageElement;
 use statement_element::StatementElement;
 use statement_token::StatementToken;
-use structless::{LanguageElementStructless, StatementElementStructless};
+use structless_language::StructlessLanguage;
+use structless_statement::StructlessStatement;
 use token::{Token, Token::*};
 use types::{
 	Block, BlockStructless, Function, NativeType, NativeVariable, Statement, Type, Variable,

@@ -25,7 +25,7 @@ struct State<'a, 'b, 'c, 'd, 'e> {
 }
 
 pub fn compile<'a>(
-	program: &'a [LanguageElementStructless],
+	program: &'a [StructlessLanguage],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	compile_elements(
@@ -44,7 +44,7 @@ pub fn compile<'a>(
 }
 
 fn compile_elements<'a>(
-	block: &'a [LanguageElementStructless],
+	block: &'a [StructlessLanguage],
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
@@ -71,13 +71,13 @@ fn compile_elements<'a>(
 //Any error returned from here is an internal error or a naming issue that should've already been caught
 // by the (potentially disabled) type checker
 fn compile_element<'a>(
-	element: &'a LanguageElementStructless,
+	element: &'a StructlessLanguage,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let res = match element {
-		LanguageElementStructless::StructDeclaration {
+		StructlessLanguage::StructDeclaration {
 			name, is_static, ..
 		} => {
 			if state.scope_name == "global" || *is_static {
@@ -105,7 +105,7 @@ fn compile_element<'a>(
 			}
 			vec![(Instruction::Label(name.clone()), None)]
 		}
-		LanguageElementStructless::VariableDeclaration {
+		StructlessLanguage::VariableDeclaration {
 			typ,
 			name,
 			is_static,
@@ -145,7 +145,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElementStructless::VariableAssignment { name, value } => {
+		StructlessLanguage::VariableAssignment { name, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
@@ -160,17 +160,17 @@ fn compile_element<'a>(
 			statement
 		}
 
-		LanguageElementStructless::VariableDeclarationAssignment {
+		StructlessLanguage::VariableDeclarationAssignment {
 			typ,
 			name,
 			value,
 			is_static,
 			..
 		} => {
-			let global_def = |val: &StatementElementStructless| match val {
-				StatementElementStructless::Num(n) => Ok(*n),
-				StatementElementStructless::Char(c) => Ok(*c as isize),
-				StatementElementStructless::Bool(b) => Ok(*b as isize),
+			let global_def = |val: &StructlessStatement| match val {
+				StructlessStatement::Num(n) => Ok(*n),
+				StructlessStatement::Char(c) => Ok(*c as isize),
+				StructlessStatement::Bool(b) => Ok(*b as isize),
 				_ => {
 					dbg!(val);
 					Err(CompileError(
@@ -187,7 +187,7 @@ fn compile_element<'a>(
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
 				}
-				if let StatementElementStructless::Array(elements) = value {
+				if let StructlessStatement::Array(elements) = value {
 					state
 						.global_variables
 						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
@@ -216,7 +216,7 @@ fn compile_element<'a>(
 						"Name already exists in scope! (No shadowing)",
 					));
 				}
-				if let StatementElementStructless::Array(elements) = value {
+				if let StructlessStatement::Array(elements) = value {
 					let mut statement = Vec::new();
 					//Rev because the stack grows down and we don't want to invert indexing
 					for element in elements.iter().rev() {
@@ -248,25 +248,19 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElementStructless::PointerAssignment { ptr, value } => {
+		StructlessLanguage::PointerAssignment { ptr, value } => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
 
 			match (ptr, ptr.internal_ref()) {
 				(
-					StatementElementStructless::Add { .. },
-					Some((
-						StatementElementStructless::Num(idx),
-						StatementElementStructless::Var(name),
-					)),
+					StructlessStatement::Add { .. },
+					Some((StructlessStatement::Num(idx), StructlessStatement::Var(name))),
 				)
 				| (
-					StatementElementStructless::Add { .. },
-					Some((
-						StatementElementStructless::Var(name),
-						StatementElementStructless::Num(idx),
-					)),
+					StructlessStatement::Add { .. },
+					Some((StructlessStatement::Var(name), StructlessStatement::Num(idx))),
 				) => {
 					let mut statement = compile_statement(value, state)?;
 					statement.append(&mut vec![
@@ -298,7 +292,7 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElementStructless::FunctionDeclaration {
+		StructlessLanguage::FunctionDeclaration {
 			name, args, block, ..
 		} => {
 			if state.functions.contains_key(name) {
@@ -348,7 +342,7 @@ fn compile_element<'a>(
 			function_body
 		}
 
-		LanguageElementStructless::IfStatement {
+		StructlessLanguage::IfStatement {
 			condition,
 			then,
 			else_then,
@@ -378,7 +372,7 @@ fn compile_element<'a>(
 			cond
 		}
 
-		LanguageElementStructless::Loop { condition, body } => {
+		StructlessLanguage::Loop { condition, body } => {
 			let cond_str = format!("cond_{}", state.scope_name);
 			let end_str = format!("end_{}", state.scope_name);
 			let mut instructions = vec![(Instruction::Label(Cow::Owned(cond_str.clone())), None)];
@@ -397,7 +391,7 @@ fn compile_element<'a>(
 			instructions
 		}
 
-		LanguageElementStructless::Return(ret) => {
+		StructlessLanguage::Return(ret) => {
 			let stack_clear = (
 				Instruction::LEASP(Addressing::SP(*state.stack_size - stack_base)),
 				Some("Clearing variables".into()),
@@ -412,14 +406,14 @@ fn compile_element<'a>(
 			}
 		}
 
-		LanguageElementStructless::Statement(statement) => {
+		StructlessLanguage::Statement(statement) => {
 			if state.scope_name == "global" {
 				return Err(CompileError(line!(), "Lone statement in global scope"));
 			}
 			compile_statement(statement, state)?
 		}
 
-		LanguageElementStructless::Block { block, scope_name } => {
+		StructlessLanguage::Block { block, scope_name } => {
 			let mut inner_variables = state.variables.clone();
 			let mut inner_stack = *state.stack_size;
 			let scope_name = format!("{}_{}_{}", scope_name, state.scope_name, state.line_id);
@@ -443,7 +437,7 @@ fn compile_element<'a>(
 }
 
 fn compile_statement<'a>(
-	statement: &'a StatementElementStructless,
+	statement: &'a StructlessStatement,
 	state: &mut State<'a, '_, '_, '_, '_>,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
@@ -477,19 +471,19 @@ fn compile_statement<'a>(
 }
 
 fn compile_statement_inner<'a>(
-	statement: &'a StatementElementStructless,
+	statement: &'a StructlessStatement,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		//Commutative operations
-		StatementElementStructless::Add { lhs, rhs }
-		| StatementElementStructless::Mul { lhs, rhs }
-		| StatementElementStructless::And { lhs, rhs }
-		| StatementElementStructless::Or { lhs, rhs }
-		| StatementElementStructless::Xor { lhs, rhs }
-		| StatementElementStructless::NotCmp { lhs, rhs }
-		| StatementElementStructless::Cmp { lhs, rhs } => {
+		StructlessStatement::Add { lhs, rhs }
+		| StructlessStatement::Mul { lhs, rhs }
+		| StructlessStatement::And { lhs, rhs }
+		| StructlessStatement::Or { lhs, rhs }
+		| StructlessStatement::Xor { lhs, rhs }
+		| StructlessStatement::NotCmp { lhs, rhs }
+		| StructlessStatement::Cmp { lhs, rhs } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right) = if left_depth > right_depth {
@@ -516,7 +510,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElementStructless::Mul { .. } => {
+				StructlessStatement::Mul { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -525,7 +519,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::Cmp { .. } => {
+				StructlessStatement::Cmp { .. } => {
 					instructions.push((Instruction::PSHA, Some("cmp rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -534,7 +528,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::NotCmp { .. } => {
+				StructlessStatement::NotCmp { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -572,15 +566,15 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StatementElementStructless::Sub { lhs, rhs }
-		| StatementElementStructless::Div { lhs: rhs, rhs: lhs }
-		| StatementElementStructless::Mod { lhs: rhs, rhs: lhs }
-		| StatementElementStructless::LShift { lhs, rhs }
-		| StatementElementStructless::RShift { lhs, rhs }
-		| StatementElementStructless::GreaterThan { lhs: rhs, rhs: lhs }
-		| StatementElementStructless::LessThanEqual { lhs: rhs, rhs: lhs }
-		| StatementElementStructless::LessThan { lhs, rhs }
-		| StatementElementStructless::GreaterThanEqual { lhs, rhs } => {
+		StructlessStatement::Sub { lhs, rhs }
+		| StructlessStatement::Div { lhs: rhs, rhs: lhs }
+		| StructlessStatement::Mod { lhs: rhs, rhs: lhs }
+		| StructlessStatement::LShift { lhs, rhs }
+		| StructlessStatement::RShift { lhs, rhs }
+		| StructlessStatement::GreaterThan { lhs: rhs, rhs: lhs }
+		| StructlessStatement::LessThanEqual { lhs: rhs, rhs: lhs }
+		| StructlessStatement::LessThan { lhs, rhs }
+		| StructlessStatement::GreaterThanEqual { lhs, rhs } => {
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
@@ -601,7 +595,7 @@ fn compile_statement_inner<'a>(
 				res
 			};
 			match statement {
-				StatementElementStructless::Div { .. } => {
+				StructlessStatement::Div { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("div rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -610,7 +604,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::Mod { .. } => {
+				StructlessStatement::Mod { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mod rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -619,8 +613,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::GreaterThan { .. }
-				| StatementElementStructless::LessThan { .. } => {
+				StructlessStatement::GreaterThan { .. } | StructlessStatement::LessThan { .. } => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("gt rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -629,8 +622,8 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StatementElementStructless::LessThanEqual { .. }
-				| StatementElementStructless::GreaterThanEqual { .. } => {
+				StructlessStatement::LessThanEqual { .. }
+				| StructlessStatement::GreaterThanEqual { .. } => {
 					instructions.push((Instruction::PSHA, Some("lte rhs".into())));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -640,15 +633,13 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
-				StatementElementStructless::RShift { .. }
-				| StatementElementStructless::LShift { .. } => {
+				StructlessStatement::RShift { .. } | StructlessStatement::LShift { .. } => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
-					if let StatementElementStructless::Num(n) = rhs.as_ref() {
+					if let StructlessStatement::Num(n) = rhs.as_ref() {
 						if *n < 0 {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
 						}
-						let inst = if matches!(statement, StatementElementStructless::RShift { .. })
-						{
+						let inst = if matches!(statement, StructlessStatement::RShift { .. }) {
 							Instruction::LSRA
 						} else {
 							Instruction::LSLA
@@ -661,8 +652,7 @@ fn compile_statement_inner<'a>(
 							format!("bit_shift_start_{}_{}", state.scope_name, state.line_id);
 						let end_str =
 							format!("bit_shift_end_{}_{}", state.scope_name, state.line_id);
-						let inst = if matches!(statement, StatementElementStructless::RShift { .. })
-						{
+						let inst = if matches!(statement, StructlessStatement::RShift { .. }) {
 							Instruction::LSR(Addressing::SP(*tmps_used))
 						} else {
 							Instruction::LSL(Addressing::SP(*tmps_used))
@@ -713,7 +703,7 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
-		StatementElementStructless::FunctionCall { name, parametres } => {
+		StructlessStatement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
 			let arg_names = state.functions.get(name).ok_or_else(|| {
 				dbg!(name);
@@ -743,7 +733,7 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
-		StatementElementStructless::Var(name) => {
+		StructlessStatement::Var(name) => {
 			let adr = adr_for_name(
 				name,
 				state.variables,
@@ -753,39 +743,33 @@ fn compile_statement_inner<'a>(
 			vec![(Instruction::LDA(adr), Some(Cow::Borrowed(name.as_ref())))]
 		}
 
-		StatementElementStructless::Num(n) => {
+		StructlessStatement::Num(n) => {
 			vec![(Instruction::LDA(Addressing::Data(*n)), None)]
 		}
 
-		StatementElementStructless::Char(c) => {
+		StructlessStatement::Char(c) => {
 			vec![(Instruction::LDA(Addressing::Data(*c as isize)), None)]
 		}
 
-		StatementElementStructless::Bool(b) => {
+		StructlessStatement::Bool(b) => {
 			let val = if *b { 0xFF } else { 0 };
 			vec![(Instruction::LDA(Addressing::Data(val)), None)]
 		}
 
-		StatementElementStructless::Array(_) => {
+		StructlessStatement::Array(_) => {
 			return Err(CompileError(line!(), "Illegal array literal"))
 		}
 
-		StatementElementStructless::Deref(adr) => {
+		StructlessStatement::Deref(adr) => {
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
-					&StatementElementStructless::Add { .. },
-					Some((
-						StatementElementStructless::Var(name),
-						&StatementElementStructless::Num(offset),
-					)),
+					&StructlessStatement::Add { .. },
+					Some((StructlessStatement::Var(name), &StructlessStatement::Num(offset))),
 				)
 				| (
-					&StatementElementStructless::Add { .. },
-					Some((
-						&StatementElementStructless::Num(offset),
-						StatementElementStructless::Var(name),
-					)),
+					&StructlessStatement::Add { .. },
+					Some((&StructlessStatement::Num(offset), StructlessStatement::Var(name))),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -799,14 +783,8 @@ fn compile_statement_inner<'a>(
 					]
 				}
 				//General opt
-				(
-					&StatementElementStructless::Add { .. },
-					Some((StatementElementStructless::Var(name), rhs)),
-				)
-				| (
-					&StatementElementStructless::Add { .. },
-					Some((rhs, StatementElementStructless::Var(name))),
-				) => {
+				(&StructlessStatement::Add { .. }, Some((StructlessStatement::Var(name), rhs)))
+				| (&StructlessStatement::Add { .. }, Some((rhs, StructlessStatement::Var(name)))) => {
 					let adr = adr_for_name(
 						name.as_ref(),
 						state.variables,
@@ -821,14 +799,8 @@ fn compile_statement_inner<'a>(
 					statement
 				}
 				//General opt
-				(
-					&StatementElementStructless::Add { .. },
-					Some((StatementElementStructless::Num(idx), rhs)),
-				)
-				| (
-					&StatementElementStructless::Add { .. },
-					Some((rhs, StatementElementStructless::Num(idx))),
-				) => {
+				(&StructlessStatement::Add { .. }, Some((StructlessStatement::Num(idx), rhs)))
+				| (&StructlessStatement::Add { .. }, Some((rhs, StructlessStatement::Num(idx)))) => {
 					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
 						(Instruction::LDY(Addressing::Data(*idx)), None),
@@ -853,7 +825,7 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElementStructless::AdrOf(name) => {
+		StructlessStatement::AdrOf(name) => {
 			//use adr_for_name and calculate the address -> A
 			let adr = adr_for_name(
 				name,
@@ -882,7 +854,7 @@ fn compile_statement_inner<'a>(
 			}
 		}
 
-		StatementElementStructless::Not(lhs) => {
+		StructlessStatement::Not(lhs) => {
 			let mut instructions = compile_statement_inner(lhs, state, tmps_used)?;
 			instructions.push((Instruction::COMA, None));
 			instructions

@@ -8,7 +8,7 @@ use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
 	optimise_language, parser,
-	structless::LanguageElementStructless,
+	structless_language::StructlessLanguage,
 	type_checker,
 };
 
@@ -61,7 +61,7 @@ fn main() {
 		type_checker::type_check(&parsed)
 			.unwrap_or_else(|e| exit_error(&format!("Type check error ({})", e)));
 	}
-	let mut struct_filtered = LanguageElementStructless::from_language_elements(parsed)
+	let mut struct_filtered = StructlessLanguage::from_language_elements(parsed)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 	if flags.optimise >= 2 {
 		optimise_language::all_optimisations(&mut struct_filtered)

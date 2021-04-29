@@ -4,7 +4,7 @@ use std::{
 	slice,
 };
 
-pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
+pub fn all_optimisations(elements: &mut Vec<StructlessLanguage>) -> Result<(), ParseError> {
 	const_prop(elements);
 	statement_optimisation(elements)?;
 	dead_code_elimination(elements);
@@ -12,33 +12,31 @@ pub fn all_optimisations(elements: &mut Vec<LanguageElementStructless>) -> Resul
 	Ok(())
 }
 
-fn single_statement_optimisation(
-	element: &mut LanguageElementStructless,
-) -> Result<(), ParseError> {
-	if let LanguageElementStructless::Block { block, .. } = element {
+fn single_statement_optimisation(element: &mut StructlessLanguage) -> Result<(), ParseError> {
+	if let StructlessLanguage::Block { block, .. } = element {
 		all_optimisations(block)?;
 	}
 	Ok(())
 }
 
-fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Result<(), ParseError> {
+fn statement_optimisation(elements: &mut Vec<StructlessLanguage>) -> Result<(), ParseError> {
 	for element in elements {
 		match element {
-			LanguageElementStructless::VariableDeclaration { .. } => {}
-			LanguageElementStructless::Return(Some(value))
-			| LanguageElementStructless::Statement(value)
-			| LanguageElementStructless::VariableAssignment { value, .. }
-			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
+			StructlessLanguage::VariableDeclaration { .. } => {}
+			StructlessLanguage::Return(Some(value))
+			| StructlessLanguage::Statement(value)
+			| StructlessLanguage::VariableAssignment { value, .. }
+			| StructlessLanguage::VariableDeclarationAssignment { value, .. } => {
 				optimise_statement::all_optimisations(value)?;
 			}
-			LanguageElementStructless::PointerAssignment { ptr, value } => {
+			StructlessLanguage::PointerAssignment { ptr, value } => {
 				optimise_statement::all_optimisations(ptr)?;
 				optimise_statement::all_optimisations(value)?;
 			}
-			LanguageElementStructless::FunctionDeclaration { block, .. } => {
+			StructlessLanguage::FunctionDeclaration { block, .. } => {
 				all_optimisations(block)?;
 			}
-			LanguageElementStructless::IfStatement {
+			StructlessLanguage::IfStatement {
 				condition,
 				then,
 				else_then,
@@ -49,13 +47,12 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 					single_statement_optimisation(else_then)?;
 				}
 			}
-			LanguageElementStructless::Loop { condition, body } => {
+			StructlessLanguage::Loop { condition, body } => {
 				optimise_statement::all_optimisations(condition)?;
 				single_statement_optimisation(body)?;
 			}
-			LanguageElementStructless::Return(None)
-			| LanguageElementStructless::StructDeclaration { .. } => {}
-			LanguageElementStructless::Block { block, .. } => {
+			StructlessLanguage::Return(None) | StructlessLanguage::StructDeclaration { .. } => {}
+			StructlessLanguage::Block { block, .. } => {
 				all_optimisations(block)?;
 			}
 		}
@@ -63,17 +60,17 @@ fn statement_optimisation(elements: &mut Vec<LanguageElementStructless>) -> Resu
 	Ok(())
 }
 
-pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless>) {
+pub(crate) fn dead_code_elimination(elements: &mut Vec<StructlessLanguage>) {
 	let mut idx = 0;
 	while idx < elements.len() {
 		match &elements[idx] {
-			LanguageElementStructless::IfStatement {
+			StructlessLanguage::IfStatement {
 				condition,
 				then,
 				else_then,
 			} => match condition {
-				StatementElementStructless::Bool(true) => elements[idx] = *then.clone(),
-				StatementElementStructless::Bool(false) => {
+				StructlessStatement::Bool(true) => elements[idx] = *then.clone(),
+				StructlessStatement::Bool(false) => {
 					if let Some(else_then) = else_then {
 						elements[idx] = *else_then.clone();
 					} else {
@@ -83,18 +80,18 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 				}
 				_ => {}
 			},
-			LanguageElementStructless::Loop { condition, body: _ } => {
-				if condition == &StatementElementStructless::Bool(false) {
+			StructlessLanguage::Loop { condition, body: _ } => {
+				if condition == &StructlessStatement::Bool(false) {
 					elements.remove(idx);
 					continue;
 				}
 			}
-			LanguageElementStructless::Return(_) => {
+			StructlessLanguage::Return(_) => {
 				while elements.len() != idx + 1 {
 					elements.pop();
 				}
 			}
-			LanguageElementStructless::Statement(_) => {
+			StructlessLanguage::Statement(_) => {
 				elements.remove(idx);
 				continue;
 			}
@@ -105,17 +102,17 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<LanguageElementStructless
 	}
 }
 
-pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructless>) {
+pub(crate) fn remove_unused_variables(elements: &mut Vec<StructlessLanguage>) {
 	let mut used_variables = HashSet::new();
 	find_variables_le(&mut used_variables, elements);
 	elements.retain(|elem| match elem {
-		LanguageElementStructless::VariableAssignment { name, .. }
-		| LanguageElementStructless::VariableDeclarationAssignment {
+		StructlessLanguage::VariableAssignment { name, .. }
+		| StructlessLanguage::VariableDeclarationAssignment {
 			name,
 			is_static: false,
 			..
 		}
-		| LanguageElementStructless::VariableDeclaration {
+		| StructlessLanguage::VariableDeclaration {
 			name,
 			is_static: false,
 			..
@@ -127,33 +124,30 @@ pub(crate) fn remove_unused_variables(elements: &mut Vec<LanguageElementStructle
 	});
 }
 
-fn find_variables_le<'a>(
-	vars: &mut HashSet<String>,
-	elements: &'a [LanguageElementStructless<'a>],
-) {
+fn find_variables_le<'a>(vars: &mut HashSet<String>, elements: &'a [StructlessLanguage<'a>]) {
 	for element in elements {
 		match element {
-			LanguageElementStructless::VariableDeclaration {
+			StructlessLanguage::VariableDeclaration {
 				name,
 				is_volatile: true,
 				..
 			}
-			| LanguageElementStructless::VariableDeclarationAssignment {
+			| StructlessLanguage::VariableDeclarationAssignment {
 				name,
 				is_volatile: true,
 				..
 			} => {
 				vars.insert(name.to_string());
 			}
-			LanguageElementStructless::VariableAssignment { value, .. }
-			| LanguageElementStructless::VariableDeclarationAssignment { value, .. } => {
+			StructlessLanguage::VariableAssignment { value, .. }
+			| StructlessLanguage::VariableDeclarationAssignment { value, .. } => {
 				find_variables_se(vars, value);
 			}
-			LanguageElementStructless::PointerAssignment { ptr, value } => {
+			StructlessLanguage::PointerAssignment { ptr, value } => {
 				find_variables_se(vars, ptr);
 				find_variables_se(vars, value);
 			}
-			LanguageElementStructless::IfStatement {
+			StructlessLanguage::IfStatement {
 				condition,
 				then,
 				else_then: Some(else_then),
@@ -162,20 +156,20 @@ fn find_variables_le<'a>(
 				find_variables_le(vars, slice::from_ref(then));
 				find_variables_le(vars, slice::from_ref(else_then));
 			}
-			LanguageElementStructless::IfStatement {
+			StructlessLanguage::IfStatement {
 				condition,
 				then: body,
 				..
 			}
-			| LanguageElementStructless::Loop { condition, body } => {
+			| StructlessLanguage::Loop { condition, body } => {
 				find_variables_se(vars, condition);
 				find_variables_le(vars, slice::from_ref(body));
 			}
-			LanguageElementStructless::Return(Some(statement))
-			| LanguageElementStructless::Statement(statement) => {
+			StructlessLanguage::Return(Some(statement))
+			| StructlessLanguage::Statement(statement) => {
 				find_variables_se(vars, statement);
 			}
-			LanguageElementStructless::Block { block, .. } => {
+			StructlessLanguage::Block { block, .. } => {
 				find_variables_le(vars, block);
 			}
 
@@ -184,57 +178,57 @@ fn find_variables_le<'a>(
 	}
 }
 
-fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StatementElementStructless<'a>) {
+fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StructlessStatement<'a>) {
 	match element {
-		StatementElementStructless::Add { lhs, rhs }
-		| StatementElementStructless::Sub { lhs, rhs }
-		| StatementElementStructless::Mul { lhs, rhs }
-		| StatementElementStructless::Div { lhs, rhs }
-		| StatementElementStructless::Mod { lhs, rhs }
-		| StatementElementStructless::LShift { lhs, rhs }
-		| StatementElementStructless::RShift { lhs, rhs }
-		| StatementElementStructless::And { lhs, rhs }
-		| StatementElementStructless::Or { lhs, rhs }
-		| StatementElementStructless::Xor { lhs, rhs }
-		| StatementElementStructless::GreaterThan { lhs, rhs }
-		| StatementElementStructless::LessThan { lhs, rhs }
-		| StatementElementStructless::GreaterThanEqual { lhs, rhs }
-		| StatementElementStructless::LessThanEqual { lhs, rhs }
-		| StatementElementStructless::Cmp { lhs, rhs }
-		| StatementElementStructless::NotCmp { lhs, rhs } => {
+		StructlessStatement::Add { lhs, rhs }
+		| StructlessStatement::Sub { lhs, rhs }
+		| StructlessStatement::Mul { lhs, rhs }
+		| StructlessStatement::Div { lhs, rhs }
+		| StructlessStatement::Mod { lhs, rhs }
+		| StructlessStatement::LShift { lhs, rhs }
+		| StructlessStatement::RShift { lhs, rhs }
+		| StructlessStatement::And { lhs, rhs }
+		| StructlessStatement::Or { lhs, rhs }
+		| StructlessStatement::Xor { lhs, rhs }
+		| StructlessStatement::GreaterThan { lhs, rhs }
+		| StructlessStatement::LessThan { lhs, rhs }
+		| StructlessStatement::GreaterThanEqual { lhs, rhs }
+		| StructlessStatement::LessThanEqual { lhs, rhs }
+		| StructlessStatement::Cmp { lhs, rhs }
+		| StructlessStatement::NotCmp { lhs, rhs } => {
 			find_variables_se(vars, lhs);
 			find_variables_se(vars, rhs);
 		}
-		StatementElementStructless::Deref(lhs) | StatementElementStructless::Not(lhs) => {
+		StructlessStatement::Deref(lhs) | StructlessStatement::Not(lhs) => {
 			find_variables_se(vars, lhs);
 		}
-		StatementElementStructless::FunctionCall { .. }
-		| StatementElementStructless::Num(_)
-		| StatementElementStructless::Char(_)
-		| StatementElementStructless::Bool(_) => {}
-		StatementElementStructless::Array(statements) => {
+		StructlessStatement::FunctionCall { .. }
+		| StructlessStatement::Num(_)
+		| StructlessStatement::Char(_)
+		| StructlessStatement::Bool(_) => {}
+		StructlessStatement::Array(statements) => {
 			for statement in statements {
 				find_variables_se(vars, statement)
 			}
 		}
-		StatementElementStructless::AdrOf(n) | StatementElementStructless::Var(n) => {
+		StructlessStatement::AdrOf(n) | StructlessStatement::Var(n) => {
 			vars.insert(n.to_string());
 		}
 	}
 }
 
-pub(crate) fn const_prop(elements: &mut [LanguageElementStructless]) {
+pub(crate) fn const_prop(elements: &mut [StructlessLanguage]) {
 	let mut constants = HashMap::new();
 	const_prop_inner(elements, &mut constants);
 }
 
 fn const_prop_inner<'a>(
-	elements: &mut [LanguageElementStructless<'a>],
-	constants: &mut HashMap<String, StatementElementStructless<'a>>,
+	elements: &mut [StructlessLanguage<'a>],
+	constants: &mut HashMap<String, StructlessStatement<'a>>,
 ) {
 	for elem in elements.iter_mut() {
 		match elem {
-			LanguageElementStructless::VariableDeclarationAssignment {
+			StructlessLanguage::VariableDeclarationAssignment {
 				name,
 				value,
 				is_const: true,
@@ -244,7 +238,7 @@ fn const_prop_inner<'a>(
 				optimise_statement::const_prop(value, constants);
 				constants.insert(name.to_string(), value.clone());
 			}
-			LanguageElementStructless::IfStatement {
+			StructlessLanguage::IfStatement {
 				condition,
 				then,
 				else_then,
@@ -257,16 +251,16 @@ fn const_prop_inner<'a>(
 					const_prop_inner(slice::from_mut(else_then), &mut inner_scope);
 				}
 			}
-			LanguageElementStructless::Return(Some(statement))
-			| LanguageElementStructless::Statement(statement) => {
+			StructlessLanguage::Return(Some(statement))
+			| StructlessLanguage::Statement(statement) => {
 				optimise_statement::const_prop(statement, constants);
 			}
-			LanguageElementStructless::Loop { condition, body } => {
+			StructlessLanguage::Loop { condition, body } => {
 				optimise_statement::const_prop(condition, constants);
 				let mut inner_scope = constants.clone();
 				const_prop_inner(slice::from_mut(body), &mut inner_scope);
 			}
-			LanguageElementStructless::Block { block, .. } => {
+			StructlessLanguage::Block { block, .. } => {
 				let mut inner_scope = constants.clone();
 				const_prop_inner(block, &mut inner_scope);
 			}

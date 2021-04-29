@@ -4,7 +4,7 @@ use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
 	optimise_language, parser,
-	structless::LanguageElementStructless,
+	structless_language::StructlessLanguage,
 	type_checker,
 };
 
@@ -69,8 +69,8 @@ fn compile_to_text(
 	if type_check {
 		type_checker::type_check(&tree).map_err(|err| format!("{:?}", err))?;
 	}
-	let mut structless = LanguageElementStructless::from_language_elements(tree)
-		.map_err(|err| format!("{:?}", err))?;
+	let mut structless =
+		StructlessLanguage::from_language_elements(tree).map_err(|err| format!("{:?}", err))?;
 	if optimise >= 2 {
 		optimise_language::all_optimisations(&mut structless)
 			.map_err(|err| format!("{:?}", err))?;
