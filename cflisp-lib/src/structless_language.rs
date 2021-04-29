@@ -170,8 +170,16 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
+					let new_name = format!("{}::{}", &scope, &name);
+					rename_map.insert(name.to_string(), new_name.clone());
 					let t = t.as_ref();
-					for idx in (0..len).rev() {
+					upper.push(StructlessLanguage::StructDeclaration {
+						name: Cow::Owned(new_name),
+						is_static: true,
+						is_const,
+						is_volatile,
+					});
+					for idx in 0..len {
 						let new_name = format!("{}::{}[{}]", &scope, &name, idx);
 						rename_map.insert(format!("{}[{}]", &name, idx), new_name.clone());
 						upper.push(StructlessLanguage::VariableDeclaration {
@@ -182,17 +190,6 @@ impl<'a> StructlessLanguage<'a> {
 							is_volatile,
 						});
 					}
-					let target_name = Cow::Owned(format!("{}::{}[0]", scope, &name));
-					let new_name = format!("{}::{}", &scope, &name);
-					rename_map.insert(name.to_string(), new_name.clone());
-					upper.push(StructlessLanguage::VariableDeclarationAssignment {
-						typ: NativeType::ptr(t.into()),
-						name: Cow::Owned(new_name),
-						value: StructlessStatement::AdrOf(target_name),
-						is_static: true,
-						is_const,
-						is_volatile,
-					});
 				}
 
 				LanguageElement::VariableDeclaration {
