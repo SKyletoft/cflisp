@@ -288,39 +288,35 @@ impl<'a> StructlessLanguage<'a> {
 				}
 
 				LanguageElement::VariableDeclarationAssignment {
-					typ: Type::Arr(t, _),
+					typ: Type::Arr(t, len),
 					name,
 					value,
 					is_static: true,
 					is_const,
 					is_volatile,
 				} => {
-					let value = StructlessStatement::from(
+					let new_name = format!("{}::{}", scope, name);
+					rename_map.insert(name.to_string(), new_name.clone());
+					let mut value = StructlessStatement::from(
 						&value,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
 					)?;
+					if let StructlessStatement::Array(arr) = &mut value {
+						while arr.len() < len as usize {
+							arr.push(StructlessStatement::Num(0));
+						}
+						arr.truncate(len as usize);
+					}
 					if let Some(n) = t.as_ref().get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
 					}
 					let t = t.as_ref();
-					let alloc_name: Cow<'a, str> =
-						Cow::Owned(format!("__{}::{}_alloc", scope, name));
 					upper.push(StructlessLanguage::VariableDeclarationAssignment {
 						typ: t.into(),
-						name: alloc_name.clone(),
-						value,
-						is_static: true,
-						is_const,
-						is_volatile,
-					});
-					let new_name = format!("{}::{}", scope, name);
-					rename_map.insert(name.to_string(), new_name.clone());
-					upper.push(StructlessLanguage::VariableDeclarationAssignment {
-						typ: NativeType::ptr(t.into()),
 						name: Cow::Owned(new_name),
-						value: StructlessStatement::AdrOf(alloc_name),
+						value,
 						is_static: true,
 						is_const,
 						is_volatile,
@@ -328,19 +324,25 @@ impl<'a> StructlessLanguage<'a> {
 				}
 
 				LanguageElement::VariableDeclarationAssignment {
-					typ: Type::Arr(t, _),
+					typ: Type::Arr(t, len),
 					name,
 					value,
 					is_static: false,
 					is_const,
 					is_volatile,
 				} => {
-					let value = StructlessStatement::from(
+					let mut value = StructlessStatement::from(
 						&value,
 						struct_types,
 						structs_and_struct_pointers,
 						functions,
 					)?;
+					if let StructlessStatement::Array(arr) = &mut value {
+						while arr.len() < len as usize {
+							arr.push(StructlessStatement::Num(0));
+						}
+						arr.truncate(len as usize);
+					}
 					if let Some(n) = t.as_ref().get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
 					}
