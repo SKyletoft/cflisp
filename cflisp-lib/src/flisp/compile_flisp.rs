@@ -81,9 +81,6 @@ fn compile_element<'a>(
 			name, is_static, ..
 		} => {
 			if state.scope_name == "global" || *is_static {
-				if state.scope_name == "global" && !is_static {
-					return Err(CompileError(line!(), "Nonstatic global variable!"));
-				}
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
@@ -112,9 +109,6 @@ fn compile_element<'a>(
 			..
 		} => {
 			if state.scope_name == "global" || *is_static {
-				if state.scope_name == "global" && !is_static {
-					return Err(CompileError(line!(), "Nonstatic global variable!"));
-				}
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
@@ -180,9 +174,6 @@ fn compile_element<'a>(
 				}
 			};
 			if state.scope_name == "global" || *is_static {
-				if state.scope_name == "global" && !is_static {
-					return Err(CompileError(line!(), "Nonstatic global variable!"));
-				}
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
 					return Err(CompileError(line!(), "Name already exists in scope!"));
