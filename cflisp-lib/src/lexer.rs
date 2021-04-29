@@ -208,7 +208,7 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 //Literal, needs following whitespace, closure to return token
 //Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
-const PATTERNS: [(&str, bool, TokenFunction); 84] = [
+const PATTERNS: [(&str, bool, TokenFunction); 88] = [
 	("_Alignas", true, || AlignAs),
 	("_Alignof", true, || AlignOf),
 	("_Atomic", true, || Atomic),
@@ -267,6 +267,10 @@ const PATTERNS: [(&str, bool, TokenFunction); 84] = [
 	("char", true, || Decl(NativeType::Char)),
 	("uint", true, || Decl(NativeType::Uint)),
 	("void", true, || Decl(NativeType::Void)),
+	("(bool)", false, || BoolCast),
+	("(int)", false, || IntCast),
+	("(char)", false, || CharCast),
+	("(any)", false, || AnyCast),
 	("==", false, || Cmp),
 	("!=", false, || NotCmp),
 	(">=", false, || GreaterThanEqual),
