@@ -102,7 +102,6 @@ impl<'a> Token<'a> {
 			vec.push(token);
 			src = rest.trim_start();
 		}
-		//vec = Token::fix_deref(vec);
 		Ok(vec)
 	}
 
@@ -111,7 +110,6 @@ impl<'a> Token<'a> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		//Token::parse_str_to_vec(s)
 		Token::by_byte(s)
 	}
 
@@ -132,7 +130,6 @@ impl<'a> Token<'a> {
 			Ok(vec![])
 		} else {
 			s.split(',')
-				//.map(|slice| Token::parse_str_to_vec(slice).map(|t| StatementToken::from_tokens(&t)))
 				.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
 				.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
 		}
