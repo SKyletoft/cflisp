@@ -54,6 +54,17 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 1);
 			}
 		}
+		if let ((Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULX, _)) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if !matches!(addressing, Addressing::AX) {
+				instructions[idx].0 = Instruction::LDX(addressing.clone());
+				instructions.remove(idx + 2); //Order matters!
+				instructions.remove(idx + 1);
+			}
+		}
 		if let (
 			(Instruction::LDA(addressing), _),
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
@@ -69,10 +80,38 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 1);
 			}
 		}
+		if let ((Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULY, _)) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			if !matches!(addressing, Addressing::AY) {
+				instructions[idx].0 = Instruction::LDY(addressing.clone());
+				instructions.remove(idx + 2); //Order matters!
+				instructions.remove(idx + 1);
+			}
+		}
 		if let (
 			(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
 			(Instruction::LDA(a_adr), a_comment),
 			(Instruction::STA(Addressing::Xn(0)), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			let a_comment = a_comment.clone();
+			let a_adr = a_adr.clone();
+			let x_comment = x_comment.clone();
+			let x_adr = *x_adr;
+			instructions[idx] = (Instruction::LDA(a_adr), a_comment);
+			instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
+			instructions.remove(idx + 2);
+		}
+		if let (
+			(Instruction::LDY(Addressing::Data(x_adr)), x_comment),
+			(Instruction::LDA(a_adr), a_comment),
+			(Instruction::STA(Addressing::Yn(0)), _),
 		) = (
 			&instructions[idx],
 			&instructions[idx + 1],
@@ -252,6 +291,21 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 		if let (
 			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
 			(Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _),
+			(Instruction::LDA(Addressing::Xn(0)), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			instructions[idx] = (Instruction::LDX(Addressing::Data(0)), None);
+			instructions[idx + 2].0 = Instruction::LDA(Addressing::AX); //To keep the existing comment on the third instruction
+			instructions.remove(idx + 1);
+			continue;
+		}
+		//Load to A the address of A
+		if let (
+			(Instruction::PSHA, _),
+			(Instruction::PULX, _),
 			(Instruction::LDA(Addressing::Xn(0)), _),
 		) = (
 			&instructions[idx],
