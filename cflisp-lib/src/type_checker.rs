@@ -542,12 +542,16 @@ pub fn statement_element(
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs } => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?;
-			statement_element(rhs.as_ref(), variables, functions, structs)?;
+			statement_element(lhs, variables, functions, structs)?;
+			statement_element(rhs, variables, functions, structs)?;
 		}
 
 		StatementElement::BoolNot(lhs) => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?;
+			statement_element(lhs, variables, functions, structs)?;
+		}
+
+		StatementElement::Cast { value, .. } => {
+			statement_element(value, variables, functions, structs)?;
 		}
 
 		_ => {}
