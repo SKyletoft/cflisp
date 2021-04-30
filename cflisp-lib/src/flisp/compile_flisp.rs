@@ -280,17 +280,11 @@ fn compile_element<'a>(
 				_ => {
 					let mut value = compile_statement(value, state)?;
 					let mut load_ptr = compile_statement(ptr, state)?;
-					value.append(&mut load_ptr);
-					value.push((
-						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some(Cow::Borrowed("A to X part 1")),
-					));
-					value.push((
-						Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some(Cow::Borrowed("A to X part 2")),
-					));
-					value.push((Instruction::STA(Addressing::Xn(0)), None));
-					value
+					load_ptr.push((Instruction::PSHA, Some(Cow::Borrowed("A to X part 1"))));
+					load_ptr.push((Instruction::PULX, Some(Cow::Borrowed("A to X part 2"))));
+					load_ptr.append(&mut value);
+					load_ptr.push((Instruction::STA(Addressing::Xn(0)), None));
+					load_ptr
 				}
 			}
 		}
@@ -814,14 +808,9 @@ fn compile_statement_inner<'a>(
 				//General case
 				_ => {
 					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
-					instructions.push((
-						Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some(Cow::Borrowed("A to Y transfer")),
-					));
-					instructions.push((
-						Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)),
-						Some(Cow::Borrowed("A to Y  continued")),
-					));
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("A to Y transfer"))));
+					instructions
+						.push((Instruction::PULY, Some(Cow::Borrowed("A to Y  continued"))));
 					instructions.push((Instruction::LDA(Addressing::Yn(0)), None));
 					instructions
 				}
@@ -875,8 +864,12 @@ fn adr_for_name<'a>(
 ) -> Result<Addressing<'a>, CompileError> {
 	if let Some((_, adr)) = variables.get(name) {
 		Ok(Addressing::SP(stack_size - *adr - 1))
-	} else if global_variables.contains_key(name) {
-		Ok(Addressing::Label(Cow::Borrowed(name)))
+	} else if let Some(typ) = global_variables.get(name) {
+		if matches!(typ, NativeType::Ptr(_)) {
+			Ok(Addressing::DataLabel(Cow::Borrowed(name)))
+		} else {
+			Ok(Addressing::Label(Cow::Borrowed(name)))
+		}
 	} else {
 		eprintln!("Error: {}", name);
 		Err(CompileError(

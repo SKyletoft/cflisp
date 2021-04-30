@@ -886,7 +886,9 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst.get_adr() {
-			Some(Addressing::Label(lbl)) => Some(lbl.trim().to_string()),
+			Some(Addressing::Label(lbl)) | Some(Addressing::DataLabel(lbl)) => {
+				Some(lbl.trim().to_string())
+			}
 			_ => None,
 		})
 		.chain(iter::once("main".to_string()))
