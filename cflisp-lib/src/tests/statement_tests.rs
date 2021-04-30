@@ -36,6 +36,34 @@ fn fast_mul() {
 }
 
 #[test]
+fn fast_div() {
+	let mut case_1 = StructlessStatement::Div {
+		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+		rhs: Box::new(StructlessStatement::Num(8)),
+	};
+	let expected_1 = StructlessStatement::RShift {
+		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+		rhs: Box::new(StructlessStatement::Num(3)),
+	};
+	optimise_statement::fast_div(&mut case_1);
+	assert_eq!(case_1, expected_1);
+}
+
+#[test]
+fn fast_mod() {
+	let mut case_1 = StructlessStatement::Mod {
+		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+		rhs: Box::new(StructlessStatement::Num(8)),
+	};
+	let expected_1 = StructlessStatement::And {
+		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+		rhs: Box::new(StructlessStatement::Num(0b0000_0111)),
+	};
+	optimise_statement::fast_mod(&mut case_1);
+	assert_eq!(case_1, expected_1);
+}
+
+#[test]
 fn const_eval() {
 	let mut case_1 = StructlessStatement::Add {
 		lhs: Box::new(StructlessStatement::Num(5)),

@@ -12,9 +12,9 @@ bool is_prime(int n) {
 }
 
 int main() {
-	for (int CANDIDATE = 5; CANDIDATE >= 5; CANDIDATE = CANDIDATE + 2) {
-		if (is_prime(CANDIDATE)) {
-			PRIMES[PRIME_COUNT] = CANDIDATE;
+	for (int candidate = 5; candidate >= 5; candidate = candidate + 2) {
+		if (is_prime(candidate)) {
+			PRIMES[PRIME_COUNT] = candidate;
 			PRIME_COUNT         = PRIME_COUNT + 1;
 		}
 	}
