@@ -67,6 +67,9 @@ pub fn automatic_imports(instructions: &mut String, debug: bool, kill_interrupts
 	if instructions.contains("__mod__") {
 		instructions.push_str(include_str!("asm_deps/mod.sflisp"));
 	}
+	if instructions.contains("__tb__") {
+		instructions.push_str(include_str!("asm_deps/cast_to_bool.sflisp"));
+	}
 	if !instructions.contains("__init_") {
 		let interrupts = instructions.contains("interrupt");
 		let init = match (interrupts, debug, kill_interrupts) {
