@@ -76,6 +76,10 @@ pub enum StatementElement<'a> {
 		lhs: Box<StatementElement<'a>>,
 		rhs: Box<StatementElement<'a>>,
 	},
+	Cast {
+		typ: NativeType,
+		value: Box<StatementElement<'a>>,
+	},
 	Ternary {
 		cond: Box<StatementElement<'a>>,
 		lhs: Box<StatementElement<'a>>,
@@ -329,7 +333,7 @@ impl<'a> StatementElement<'a> {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
 		do_array_access(&mut working_tokens)?;
-
+		do_cast(&mut working_tokens)?;
 		for (from, to) in un_ops.iter() {
 			do_unary_operation_left(&mut working_tokens, from, *to)?;
 		}
@@ -406,7 +410,7 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 				return Err(ParseError(
 					line!(),
 					"Couldn't construct tree from statement. Element that \
-					should've been parsed first has not been parsed",
+					should've been parsed first has not been parsed. (In ternary)",
 				));
 			}
 		}
@@ -442,6 +446,43 @@ fn do_unary_operation_left<'a>(
 					line!(),
 					"Couldn't construct tree from statement. Element that \
 					should've been parsed first has not been parsed",
+				));
+			}
+		}
+		idx = idx.wrapping_sub(1);
+	}
+	Ok(())
+}
+
+/// Left as in [OP] [TARGET]
+fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
+	let mut idx = tokens.len().wrapping_sub(1);
+	while idx != usize::MAX {
+		let typ = match tokens.get(idx) {
+			Some(MaybeParsed::Unparsed(StatementToken::Cast(t))) => t.clone(),
+			_ => {
+				idx = idx.wrapping_sub(1);
+				continue;
+			}
+		};
+		let prev_is_op = tokens
+			.get(idx.wrapping_sub(1))
+			.map(
+				|token| token.map_unparsed(StatementToken::is_op).unwrap_or(false), //Parsed is false
+			)
+			.unwrap_or(true); //Non existant is true
+		if prev_is_op {
+			let next = tokens.remove(idx + 1);
+			if let Parsed(value) = next {
+				tokens[idx] = Parsed(StatementElement::Cast {
+					typ,
+					value: Box::new(value),
+				});
+			} else {
+				return Err(ParseError(
+					line!(),
+					"Couldn't construct tree from statement. Element that \
+					should've been parsed first has not been parsed. (In cast)",
 				));
 			}
 		}

@@ -8,6 +8,7 @@ pub enum StatementToken<'a> {
 	Char(char),
 	Var(&'a str),
 	FunctionCall(&'a str, Vec<Vec<StatementToken<'a>>>),
+	Cast(NativeType),
 	Add,
 	Sub,
 	Mul,
@@ -68,6 +69,9 @@ impl<'a> StatementToken<'a> {
 				Token::NotCmp => StatementToken::NotCmp,
 				Token::FieldAccess => StatementToken::FieldAccess,
 				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
+				Token::BoolCast => StatementToken::Cast(NativeType::Bool),
+				Token::IntCast => StatementToken::Cast(NativeType::Int),
+				Token::CharCast => StatementToken::Cast(NativeType::Char),
 				Token::Ternary(b) => {
 					let tokenised = Token::by_byte(b)?;
 					let as_statement = StatementToken::from_tokens(&tokenised)?;

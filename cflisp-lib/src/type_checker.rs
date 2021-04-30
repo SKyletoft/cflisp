@@ -495,6 +495,7 @@ pub(crate) fn type_of<'a>(
 				.typ
 				.clone()
 		}
+		StatementElement::Cast { typ, .. } => typ.into(),
 	};
 	Ok(res)
 }

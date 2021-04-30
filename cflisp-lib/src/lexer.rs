@@ -208,7 +208,7 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 //Literal, needs following whitespace, closure to return token
 //Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
-const PATTERNS: [(&str, bool, TokenFunction); 88] = [
+const PATTERNS: [(&str, bool, TokenFunction); 90] = [
 	("_Alignas", true, || AlignAs),
 	("_Alignof", true, || AlignOf),
 	("_Atomic", true, || Atomic),
@@ -231,7 +231,7 @@ const PATTERNS: [(&str, bool, TokenFunction); 88] = [
 	("else", false, || Else),
 	("enum", true, || Enum),
 	("extern", true, || Extern),
-	("false", true, || Bool(false)),
+	("false", false, || Bool(false)),
 	("float", true, || Float),
 	("for", false, || For),
 	("generic", true, || Generic),
@@ -240,6 +240,7 @@ const PATTERNS: [(&str, bool, TokenFunction); 88] = [
 	("imaginary", true, || Imaginary),
 	("inline", true, || Inline),
 	("long", true, || Long),
+	("namespace", false, || Namespace),
 	("noreturn", true, || NoReturn),
 	("register", true, || Register),
 	("restrict", true, || Restrict),
@@ -251,7 +252,7 @@ const PATTERNS: [(&str, bool, TokenFunction); 88] = [
 	("static", true, || Static),
 	("struct", true, || Struct),
 	("switch", false, || Switch),
-	("true", true, || Bool(true)),
+	("true", false, || Bool(true)),
 	("typedef", true, || TypeDef),
 	("union", true, || Union),
 	("unsigned", true, || Unsigned),
@@ -296,5 +297,6 @@ const PATTERNS: [(&str, bool, TokenFunction); 88] = [
 	(".", false, || FieldAccess),
 	(",", false, || Comma),
 	(";", false, || NewLine),
+	("::", false, || NamespaceSplitter),
 	(":", false, || Colon),
 ];

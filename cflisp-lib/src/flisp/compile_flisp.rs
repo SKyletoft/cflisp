@@ -28,12 +28,20 @@ pub fn compile<'a>(
 	program: &'a [StructlessLanguage],
 	flags: &Flags,
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+	let mut functions: HashMap<Cow<'a, str>, &[NativeVariable]> = HashMap::new();
+	functions.insert(
+		Cow::Borrowed("__tb__"),
+		&[NativeVariable {
+			name: Cow::Borrowed("val"),
+			typ: NativeType::Int,
+		}],
+	);
 	compile_elements(
 		program,
 		&mut State {
 			variables: &mut HashMap::new(),
 			global_variables: &mut HashMap::new(),
-			functions: &mut HashMap::new(),
+			functions: &mut functions,
 			scope_name: Cow::Borrowed("global"),
 			stack_size: &mut 0,
 			line_id: 0,

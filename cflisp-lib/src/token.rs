@@ -58,6 +58,8 @@ pub enum Token<'a> {
 	Mod,
 	Mul,
 	Name(&'a str),
+	Namespace,
+	NamespaceSplitter,
 	NewLine,
 	NoReturn,
 	NotCmp,

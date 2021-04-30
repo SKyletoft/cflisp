@@ -213,7 +213,34 @@ impl<'a> StructlessStatement<'a> {
 				}))
 			}
 
-			StatementElement::Ternary { .. } => todo!(),
+			StatementElement::Cast {
+				typ: NativeType::Bool,
+				value,
+			} => StructlessStatement::FunctionCall {
+				name: Cow::Borrowed("__tb__"),
+				parametres: vec![StructlessStatement::from(
+					value,
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+				)?],
+			},
+
+			StatementElement::Cast {
+				typ: NativeType::Char,
+				value,
+			}
+			| StatementElement::Cast {
+				typ: NativeType::Int,
+				value,
+			} => StructlessStatement::from(
+				value,
+				struct_types,
+				structs_and_struct_pointers,
+				functions,
+			)?,
+
+			StatementElement::Cast { .. } | StatementElement::Ternary { .. } => todo!(),
 		};
 		Ok(res)
 	}
