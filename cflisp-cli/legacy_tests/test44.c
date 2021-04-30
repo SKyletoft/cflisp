@@ -7,5 +7,10 @@ int main() {
 	int d = 23 % 3;
 	int e = 32 % 1;
 
+	int do_something_later;
+	int while_something_else;
+	int integral;
+	int boolean;
+
 	// printf("%x %x %x %x %x\n", a, b, c, d, e);
 }
