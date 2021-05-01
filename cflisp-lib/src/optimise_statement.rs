@@ -4,6 +4,8 @@ use std::collections::HashMap;
 pub fn all_optimisations(element: &mut StructlessStatement) -> Result<(), ParseError> {
 	const_eval(element);
 	fast_mul(element);
+	fast_div(element);
+	fast_mod(element);
 	Ok(())
 }
 
@@ -69,6 +71,53 @@ pub(crate) fn fast_mul(elem: &mut StructlessStatement) {
 					}
 				}
 				*elem = inner;
+			}
+			_ => {}
+		}
+	}
+}
+
+pub(crate) fn fast_div(elem: &mut StructlessStatement) {
+	if let StructlessStatement::Div { lhs, rhs } = elem {
+		match (lhs.as_ref(), rhs.as_ref()) {
+			(StructlessStatement::Num(a), StructlessStatement::Num(b)) => {
+				*elem = StructlessStatement::Num(*a / *b);
+			}
+			(a, StructlessStatement::Num(b)) => {
+				// = is a multiple of two
+				if b.count_ones() == 1 && *b >= 0 {
+					let mut shifts = -1;
+					let mut b_copy = *b as usize;
+					while b_copy != 0 {
+						b_copy >>= 1;
+						shifts += 1;
+					}
+					*elem = StructlessStatement::RShift {
+						lhs: Box::new(a.clone()),
+						rhs: Box::new(StructlessStatement::Num(shifts)),
+					};
+				}
+			}
+			_ => {}
+		}
+	}
+}
+
+pub(crate) fn fast_mod(elem: &mut StructlessStatement) {
+	if let StructlessStatement::Mod { lhs, rhs } = elem {
+		match (lhs.as_ref(), rhs.as_ref()) {
+			(StructlessStatement::Num(a), StructlessStatement::Num(b)) => {
+				*elem = StructlessStatement::Num(*a / *b);
+			}
+			(a, StructlessStatement::Num(b)) => {
+				// = is a multiple of two
+				if b.count_ones() == 1 && *b >= 0 {
+					let mask = *b - 1;
+					*elem = StructlessStatement::And {
+						lhs: Box::new(a.clone()),
+						rhs: Box::new(StructlessStatement::Num(mask)),
+					};
+				}
 			}
 			_ => {}
 		}

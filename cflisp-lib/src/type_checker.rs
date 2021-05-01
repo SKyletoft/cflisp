@@ -114,6 +114,9 @@ pub(crate) fn language_element<'a>(
 				}
 
 				let mut inner_variables = variables.clone();
+				args.iter().cloned().for_each(|Variable { name, typ }| {
+					inner_variables.insert(Cow::Borrowed(name), typ);
+				});
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
 				let mut inner_constants = constants.clone();
@@ -541,16 +544,63 @@ pub fn statement_element(
 		| StatementElement::BoolOr { lhs, rhs }
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
-		| StatementElement::Cmp { lhs, rhs } => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?;
-			statement_element(rhs.as_ref(), variables, functions, structs)?;
+		| StatementElement::Cmp { lhs, rhs }
+		| StatementElement::BitAnd { lhs, rhs }
+		| StatementElement::BitOr { lhs, rhs }
+		| StatementElement::Xor { lhs, rhs }
+		| StatementElement::GreaterThanEqual { lhs, rhs }
+		| StatementElement::LessThanEqual { lhs, rhs }
+		| StatementElement::NotCmp { lhs, rhs } => {
+			statement_element(lhs, variables, functions, structs)?;
+			statement_element(rhs, variables, functions, structs)?;
 		}
 
-		StatementElement::BoolNot(lhs) => {
-			statement_element(lhs.as_ref(), variables, functions, structs)?;
+		StatementElement::Deref(lhs)
+		| StatementElement::BitNot(lhs)
+		| StatementElement::BoolNot(lhs) => {
+			statement_element(lhs, variables, functions, structs)?;
 		}
 
-		_ => {}
+		StatementElement::Cast { value, .. } => {
+			statement_element(value, variables, functions, structs)?;
+		}
+
+		StatementElement::Array(arr) => {
+			arr.iter()
+				.try_for_each(|elem| statement_element(elem, variables, functions, structs))?;
+		}
+
+		StatementElement::Var(name) | StatementElement::AdrOf(name) => {
+			if !variables.contains_key(name) {
+				dbg!(elem);
+				return Err(TypeError(line!(), "Unknown variable"));
+			}
+		}
+		StatementElement::FieldPointerAccess(name, field) => {
+			if !variables.contains_key(name) {
+				dbg!(elem);
+				return Err(TypeError(line!(), "Unknown variable"));
+			}
+			if let Some(Type::Struct(struct_type)) = variables.get(name) {
+				if let Some(fields) = structs.get(struct_type) {
+					if !fields.iter().any(|Variable { name, .. }| name == field) {
+						dbg!(elem);
+						return Err(TypeError(line!(), "Unknown field name"));
+					}
+				} else {
+					dbg!(elem);
+					return Err(TypeError(line!(), "Unknown struct type"));
+				}
+			} else {
+				dbg!(elem);
+				return Err(TypeError(line!(), "Variable is not a struct"));
+			}
+		}
+
+		StatementElement::Ternary { .. }
+		| StatementElement::Num(_)
+		| StatementElement::Char(_)
+		| StatementElement::Bool(_) => {}
 	};
 	Ok(res)
 }

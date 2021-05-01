@@ -177,14 +177,22 @@ fn get_name(s: &str) -> Option<(Token, &str)> {
 
 ///Matches against a single pattern in the list of keywords and its potential followed whitespace
 fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
-	PATTERNS
-		.iter()
-		.find(|(pat, whitespace, _)| {
-			s.starts_with(pat)
-				&& (!*whitespace //Trust the shortcircuit
-					|| s.as_bytes().get(pat.len()).map(u8::is_ascii_whitespace) != Some(false))
-		})
-		.map(|(pat, _, t)| (t(), s[pat.len()..].trim()))
+	let get_keyword = || {
+		KEYWORDS
+			.iter()
+			.find(|(pat, _)| {
+				s.starts_with(pat)
+					&& !s[pat.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_')
+			})
+			.map(|(pat, token)| (token(), s[pat.len()..].trim()))
+	};
+	let get_operator = || {
+		OPERATORS
+			.iter()
+			.find(|(pat, _)| s.starts_with(pat))
+			.map(|(pat, token)| (token(), s[pat.len()..].trim()))
+	};
+	get_keyword().or_else(get_operator)
 }
 
 pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
@@ -197,7 +205,10 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_string_literal(s))
 		.or_else(|| get_char(s))
 		.or_else(|| get_name(s))
-		.ok_or(ParseError(line!(), "Couldn't parse token"))
+		.ok_or_else(|| {
+			dbg!(s);
+			ParseError(line!(), "Couldn't parse token")
+		})
 }
 
 const FORBIDDEN_CHARACTERS: &[char] = &[
@@ -208,95 +219,98 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 //Literal, needs following whitespace, closure to return token
 //Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
-const PATTERNS: [(&str, bool, TokenFunction); 90] = [
-	("_Alignas", true, || AlignAs),
-	("_Alignof", true, || AlignOf),
-	("_Atomic", true, || Atomic),
-	("_Bool", true, || Decl(NativeType::Bool)),
-	("_Complex", true, || Complex),
-	("_Generic", true, || Generic),
-	("_Imaginary", true, || Imaginary),
-	("_Noreturn", true, || NoReturn),
-	("_Static_assert", true, || StaticAssert),
-	("_Thread_local", true, || ThreadLocal),
-	("auto", true, || Auto),
-	("break", true, || Break),
-	("case", true, || Case),
-	("complex", true, || Complex),
-	("const", true, || Const),
-	("continue", true, || Continue),
-	("default", false, || Default),
-	("do", false, || Do),
-	("double", true, || Double),
-	("else", false, || Else),
-	("enum", true, || Enum),
-	("extern", true, || Extern),
-	("false", false, || Bool(false)),
-	("float", true, || Float),
-	("for", false, || For),
-	("generic", true, || Generic),
-	("goto", true, || Goto),
-	("if", false, || If),
-	("imaginary", true, || Imaginary),
-	("inline", true, || Inline),
-	("long", true, || Long),
-	("namespace", false, || Namespace),
-	("noreturn", true, || NoReturn),
-	("register", true, || Register),
-	("restrict", true, || Restrict),
-	("return", true, || Return),
-	("short", true, || Short),
-	("signed", true, || Signed),
-	("sizeof", true, || SizeOf),
-	("static_assert", true, || StaticAssert),
-	("static", true, || Static),
-	("struct", true, || Struct),
-	("switch", false, || Switch),
-	("true", false, || Bool(true)),
-	("typedef", true, || TypeDef),
-	("union", true, || Union),
-	("unsigned", true, || Unsigned),
-	("volatile", true, || Volatile),
-	("while", false, || While),
-	("int*", true, || Decl(NativeType::ptr(NativeType::Int))),
-	("bool*", true, || Decl(NativeType::ptr(NativeType::Bool))),
-	("char*", true, || Decl(NativeType::ptr(NativeType::Char))),
-	("uint*", true, || Decl(NativeType::ptr(NativeType::Uint))),
-	("void*", true, || Decl(NativeType::ptr(NativeType::Void))),
-	("int", true, || Decl(NativeType::Int)),
-	("bool", true, || Decl(NativeType::Bool)),
-	("char", true, || Decl(NativeType::Char)),
-	("uint", true, || Decl(NativeType::Uint)),
-	("void", true, || Decl(NativeType::Void)),
-	("(bool)", false, || BoolCast),
-	("(int)", false, || IntCast),
-	("(char)", false, || CharCast),
-	("(any)", false, || AnyCast),
-	("==", false, || Cmp),
-	("!=", false, || NotCmp),
-	(">=", false, || GreaterThanEqual),
-	("<=", false, || LessThanEqual),
-	("->", false, || FieldPointerAccess),
-	("<<", false, || LShift),
-	(">>", false, || RShift),
-	("&&", false, || BoolAnd),
-	("||", false, || BoolOr),
-	("=", false, || Assign),
-	("+", false, || Add),
-	("-", false, || Sub),
-	("*", false, || Mul),
-	("/", false, || Div),
-	("%", false, || Mod),
-	(">", false, || GreaterThan),
-	("<", false, || LessThan),
-	("&", false, || BitAnd),
-	("|", false, || BitOr),
-	("^", false, || Xor),
-	("!", false, || BoolNot),
-	("~", false, || BitNot),
-	(".", false, || FieldAccess),
-	(",", false, || Comma),
-	(";", false, || NewLine),
-	("::", false, || NamespaceSplitter),
-	(":", false, || Colon),
+const KEYWORDS: [(&str, TokenFunction); 59] = [
+	("_Alignas", || AlignAs),
+	("_Alignof", || AlignOf),
+	("_Atomic", || Atomic),
+	("_Bool", || Decl(NativeType::Bool)),
+	("_Complex", || Complex),
+	("_Generic", || Generic),
+	("_Imaginary", || Imaginary),
+	("_Noreturn", || NoReturn),
+	("_Static_assert", || StaticAssert),
+	("_Thread_local", || ThreadLocal),
+	("auto", || Auto),
+	("break", || Break),
+	("case", || Case),
+	("complex", || Complex),
+	("const", || Const),
+	("continue", || Continue),
+	("default", || Default),
+	("do", || Do),
+	("double", || Double),
+	("else", || Else),
+	("enum", || Enum),
+	("extern", || Extern),
+	("false", || Bool(false)),
+	("float", || Float),
+	("for", || For),
+	("generic", || Generic),
+	("goto", || Goto),
+	("if", || If),
+	("imaginary", || Imaginary),
+	("inline", || Inline),
+	("long", || Long),
+	("namespace", || Namespace),
+	("noreturn", || NoReturn),
+	("register", || Register),
+	("restrict", || Restrict),
+	("return", || Return),
+	("short", || Short),
+	("signed", || Signed),
+	("sizeof", || SizeOf),
+	("static_assert", || StaticAssert),
+	("static", || Static),
+	("struct", || Struct),
+	("switch", || Switch),
+	("true", || Bool(true)),
+	("typedef", || TypeDef),
+	("union", || Union),
+	("unsigned", || Unsigned),
+	("volatile", || Volatile),
+	("while", || While),
+	("int*", || Decl(NativeType::ptr(NativeType::Int))),
+	("bool*", || Decl(NativeType::ptr(NativeType::Bool))),
+	("char*", || Decl(NativeType::ptr(NativeType::Char))),
+	("uint*", || Decl(NativeType::ptr(NativeType::Uint))),
+	("void*", || Decl(NativeType::ptr(NativeType::Void))),
+	("int", || Decl(NativeType::Int)),
+	("bool", || Decl(NativeType::Bool)),
+	("char", || Decl(NativeType::Char)),
+	("uint", || Decl(NativeType::Uint)),
+	("void", || Decl(NativeType::Void)),
+];
+
+const OPERATORS: [(&str, TokenFunction); 31] = [
+	("(bool)", || BoolCast),
+	("(int)", || IntCast),
+	("(char)", || CharCast),
+	("(any)", || AnyCast),
+	("==", || Cmp),
+	("!=", || NotCmp),
+	(">=", || GreaterThanEqual),
+	("<=", || LessThanEqual),
+	("->", || FieldPointerAccess),
+	("<<", || LShift),
+	(">>", || RShift),
+	("&&", || BoolAnd),
+	("||", || BoolOr),
+	("=", || Assign),
+	("+", || Add),
+	("-", || Sub),
+	("*", || Mul),
+	("/", || Div),
+	("%", || Mod),
+	(">", || GreaterThan),
+	("<", || LessThan),
+	("&", || BitAnd),
+	("|", || BitOr),
+	("^", || Xor),
+	("!", || BoolNot),
+	("~", || BitNot),
+	(".", || FieldAccess),
+	(",", || Comma),
+	(";", || NewLine),
+	("::", || NamespaceSplitter),
+	(":", || Colon),
 ];

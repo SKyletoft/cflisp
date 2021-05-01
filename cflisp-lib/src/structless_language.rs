@@ -314,9 +314,9 @@ impl<'a> StructlessLanguage<'a> {
 					if let Some(n) = t.as_ref().get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
 					}
-					let t = t.as_ref();
+					let typ = NativeType::ptr(t.as_ref().into());
 					upper.push(StructlessLanguage::VariableDeclarationAssignment {
-						typ: t.into(),
+						typ,
 						name: Cow::Owned(new_name),
 						value,
 						is_static: true,
@@ -348,10 +348,10 @@ impl<'a> StructlessLanguage<'a> {
 					if let Some(n) = t.as_ref().get_struct_type() {
 						structs_and_struct_pointers.insert(name.clone(), n);
 					}
-					let t = t.as_ref();
+					let typ = NativeType::ptr(t.as_ref().into());
 					let alloc_name: Cow<'a, str> = Cow::Owned(format!("{}_alloc", name));
 					new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
-						typ: t.into(),
+						typ: t.as_ref().into(),
 						name: alloc_name.clone(),
 						value,
 						is_static: false,
@@ -359,7 +359,7 @@ impl<'a> StructlessLanguage<'a> {
 						is_volatile,
 					});
 					new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
-						typ: NativeType::ptr(t.into()),
+						typ,
 						name,
 						value: StructlessStatement::AdrOf(alloc_name),
 						is_static: false,
