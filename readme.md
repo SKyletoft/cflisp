@@ -11,7 +11,7 @@ Basic maths, function calls (even recursive function calls), if-else-statements 
 Interrupts are supported. The `interrupt` function (`void interrupt()`) is called when triggered. The interrupt enable flag is set automatically if the interrupt function exists.
 
 ## How do I run it?
-Install the rust toolchain from rust-lang.org, clone this repo and then just run `cargo run --release` from the cflisp-cli folder. Alternatively there is a WIP web interface like Godbolt's Compiler Explorer.
+Install the rust toolchain from rust-lang.org, clone this repo and then just run `cargo run --release` from the cflisp-cli folder. There are also binary releases from the github releases page. Alternatively there is a WIP web interface like Godbolt's Compiler Explorer. A hosted version can be found at https://eli.nu/grudat/cflisp.
 
 ## Why rust?
 Rust is known for its correctness and safety guarantees without sacrificing performance. Here, however, rust was just chosen because the type system is really nice and idiomatic rust allows for some very functional style code without being fully functional. And performance doesn't hurt.
@@ -91,7 +91,13 @@ k|kill_interrupts|Disables interrupts after main has exited
 * Line numbers for parse errors
 * Inline assembly
 * `-a` flag on Windows and Mac
-* Figure out licensing
 * Implement own flisp simulator (16 bit addressing?)
 * New ABI. (Multibyte size variables, return structs from functions)
 * casts
+
+## License
+The cflisp library is published under the LGPLv3 license. This linking exception is intended to cover both static and dynamic linking but I'm not going to edit the LGPL to make this clear.
+The cflisp-cli program is published under the GPLv3
+The ace.js library used in cflisp-web has its license in `cflisp-web/ace/LICENSE`
+The rust standard library (not in this repo, but used in binary releases) is licensed under MIT terms.
+The cflisp-web interface is proprietary.
