@@ -41,7 +41,7 @@ body, html {
 	resize: none;
 }
 
-#license_link {
+.links {
 	font-size: 0.75rem;
 	text-align: right;
 }
