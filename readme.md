@@ -97,7 +97,11 @@ k|kill_interrupts|Disables interrupts after main has exited
 
 ## License
 The cflisp library is published under the LGPLv3 license. This linking exception is intended to cover both static and dynamic linking but I'm not going to edit the LGPL to make this clear.
+
 The cflisp-cli program is published under the GPLv3
+
 The ace.js library used in cflisp-web has its license in `cflisp-web/ace/LICENSE`
+
 The rust standard library (not in this repo, but used in binary releases) is licensed under MIT terms.
+
 The cflisp-web interface is proprietary.
