@@ -105,3 +105,5 @@ The ace.js library used in cflisp-web has its license in `cflisp-web/ace/LICENSE
 The rust standard library (not in this repo, but used in binary releases) is licensed under MIT terms.
 
 The cflisp-web interface is proprietary.
+
+Digiflisp and FLISP are owned by Göteborgs Mikrovaror AB
