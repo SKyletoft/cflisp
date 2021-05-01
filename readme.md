@@ -6,7 +6,7 @@ An experimental C compiler for Digiflisp written in Rust.
 Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `float`s and `double`s are not supported at all, nor is the preprocessor.
 `struct`s are supported, but cannot be nested or returned from functions.
 
-Basic maths, function calls (even recursive function calls), if-else-statements (even if-else-if-else-statements), for and while (not do-while) loops, arbitrary levels of pointers, comments, hex and decimal printing are all supported and tested features. The ternary operator is missing. On Linux you can even call qaflisp to assemble it directly (untested on Windows/Mac).
+Basic maths, function calls (even recursive function calls), if-else-statements (even if-else-if-else-statements), for and while (not do-while) loops, arbitrary levels of pointers, comments, hex and decimal printing are all supported and tested features. The ternary operator is missing. On Linux you can even call qaflisp to assemble it directly with the `-a` flag (untested on Windows/Mac).
 
 Interrupts are supported. The `interrupt` function (`void interrupt()`) is called when triggered. The interrupt enable flag is set automatically if the interrupt function exists.
 
@@ -93,7 +93,6 @@ k|kill_interrupts|Disables interrupts after main has exited
 * `-a` flag on Windows and Mac
 * Implement own flisp simulator (16 bit addressing?)
 * New ABI. (Multibyte size variables, return structs from functions)
-* casts
 
 ## License
 The cflisp library is published under the LGPLv3 license. This linking exception is intended to cover both static and dynamic linking but I'm not going to edit the LGPL to make this clear.
