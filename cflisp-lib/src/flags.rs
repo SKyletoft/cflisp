@@ -80,18 +80,16 @@ impl<'a> FromIterator<&'a String> for Flags {
 				if arg.contains('k') {
 					flags.kill_interrupts = false;
 				}
-				if arg.contains('O') {
+				if arg.contains("O2") {
+					flags.optimise = 2;
+				} else if arg.contains("O1") {
+					flags.optimise = 1;
+				} else if arg.contains('O') {
 					flags.optimise = 2;
 				}
 			}
 			if arg == "-o" {
 				is_name = true;
-			}
-			if arg == "-O2" {
-				flags.optimise = 2;
-			}
-			if arg == "-O1" {
-				flags.optimise = 1;
 			}
 		}
 		flags

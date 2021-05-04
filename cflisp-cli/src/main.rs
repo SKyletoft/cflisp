@@ -31,6 +31,24 @@ fn main() {
 		process::exit(0);
 	}
 
+	if args
+		.iter()
+		.map(String::as_str)
+		.any(|s| s == "--license=full" || s == "-license=full")
+	{
+		println!(include_str!("../LICENSE"));
+		process::exit(0);
+	}
+
+	if args
+		.iter()
+		.map(String::as_str)
+		.any(|s| s == "--license" || s == "-license")
+	{
+		println!(include_str!("license_summary.txt"));
+		process::exit(0);
+	}
+
 	let flags = args.iter().collect::<Flags>();
 	let files = args
 		.iter()
