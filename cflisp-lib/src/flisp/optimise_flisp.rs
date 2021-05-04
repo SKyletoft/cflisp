@@ -7,7 +7,6 @@ use std::{borrow::Cow, cmp::Ordering, collections::HashSet, iter};
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
 pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result<(), CompileError> {
-	load_array_constant_index(instructions);
 	load_xy(instructions);
 	repeat_xy(instructions);
 	repeat_load(instructions);
@@ -901,35 +900,6 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx + 4);
 			instructions.remove(idx + 3);
 			instructions.remove(idx + 2);
-		}
-		idx += 1;
-	}
-}
-
-fn load_array_constant_index(instructions: &mut Vec<CommentedInstruction>) {
-	let mut idx = 0;
-	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
-		if let (
-			(Instruction::LDY(Addressing::SP(y)), y_comment),
-			(Instruction::LDA(Addressing::Yn(a)), a_comment),
-		) = (&instructions[idx], &instructions[idx + 1])
-		{
-			instructions[idx] = (
-				Instruction::LDA(Addressing::SP(*y + *a)),
-				merge_comments!(y_comment, a_comment),
-			);
-			instructions.remove(idx + 1);
-		}
-		if let (
-			(Instruction::LDX(Addressing::SP(x)), x_comment),
-			(Instruction::LDA(Addressing::Xn(a)), a_comment),
-		) = (&instructions[idx], &instructions[idx + 1])
-		{
-			instructions[idx] = (
-				Instruction::LDA(Addressing::SP(*x + *a)),
-				merge_comments!(x_comment, a_comment),
-			);
-			instructions.remove(idx + 1);
 		}
 		idx += 1;
 	}
