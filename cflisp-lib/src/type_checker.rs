@@ -127,7 +127,13 @@ pub(crate) fn language_element<'a>(
 					&mut inner_structs,
 					&mut inner_constants,
 				)?;
-				verify_function_return_type(block, &variables, &functions, &structs, typ)?;
+				verify_function_return_type(
+					block,
+					&inner_variables,
+					&inner_functions,
+					&inner_structs,
+					typ,
+				)?;
 			}
 
 			LanguageElement::IfStatement {
@@ -472,15 +478,21 @@ pub(crate) fn type_of<'a>(
 		}
 		StatementElement::FieldPointerAccess(name, field) => {
 			let name: &str = &name;
-			let struct_type = if let Type::Struct(struct_type) =
-				variables.get(name).ok_or_else(|| {
-					dbg!(elem, name);
-					TypeError(line!(), "Cannot resolve variable")
-				})? {
-				Ok(struct_type)
+
+			let typ = variables.get(name).ok_or_else(|| {
+				dbg!(elem, name, variables);
+				TypeError(line!(), "Cannot resolve variable")
+			})?;
+			let struct_type = if let Type::Ptr(pointing_at) = typ {
+				if let Type::Struct(struct_type) = pointing_at.as_ref() {
+					Ok(struct_type)
+				} else {
+					dbg!(elem, name, variables);
+					Err(TypeError(line!(), "Variable isn't a pointer to a struct"))
+				}
 			} else {
-				dbg!(elem, name);
-				Err(TypeError(line!(), "Variable isn't a struct"))
+				dbg!(elem, name, variables);
+				Err(TypeError(line!(), "Variable isn't a pointer"))
 			}?;
 
 			structs

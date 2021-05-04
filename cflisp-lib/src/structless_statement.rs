@@ -196,10 +196,10 @@ impl<'a> StructlessStatement<'a> {
 			StatementElement::AdrOf(n) => StructlessStatement::AdrOf(n.clone()),
 
 			StatementElement::FieldPointerAccess(name, field) => {
-				let struct_type = structs_and_struct_pointers.get(name).ok_or(ParseError(
-					line!(),
-					"Variable wasn't of struct or struct pointer type",
-				))?;
+				let struct_type = structs_and_struct_pointers.get(name).ok_or_else(|| {
+					dbg!(name, structs_and_struct_pointers);
+					ParseError(line!(), "Variable wasn't of struct or struct pointer type")
+				})?;
 				let fields = struct_types
 					.get(*struct_type)
 					.ok_or(ParseError(line!(), "Undefined struct type"))?;
@@ -209,7 +209,7 @@ impl<'a> StructlessStatement<'a> {
 					.ok_or(ParseError(line!(), "Unknown field type"))? as isize;
 				StructlessStatement::Deref(Box::new(StructlessStatement::Add {
 					lhs: Box::new(StructlessStatement::Num(idx)),
-					rhs: Box::new(StructlessStatement::AdrOf(name.clone())),
+					rhs: Box::new(StructlessStatement::Var(name.clone())),
 				}))
 			}
 

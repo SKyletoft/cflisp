@@ -598,6 +598,12 @@ impl<'a> StructlessLanguage<'a> {
 						));
 					}
 					functions.insert(name.clone(), args.clone());
+					let mut new_structs_and_struct_pointers = structs_and_struct_pointers.clone();
+					args.iter()
+						.filter_map(|v| v.typ.get_struct_type().map(|t| (v.name, t)))
+						.for_each(|(name, typ)| {
+							new_structs_and_struct_pointers.insert(Cow::Borrowed(name), typ);
+						});
 					let new_args = args
 						.into_iter()
 						.map(|v| v.split_into_native(struct_types))
@@ -613,7 +619,7 @@ impl<'a> StructlessLanguage<'a> {
 						block: StructlessLanguage::from_language_elements_internal(
 							block,
 							struct_types,
-							structs_and_struct_pointers,
+							&mut new_structs_and_struct_pointers,
 							functions,
 							upper,
 							new_scope,
