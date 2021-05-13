@@ -29,6 +29,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	clr(instructions);
 	clra(instructions);
 	remove_post_early_return_code(instructions);
+	while_true(instructions);
 
 	Ok(())
 }
@@ -900,6 +901,40 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			instructions.remove(idx + 4);
 			instructions.remove(idx + 3);
 			instructions.remove(idx + 2);
+		}
+		idx += 1;
+	}
+}
+
+///Remove the conditions in an infinite loop
+fn while_true(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
+		if let (
+			(Instruction::LDA(Addressing::Data(0xFF)), _),
+			(Instruction::TSTA, _),
+			(Instruction::BEQ(_), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			instructions.remove(idx + 2);
+			instructions.remove(idx + 1);
+			instructions.remove(idx);
+		}
+		if let (
+			(Instruction::LDA(Addressing::Data(0)), _),
+			(Instruction::TSTA, _),
+			(Instruction::BNE(_), _),
+		) = (
+			&instructions[idx],
+			&instructions[idx + 1],
+			&instructions[idx + 2],
+		) {
+			instructions.remove(idx + 2);
+			instructions.remove(idx + 1);
+			instructions.remove(idx);
 		}
 		idx += 1;
 	}
