@@ -83,8 +83,8 @@ pub fn automatic_imports(instructions: &mut String, debug: bool, kill_interrupts
 		instructions.push_str(init);
 	}
 	if instructions.contains("interrupt") {
-		instructions.push_str("\n\tORG\t$FD\n\tFCB\tinterrupt\n\tFCB\tinterrupt\n\tFCB\t__init_\n");
+		instructions.push_str("\n\tORG\t$FD\n\tFCB\tinterrupt\n\tFCB\t__err__\n\tFCB\t__init_\n");
 	} else {
-		instructions.push_str("\n\tORG\t$FF\n\tFCB\t__init_\n");
+		instructions.push_str("\n\tORG\t$FE\n\tFCB\t__err__\n\tFCB\t__init_\n");
 	}
 }

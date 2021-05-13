@@ -5,3 +5,5 @@ int main() {
 		loops = loops + 1;
 	}
 }
+
+void interrupt() {}

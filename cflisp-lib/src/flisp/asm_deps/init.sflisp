@@ -1,4 +1,5 @@
 __init_	LDSP	#$FB
 	JSR	main
 __end__	JMP	__end__
+__err__	JMP	__err__
 

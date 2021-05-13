@@ -3,4 +3,5 @@ __init_	LDSP	#$FB
 	JSR	main
 	ORCC	#%00010000
 __end__	JMP	__end__
+__err__	JMP	__err__
 
