@@ -82,7 +82,9 @@ pub(crate) fn fast_div(elem: &mut StructlessStatement) {
 	if let StructlessStatement::Div { lhs, rhs } = elem {
 		match (lhs.as_ref(), rhs.as_ref()) {
 			(StructlessStatement::Num(a), StructlessStatement::Num(b)) => {
-				*elem = StructlessStatement::Num(*a / *b);
+				if *b != 0 {
+					*elem = StructlessStatement::Num(*a / *b);
+				}
 			}
 			(a, StructlessStatement::Num(b)) => {
 				// = is a multiple of two
@@ -162,17 +164,27 @@ pub(crate) fn const_eval<'a>(
 		StructlessStatement::Mul { lhs, rhs } => {
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a * b))
 		}
-		StructlessStatement::Div { lhs, rhs } => {
+		StructlessStatement::Div { lhs, rhs }
+			if !matches!(rhs.as_ref(), &StructlessStatement::Num(0)) =>
+		{
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a / b))
 		}
 		StructlessStatement::Mod { lhs, rhs } => {
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a % b))
 		}
 		StructlessStatement::LShift { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a << b))
+			if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < 0) {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a << b))
+			} else {
+				None
+			}
 		}
 		StructlessStatement::RShift { lhs, rhs } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a >> b))
+			if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < 0) {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a >> b))
+			} else {
+				None
+			}
 		}
 		StructlessStatement::GreaterThan { lhs, rhs } => {
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a > b))
@@ -206,17 +218,13 @@ pub(crate) fn const_eval<'a>(
 			Some(StructlessStatement::Bool(a)) => Some(StructlessStatement::Bool(!a)),
 			_ => None,
 		},
-		StructlessStatement::FunctionCall { .. }
-		| StructlessStatement::Var(_)
-		| StructlessStatement::Char(_)
-		| StructlessStatement::Array(_)
-		| StructlessStatement::Deref(_)
-		| StructlessStatement::AdrOf(_) => {
-			return None;
-		}
 
 		StructlessStatement::Num(_) | StructlessStatement::Bool(_) => {
 			return Some(elem.clone());
+		}
+
+		_ => {
+			return None;
 		}
 	};
 	if let Some(this) = &this {
