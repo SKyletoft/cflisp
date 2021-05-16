@@ -1,5 +1,6 @@
-use crate::*;
 use std::borrow::Cow;
+
+use crate::*;
 
 ///Internal representation of the program.
 /// Can represent any language pattern considered valid.
@@ -97,6 +98,7 @@ impl<'a> LanguageElement<'a> {
 		}
 		Ok(self)
 	}
+
 	pub(crate) fn make_const(mut self) -> Result<Self, ParseError> {
 		match &mut self {
 			LanguageElement::VariableDeclaration { is_const, .. } if !*is_const => {
@@ -117,6 +119,7 @@ impl<'a> LanguageElement<'a> {
 		}
 		Ok(self)
 	}
+
 	pub(crate) fn make_volatile(mut self) -> Result<Self, ParseError> {
 		match &mut self {
 			LanguageElement::VariableDeclaration { is_volatile, .. } if !*is_volatile => {

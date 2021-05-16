@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
-use super::super::*;
 use std::collections::{HashMap, HashSet};
+
+use super::super::*;
 
 #[test]
 fn integers() {

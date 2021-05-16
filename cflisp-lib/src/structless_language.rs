@@ -1,5 +1,6 @@
-use crate::*;
 use std::{borrow::Cow, collections::HashMap};
+
+use crate::*;
 
 ///Simplified internal representation of a program.
 /// Doesn't contain structs or for loops
@@ -593,8 +594,8 @@ impl<'a> StructlessLanguage<'a> {
 					if matches!(typ, Type::Struct(_)) {
 						return Err(ParseError(
 							line!(),
-							"Cannot return struct from function due to ABI limitation. \
-							Maybe try having an out pointer parametre instead? (Sorry)",
+							"Cannot return struct from function due to ABI limitation. Maybe try \
+							 having an out pointer parametre instead? (Sorry)",
 						));
 					}
 					functions.insert(name.clone(), args.clone());

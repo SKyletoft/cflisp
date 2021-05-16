@@ -1,8 +1,9 @@
-use crate::*;
 use std::{
 	borrow::Cow,
 	collections::{HashMap, HashSet},
 };
+
+use crate::*;
 
 pub fn type_check(block: &[LanguageElement]) -> Result<(), TypeError> {
 	language_element(

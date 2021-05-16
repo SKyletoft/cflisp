@@ -1,5 +1,3 @@
-use wasm_bindgen::prelude::*;
-
 use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
@@ -7,6 +5,7 @@ use cflisp_lib::{
 	structless_language::StructlessLanguage,
 	type_checker,
 };
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn add(a: i32, b: i32) -> i32 {

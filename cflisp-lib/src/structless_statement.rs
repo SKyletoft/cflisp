@@ -1,5 +1,6 @@
-use crate::*;
 use std::{borrow::Cow, collections::HashMap};
+
+use crate::*;
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
@@ -156,7 +157,11 @@ impl<'a> StructlessStatement<'a> {
 						let var_name = if let StatementElement::Var(var_name) = param {
 							Ok(var_name)
 						} else {
-							Err(ParseError(line!(), "Only struct variables can be passed into functions with struct arguments (not literals)"))
+							Err(ParseError(
+								line!(),
+								"Only struct variables can be passed into functions with struct \
+								 arguments (not literals)",
+							))
 						}?;
 						for field in fields.iter() {
 							let param_name = helper::merge_name_and_field(var_name, field.name);

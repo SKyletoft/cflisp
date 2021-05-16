@@ -1,5 +1,6 @@
-use crate::*;
 use std::collections::HashMap;
+
+use crate::*;
 
 pub fn all_optimisations(element: &mut StructlessStatement) -> Result<(), ParseError> {
 	const_eval(element);

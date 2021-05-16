@@ -1,5 +1,6 @@
-use crate::*;
 use std::{borrow::Cow, fmt};
+
+use crate::*;
 
 // Replace Cow<'a, str> with a Cow<String>?
 ///`(Instruction, Option<Cow<'a, str>>)`
@@ -199,6 +200,7 @@ impl<'a> Instruction<'a> {
 
 		Ok(res)
 	}
+
 	///The size in bytes that it will take up in the final compiled binary
 	pub(crate) fn size(&self) -> usize {
 		match self {
@@ -240,7 +242,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTI
 			| Instruction::RTS => 1,
 			Instruction::FCB(n) => n.len(),
-			Instruction::EQU(_, _) | Instruction::Label(_) => 0,
+			Instruction::EQU(..) | Instruction::Label(_) => 0,
 		}
 	}
 
@@ -285,7 +287,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTS
 			| Instruction::RTI
 			| Instruction::FCB(_)
-			| Instruction::EQU(_, _)
+			| Instruction::EQU(..)
 			| Instruction::Label(_) => None,
 		}
 	}
@@ -331,7 +333,7 @@ impl<'a> Instruction<'a> {
 			| Instruction::RTS
 			| Instruction::RTI
 			| Instruction::FCB(_)
-			| Instruction::EQU(_, _)
+			| Instruction::EQU(..)
 			| Instruction::Label(_) => None,
 		}
 	}

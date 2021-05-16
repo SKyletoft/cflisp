@@ -1,6 +1,7 @@
+use std::{borrow::Cow, collections::HashMap};
+
 use super::*;
 use crate::*;
-use std::{borrow::Cow, collections::HashMap};
 
 ///Technically illegal address for use in register -> register transfers
 pub(crate) const ABOVE_STACK_OFFSET: isize = -1;

@@ -1,8 +1,9 @@
-use crate::*;
 use std::{
 	collections::{HashMap, HashSet},
 	slice,
 };
+
+use crate::*;
 
 pub fn all_optimisations(elements: &mut Vec<StructlessLanguage>) -> Result<(), ParseError> {
 	const_prop(elements);

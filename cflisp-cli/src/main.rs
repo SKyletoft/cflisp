@@ -1,8 +1,4 @@
-use std::{
-	env, fs,
-	path::PathBuf,
-	{process, process::Command},
-};
+use std::{env, fs, path::PathBuf, process, process::Command};
 
 use cflisp_lib::{
 	flags::Flags,

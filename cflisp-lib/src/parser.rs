@@ -1,5 +1,6 @@
-use crate::*;
 use std::borrow::Cow;
+
+use crate::*;
 
 pub fn parse<'a>(
 	source: &'a str,

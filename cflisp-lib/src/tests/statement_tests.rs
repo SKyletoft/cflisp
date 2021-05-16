@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
-use super::super::*;
 use std::borrow::Cow;
+
+use super::super::*;
 
 #[test]
 fn fast_mul() {

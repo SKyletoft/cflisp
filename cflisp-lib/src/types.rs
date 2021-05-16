@@ -1,5 +1,6 @@
-use crate::*;
 use std::{borrow::Cow, collections::HashMap};
+
+use crate::*;
 
 ///A type and a name
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

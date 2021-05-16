@@ -1,5 +1,6 @@
-use crate::*;
 use std::borrow::Cow;
+
+use crate::*;
 
 ///Tree structure to represent a statement.
 #[derive(Debug, Clone, PartialEq)]
@@ -372,7 +373,8 @@ fn do_binary_operation<'a>(
 			dbg!(tokens);
 			return Err(ParseError(
 				line!(),
-				"Couldn't construct tree from statement. Are you sure the operators are correctly placed?",
+				"Couldn't construct tree from statement. Are you sure the operators are correctly \
+				 placed?",
 			));
 		}
 		let right = tokens.remove(idx + 1);
@@ -384,8 +386,8 @@ fn do_binary_operation<'a>(
 			dbg!(tokens);
 			return Err(ParseError(
 				line!(),
-				"Couldn't construct tree from statement. Element that \
-				should've been parsed first has not been parsed",
+				"Couldn't construct tree from statement. Element that should've been parsed first \
+				 has not been parsed",
 			));
 		}
 	}
@@ -409,8 +411,8 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 			} else {
 				return Err(ParseError(
 					line!(),
-					"Couldn't construct tree from statement. Element that \
-					should've been parsed first has not been parsed. (In ternary)",
+					"Couldn't construct tree from statement. Element that should've been parsed \
+					 first has not been parsed. (In ternary)",
 				));
 			}
 		}
@@ -444,8 +446,8 @@ fn do_unary_operation_left<'a>(
 			} else {
 				return Err(ParseError(
 					line!(),
-					"Couldn't construct tree from statement. Element that \
-					should've been parsed first has not been parsed",
+					"Couldn't construct tree from statement. Element that should've been parsed \
+					 first has not been parsed",
 				));
 			}
 		}
@@ -481,8 +483,8 @@ fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 			} else {
 				return Err(ParseError(
 					line!(),
-					"Couldn't construct tree from statement. Element that \
-					should've been parsed first has not been parsed. (In cast)",
+					"Couldn't construct tree from statement. Element that should've been parsed \
+					 first has not been parsed. (In cast)",
 				));
 			}
 		}
@@ -507,8 +509,8 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 			} else {
 				return Err(ParseError(
 					line!(),
-					"Couldn't construct tree from statement. Element that \
-					should've been parsed first has not been parsed",
+					"Couldn't construct tree from statement. Element that should've been parsed \
+					 first has not been parsed",
 				));
 			}
 		}

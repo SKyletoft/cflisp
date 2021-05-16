@@ -1,7 +1,9 @@
+use std::{borrow::Cow, cmp::Ordering, collections::HashSet, iter};
+
+use compile_flisp::ABOVE_STACK_OFFSET;
+
 use super::*;
 use crate::*;
-use compile_flisp::ABOVE_STACK_OFFSET;
-use std::{borrow::Cow, cmp::Ordering, collections::HashSet, iter};
 
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
