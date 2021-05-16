@@ -140,14 +140,17 @@ fn find_variables_le<'a>(vars: &mut HashSet<String>, elements: &'a [StructlessLa
 			} => {
 				vars.insert(name.to_string());
 			}
+
 			StructlessLanguage::VariableAssignment { value, .. }
 			| StructlessLanguage::VariableDeclarationAssignment { value, .. } => {
 				find_variables_se(vars, value);
 			}
+
 			StructlessLanguage::PointerAssignment { ptr, value } => {
 				find_variables_se(vars, ptr);
 				find_variables_se(vars, value);
 			}
+
 			StructlessLanguage::IfStatement {
 				condition,
 				then,
@@ -157,6 +160,7 @@ fn find_variables_le<'a>(vars: &mut HashSet<String>, elements: &'a [StructlessLa
 				find_variables_le(vars, slice::from_ref(then));
 				find_variables_le(vars, slice::from_ref(else_then));
 			}
+
 			StructlessLanguage::IfStatement {
 				condition,
 				then: body,
@@ -170,7 +174,9 @@ fn find_variables_le<'a>(vars: &mut HashSet<String>, elements: &'a [StructlessLa
 			| StructlessLanguage::Statement(statement) => {
 				find_variables_se(vars, statement);
 			}
-			StructlessLanguage::Block { block, .. } => {
+
+			StructlessLanguage::FunctionDeclaration { block, .. }
+			| StructlessLanguage::Block { block, .. } => {
 				find_variables_le(vars, block);
 			}
 
