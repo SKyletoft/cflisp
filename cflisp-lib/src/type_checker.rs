@@ -33,18 +33,18 @@ pub(crate) fn language_element<'a>(
 			} => {
 				variables.insert(name.clone(), typ.clone());
 				if *is_const {
-					constants.insert(&name);
+					constants.insert(name);
 				}
 			}
 
 			LanguageElement::VariableAssignment { name, value, .. } => {
-				statement_element(value, &variables, &functions, &structs)?;
+				statement_element(value, variables, functions, structs)?;
 				let correct_type = variables.get(name).ok_or_else(|| {
 					dbg!(line, name);
 					TypeError(line!(), "Undefined variable")
 				})?;
-				let actual_type = type_of(value, &variables, &functions, &structs)?;
-				let name_ref: &str = &name;
+				let actual_type = type_of(value, variables, functions, structs)?;
+				let name_ref: &str = name;
 				if correct_type != &actual_type {
 					dbg!(line, correct_type, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
@@ -62,12 +62,12 @@ pub(crate) fn language_element<'a>(
 				is_const,
 				..
 			} => {
-				statement_element(value, &variables, &functions, &structs)?;
+				statement_element(value, variables, functions, structs)?;
 				variables.insert(name.clone(), typ.clone());
 				if *is_const {
-					constants.insert(&name);
+					constants.insert(name);
 				}
-				let actual_type = type_of(value, &variables, &functions, &structs)?;
+				let actual_type = type_of(value, variables, functions, structs)?;
 				if typ != &actual_type {
 					dbg!(line, typ, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
@@ -75,10 +75,10 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::PointerAssignment { ptr, value } => {
-				statement_element(ptr, &variables, &functions, &structs)?;
-				statement_element(value, &variables, &functions, &structs)?;
-				let correct_type = type_of(ptr, &variables, &functions, &structs)?;
-				let actual_type = type_of(value, &variables, &functions, &structs)?;
+				statement_element(ptr, variables, functions, structs)?;
+				statement_element(value, variables, functions, structs)?;
+				let correct_type = type_of(ptr, variables, functions, structs)?;
+				let actual_type = type_of(value, variables, functions, structs)?;
 				if correct_type != actual_type {
 					dbg!(line, correct_type, actual_type);
 					return Err(TypeError(line!(), "Type mismatch"));
@@ -142,7 +142,7 @@ pub(crate) fn language_element<'a>(
 				then,
 				else_then,
 			} => {
-				statement_element(condition, &variables, &functions, &structs)?;
+				statement_element(condition, variables, functions, structs)?;
 				let mut inner_variables = variables.clone();
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
@@ -209,7 +209,7 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::While { condition, body } => {
-				statement_element(condition, &variables, &functions, &structs)?;
+				statement_element(condition, variables, functions, structs)?;
 				let mut inner_variables = variables.clone();
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
@@ -227,11 +227,11 @@ pub(crate) fn language_element<'a>(
 			LanguageElement::Return(_) => {}
 
 			LanguageElement::Statement(statement) => {
-				statement_element(statement, &variables, &functions, &structs)?;
+				statement_element(statement, variables, functions, structs)?;
 			}
 
 			LanguageElement::StructAssignment { name, value } => {
-				let name: &str = &name;
+				let name: &str = name;
 				let fields = structs.get(name).ok_or_else(|| {
 					dbg!(line, name);
 					TypeError(line!(), "Undefined struct type")
@@ -244,8 +244,8 @@ pub(crate) fn language_element<'a>(
 					));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					statement_element(value, &variables, &functions, &structs)?;
-					if type_of(value, &variables, &functions, &structs)? != field.typ {
+					statement_element(value, variables, functions, structs)?;
+					if type_of(value, variables, functions, structs)? != field.typ {
 						return Err(TypeError(
 							line!(),
 							"Struct field type mismatch in intialisation",
@@ -276,8 +276,8 @@ pub(crate) fn language_element<'a>(
 					));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					statement_element(value, &variables, &functions, &structs)?;
-					let actual_type = type_of(value, &variables, &functions, &structs)?;
+					statement_element(value, variables, functions, structs)?;
+					let actual_type = type_of(value, variables, functions, structs)?;
 					let correct_type = &field.typ;
 					if &actual_type != correct_type {
 						dbg!(line, actual_type, correct_type);
@@ -290,7 +290,7 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
-				let name: &str = &name;
+				let name: &str = name;
 				let fields = structs.get(name).ok_or_else(|| {
 					dbg!(line, name);
 					TypeError(line!(), "Undefined struct type")
@@ -302,8 +302,8 @@ pub(crate) fn language_element<'a>(
 						dbg!(line, field);
 						TypeError(line!(), "Undefined field")
 					})?;
-				statement_element(value, &variables, &functions, &structs)?;
-				let actual_type = type_of(value, &variables, &functions, &structs)?;
+				statement_element(value, variables, functions, structs)?;
+				let actual_type = type_of(value, variables, functions, structs)?;
 				let correct_type = &field_type.typ;
 				if &actual_type != correct_type {
 					dbg!(line, actual_type, correct_type);
@@ -315,7 +315,7 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::StructDefinition { name, members } => {
-				let name: &str = &name;
+				let name: &str = name;
 				structs.insert(name, members.to_owned());
 			}
 		}
@@ -478,7 +478,7 @@ pub(crate) fn type_of<'a>(
 			l
 		}
 		StatementElement::FieldPointerAccess(name, field) => {
-			let name: &str = &name;
+			let name: &str = name;
 
 			let typ = variables.get(name).ok_or_else(|| {
 				dbg!(elem, name, variables);
