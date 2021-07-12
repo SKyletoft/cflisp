@@ -213,3 +213,45 @@ impl<'a> PartialEq<NativeType> for Type<'a> {
 		other.eq(self)
 	}
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumberType {
+	Signed,
+	Unsigned,
+	Unknown,
+}
+
+struct Number {
+	val: isize,
+	signedness: NumberType,
+}
+
+impl From<isize> for NumberType {
+	fn from(n: isize) -> Self {
+		if n > i8::MAX as isize {
+			NumberType::Unsigned
+		} else if n < 0 {
+			NumberType::Signed
+		} else {
+			NumberType::Unknown
+		}
+	}
+}
+
+impl NumberType {
+	pub fn promote(self, other: Self) -> Self {
+		if self == other {
+			return self;
+		}
+		if self == NumberType::Unknown {
+			return other;
+		}
+		if other == NumberType::Unknown {
+			return self;
+		}
+		if self != other {
+			return NumberType::Signed;
+		}
+		unreachable!()
+	}
+}
