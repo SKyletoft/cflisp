@@ -13,8 +13,6 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	repeat_xy(instructions);
 	repeat_load(instructions);
 	reduce_reserves_redux(instructions)?;
-	cmp_eq_jmp(instructions);
-	cmp_neq_jmp(instructions);
 	cmp_gt_jmp(instructions);
 	cmp_gte_jmp(instructions);
 	merge_allocs(instructions);
@@ -24,10 +22,8 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	psha(instructions);
 	pula(instructions);
 	function_op_load_reduce(instructions);
-	inc(instructions);
-	inca(instructions);
-	dec(instructions);
-	deca(instructions);
+	inc_dec(instructions);
+	inca_deca(instructions);
 	clr(instructions);
 	clra(instructions);
 	remove_post_early_return_code(instructions);
@@ -41,91 +37,56 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		if let (
-			(Instruction::LDA(addressing), _),
-			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
-			(Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if !matches!(addressing, Addressing::AX) {
+		match &instructions[idx..idx + 2] {
+			[(Instruction::LDA(addressing), _), (Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _), (Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _)]
+				if !matches!(addressing, Addressing::AX) =>
+			{
 				instructions[idx].0 = Instruction::LDX(addressing.clone());
 				instructions.remove(idx + 2); //Order matters!
 				instructions.remove(idx + 1);
 			}
-		}
-		if let ((Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULX, _)) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if !matches!(addressing, Addressing::AX) {
+			[(Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULX, _)]
+				if !matches!(addressing, Addressing::AX) =>
+			{
 				instructions[idx].0 = Instruction::LDX(addressing.clone());
 				instructions.remove(idx + 2); //Order matters!
 				instructions.remove(idx + 1);
 			}
-		}
-		if let (
-			(Instruction::LDA(addressing), _),
-			(Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _),
-			(Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if !matches!(addressing, Addressing::AY) {
+			[(Instruction::LDA(addressing), _), (Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _), (Instruction::LDY(Addressing::SP(ABOVE_STACK_OFFSET)), _)]
+				if !matches!(addressing, Addressing::AY) =>
+			{
 				instructions[idx].0 = Instruction::LDY(addressing.clone());
 				instructions.remove(idx + 2); //Order matters!
 				instructions.remove(idx + 1);
 			}
-		}
-		if let ((Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULY, _)) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if !matches!(addressing, Addressing::AY) {
+			[(Instruction::LDA(addressing), _), (Instruction::PSHA, _), (Instruction::PULY, _)]
+				if !matches!(addressing, Addressing::AY) =>
+			{
 				instructions[idx].0 = Instruction::LDY(addressing.clone());
 				instructions.remove(idx + 2); //Order matters!
 				instructions.remove(idx + 1);
 			}
-		}
-		if let (
-			(Instruction::LDX(Addressing::Data(x_adr)), x_comment),
-			(Instruction::LDA(a_adr), a_comment),
-			(Instruction::STA(Addressing::Xn(0)), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			let a_comment = a_comment.clone();
-			let a_adr = a_adr.clone();
-			let x_comment = x_comment.clone();
-			let x_adr = *x_adr;
-			instructions[idx] = (Instruction::LDA(a_adr), a_comment);
-			instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
-			instructions.remove(idx + 2);
-		}
-		if let (
-			(Instruction::LDY(Addressing::Data(x_adr)), x_comment),
-			(Instruction::LDA(a_adr), a_comment),
-			(Instruction::STA(Addressing::Yn(0)), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			let a_comment = a_comment.clone();
-			let a_adr = a_adr.clone();
-			let x_comment = x_comment.clone();
-			let x_adr = *x_adr;
-			instructions[idx] = (Instruction::LDA(a_adr), a_comment);
-			instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
-			instructions.remove(idx + 2);
+			[(Instruction::LDX(Addressing::Data(x_adr)), x_comment), (Instruction::LDA(a_adr), a_comment), (Instruction::STA(Addressing::Xn(0)), _)] =>
+			{
+				let a_comment = a_comment.clone();
+				let a_adr = a_adr.clone();
+				let x_comment = x_comment.clone();
+				let x_adr = *x_adr;
+				instructions[idx] = (Instruction::LDA(a_adr), a_comment);
+				instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
+				instructions.remove(idx + 2);
+			}
+			[(Instruction::LDY(Addressing::Data(x_adr)), x_comment), (Instruction::LDA(a_adr), a_comment), (Instruction::STA(Addressing::Yn(0)), _)] =>
+			{
+				let a_comment = a_comment.clone();
+				let a_adr = a_adr.clone();
+				let x_comment = x_comment.clone();
+				let x_adr = *x_adr;
+				instructions[idx] = (Instruction::LDA(a_adr), a_comment);
+				instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
+				instructions.remove(idx + 2);
+			}
+			_ => {}
 		}
 		idx += 1;
 	}
@@ -407,47 +368,38 @@ fn psha(instructions: &mut Vec<CommentedInstruction>) {
 fn pula(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
-		if let (
-			(Instruction::LDA(Addressing::SP(0)), first_comment),
-			(Instruction::LEASP(Addressing::SP(1)), second_comment),
-		) = (&instructions[idx], &instructions[idx + 1])
-		{
-			let comment = merge_comments!(first_comment, second_comment);
-			instructions[idx] = (Instruction::PULA, comment);
-			instructions.remove(idx + 1);
-			idx -= 1;
-			continue;
+		match &instructions[idx..idx + 1] {
+			[(Instruction::LDA(Addressing::SP(0)), first_comment), (Instruction::LEASP(Addressing::SP(1)), second_comment)] =>
+			{
+				let comment = merge_comments!(first_comment, second_comment);
+				instructions[idx] = (Instruction::PULA, comment);
+				instructions.remove(idx + 1);
+				idx -= 1;
+			}
+			[(Instruction::LEASP(Addressing::SP(1)), first_comment), (Instruction::LDA(Addressing::SP(-1)), second_comment)] =>
+			{
+				let comment = merge_comments!(first_comment, second_comment);
+				instructions[idx] = (Instruction::PULA, comment);
+				instructions.remove(idx + 1);
+				idx -= 1;
+			}
+			[(Instruction::PSHA, _), (Instruction::PULA, _)] => {
+				instructions.remove(idx);
+				instructions.remove(idx);
+				idx -= 1;
+			}
+			_ => {
+				idx += 1;
+			}
 		}
-		if let (
-			(Instruction::LEASP(Addressing::SP(1)), first_comment),
-			(Instruction::LDA(Addressing::SP(-1)), second_comment),
-		) = (&instructions[idx], &instructions[idx + 1])
-		{
-			let comment = merge_comments!(first_comment, second_comment);
-			instructions[idx] = (Instruction::PULA, comment);
-			instructions.remove(idx + 1);
-			idx -= 1;
-			continue;
-		}
-		if let ((Instruction::PSHA, _), (Instruction::PULA, _)) =
-			(&instructions[idx], &instructions[idx + 1])
-		{
-			instructions.remove(idx);
-			instructions.remove(idx);
-			idx -= 1;
-			continue;
-		}
-		idx += 1;
 	}
 }
 
 fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
-		if let (
-			(Instruction::LEASP(Addressing::SP(a)), first_comment),
-			(Instruction::LEASP(Addressing::SP(b)), second_comment),
-		) = (&instructions[idx], &instructions[idx + 1])
+		if let [(Instruction::LEASP(Addressing::SP(a)), first_comment), (Instruction::LEASP(Addressing::SP(b)), second_comment)] =
+			&instructions[idx..idx + 1]
 		{
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::LEASP(Addressing::SP(*a + *b)), comment);
@@ -655,176 +607,51 @@ fn clra(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-///Replaces subtraction by one with a DEC instruction
-fn dec(instructions: &mut Vec<CommentedInstruction>) {
+///Replaces arithmetic by one with an INC or DEC instruction for a value in memory
+fn inc_dec(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		if let (
-			(Instruction::LDA(Addressing::Data(1)), _),
-			(Instruction::SUBA(from), _),
-			(Instruction::STA(to), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if to == from {
+		match &instructions[idx..idx + 2] {
+			[(Instruction::LDA(Addressing::Data(1)), _), (Instruction::SUBA(from), _), (Instruction::STA(to), _)]
+				if to == from =>
+			{
 				instructions[idx + 2].0 = Instruction::DEC(to.clone());
 				instructions.remove(idx + 1);
 				instructions.remove(idx);
 			}
-		}
-		idx += 1;
-	}
-}
-
-///Replaces addition by one with an INC instruction
-fn inc(instructions: &mut Vec<CommentedInstruction>) {
-	let mut idx = 0;
-	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		if let (
-			(Instruction::LDA(from), _),
-			(Instruction::ADDA(Addressing::Data(1)), _),
-			(Instruction::STA(to), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if to == from {
+			[(Instruction::LDA(from), _), (Instruction::ADDA(Addressing::Data(1)), _), (Instruction::STA(to), _)]
+				if to == from =>
+			{
 				instructions[idx].0 = Instruction::INC(to.clone());
 				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 			}
-		}
-		if let (
-			(Instruction::LDA(Addressing::Data(1)), _),
-			(Instruction::ADDA(from), _),
-			(Instruction::STA(to), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			if to == from {
+			[(Instruction::LDA(Addressing::Data(1)), _), (Instruction::ADDA(from), _), (Instruction::STA(to), _)]
+				if to == from =>
+			{
 				instructions[idx].0 = Instruction::INC(to.clone());
 				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 			}
+			_ => {}
 		}
 		idx += 1;
 	}
 }
 
-///Replaces addition by one with an INC instruction
-fn inca(instructions: &mut Vec<CommentedInstruction>) {
+///Replaces arithmetic by one with an INCA or DECA instruction for a value in A
+fn inca_deca(instructions: &mut Vec<CommentedInstruction>) {
 	for (inst, _) in instructions.iter_mut() {
-		if matches!(inst, Instruction::ADDA(Addressing::Data(1))) {
-			*inst = Instruction::INCA;
+		match inst {
+			Instruction::ADDA(Addressing::Data(1)) => *inst = Instruction::INCA,
+			Instruction::SUBA(Addressing::Data(1)) => *inst = Instruction::DECA,
+			_ => {}
 		}
 	}
 }
 
-///Replaces subtraction by one with a DEC instruction
-fn deca(instructions: &mut Vec<CommentedInstruction>) {
-	for (inst, _) in instructions.iter_mut() {
-		if matches!(inst, Instruction::SUBA(Addressing::Data(1))) {
-			*inst = Instruction::DECA;
-		}
-	}
-}
-
-///Replaces the generated function call to __eq__ and a jump that is required for
-/// chained boolean operators with a BEQ instruction directly
-fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
-	return;
-	let mut idx = 0;
-	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
-		if let (
-			(Instruction::PSHA, Some(text)),
-			(Instruction::LDA(lhs), lhs_comment),
-			(Instruction::JSR(Addressing::Label(function_name)), None),
-			(Instruction::LEASP(Addressing::SP(1)), None),
-			(Instruction::TSTA, None),
-			(Instruction::BEQ(jump_adr), None),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-			&instructions[idx + 3],
-			&instructions[idx + 4],
-			&instructions[idx + 5],
-		) {
-			if !(function_name == "__eq__" && text == "cmp rhs") {
-				idx += 1;
-				continue;
-			}
-			let lhs = if let Addressing::SP(n) = lhs {
-				Addressing::SP(n - 1) //We're removing a PSHA
-			} else {
-				lhs.clone()
-			};
-			let lhs_comment = lhs_comment.clone();
-			let jump_adr = jump_adr.clone();
-			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx + 5] = (Instruction::BNE(jump_adr), None);
-			instructions.remove(idx + 4);
-			instructions.remove(idx + 3);
-			instructions.remove(idx + 2);
-			instructions.remove(idx + 1);
-		}
-		idx += 1;
-	}
-}
-
-///Replaces the generated function call to __eq__ and a jump that is required for
-/// chained boolean operators with a BNE instruction directly
-fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
-	return;
-	let mut idx = 0;
-	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
-		if let (
-			(Instruction::PSHA, Some(text)),
-			(Instruction::LDA(lhs), lhs_comment),
-			(Instruction::JSR(Addressing::Label(function_name)), None),
-			(Instruction::LEASP(Addressing::SP(1)), None),
-			(Instruction::COMA, None),
-			(Instruction::TSTA, None),
-			(Instruction::BEQ(jump_adr), None),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-			&instructions[idx + 3],
-			&instructions[idx + 4],
-			&instructions[idx + 5],
-			&instructions[idx + 6],
-		) {
-			if !(function_name == "__eq__" && text == "cmp rhs") {
-				idx += 1;
-				continue;
-			}
-			let lhs = if let Addressing::SP(n) = lhs {
-				Addressing::SP(n - 1) //We're removing a PSHA
-			} else {
-				lhs.clone()
-			};
-			let lhs_comment = lhs_comment.clone();
-			let jump_adr = jump_adr.clone();
-			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx + 1] = (Instruction::BEQ(jump_adr), None);
-			instructions.remove(idx + 6);
-			instructions.remove(idx + 5);
-			instructions.remove(idx + 4);
-			instructions.remove(idx + 3);
-			instructions.remove(idx + 2);
-		}
-		idx += 1;
-	}
-}
-
-///Replaces the generated function call to __gt__ and a jump that is required for
-/// chained boolean operators with a BGE instruction directly
+///Replaces the generated function call to __gt__ or __eq__ and a jump that is required for
+/// chained boolean operators with a BGE/BNE instruction directly
 fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
@@ -871,8 +698,8 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	}
 }
 
-///Replaces the generated function call to __gt__ and a jump that is required for
-/// chained boolean operators with a BLT instruction directly
+///Replaces the generated function call to __gt__ or __eq__ and a jump that is required for
+/// chained boolean operators with a BLT/BEQ instruction directly
 fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
@@ -926,31 +753,20 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 fn while_true(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		if let (
-			(Instruction::LDA(Addressing::Data(0xFF)), _),
-			(Instruction::TSTA, _),
-			(Instruction::BEQ(_), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			instructions.remove(idx + 2);
-			instructions.remove(idx + 1);
-			instructions.remove(idx);
-		}
-		if let (
-			(Instruction::LDA(Addressing::Data(0)), _),
-			(Instruction::TSTA, _),
-			(Instruction::BNE(_), _),
-		) = (
-			&instructions[idx],
-			&instructions[idx + 1],
-			&instructions[idx + 2],
-		) {
-			instructions.remove(idx + 2);
-			instructions.remove(idx + 1);
-			instructions.remove(idx);
+		match &instructions[idx..idx + 2] {
+			[(Instruction::LDA(Addressing::Data(0xFF)), _), (Instruction::TSTA, _), (Instruction::BEQ(_), _)] =>
+			{
+				instructions.remove(idx + 2);
+				instructions.remove(idx + 1);
+				instructions.remove(idx);
+			}
+			[(Instruction::LDA(Addressing::Data(0)), _), (Instruction::TSTA, _), (Instruction::BNE(_), _)] =>
+			{
+				instructions.remove(idx + 2);
+				instructions.remove(idx + 1);
+				instructions.remove(idx);
+			}
+			_ => {}
 		}
 		idx += 1;
 	}
@@ -961,7 +777,7 @@ pub fn remove_unused_labels(instructions: &mut Vec<CommentedInstruction>) {
 	let jumps_to = instructions
 		.iter()
 		.filter_map(|(inst, _)| match inst.get_adr() {
-			Some(Addressing::Label(lbl)) | Some(Addressing::DataLabel(lbl)) => {
+			Some(Addressing::Label(lbl) | Addressing::DataLabel(lbl)) => {
 				Some(lbl.trim().to_string())
 			}
 			_ => None,
