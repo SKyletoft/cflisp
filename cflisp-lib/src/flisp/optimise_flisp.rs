@@ -37,7 +37,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		match &instructions[idx..idx + 2] {
+		match &instructions[idx..idx + 3] {
 			[(Instruction::LDA(addressing), _), (Instruction::STA(Addressing::SP(ABOVE_STACK_OFFSET)), _), (Instruction::LDX(Addressing::SP(ABOVE_STACK_OFFSET)), _)]
 				if !matches!(addressing, Addressing::AX) =>
 			{
@@ -86,9 +86,10 @@ fn load_xy(instructions: &mut Vec<CommentedInstruction>) {
 				instructions[idx + 1] = (Instruction::STA(Addressing::Adr(x_adr)), x_comment);
 				instructions.remove(idx + 2);
 			}
-			_ => {}
+			_ => {
+				idx += 1;
+			}
 		}
-		idx += 1;
 	}
 }
 
@@ -368,7 +369,7 @@ fn psha(instructions: &mut Vec<CommentedInstruction>) {
 fn pula(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
-		match &instructions[idx..idx + 1] {
+		match &instructions[idx..idx + 2] {
 			[(Instruction::LDA(Addressing::SP(0)), first_comment), (Instruction::LEASP(Addressing::SP(1)), second_comment)] =>
 			{
 				let comment = merge_comments!(first_comment, second_comment);
@@ -611,7 +612,7 @@ fn clra(instructions: &mut Vec<CommentedInstruction>) {
 fn inc_dec(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		match &instructions[idx..idx + 2] {
+		match &instructions[idx..idx + 3] {
 			[(Instruction::LDA(Addressing::Data(1)), _), (Instruction::SUBA(from), _), (Instruction::STA(to), _)]
 				if to == from =>
 			{
@@ -633,9 +634,10 @@ fn inc_dec(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 			}
-			_ => {}
+			_ => {
+				idx += 1;
+			}
 		}
-		idx += 1;
 	}
 }
 
@@ -753,7 +755,7 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 fn while_true(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 3 && idx <= instructions.len() - 3 {
-		match &instructions[idx..idx + 2] {
+		match &instructions[idx..idx + 3] {
 			[(Instruction::LDA(Addressing::Data(0xFF)), _), (Instruction::TSTA, _), (Instruction::BEQ(_), _)] =>
 			{
 				instructions.remove(idx + 2);
