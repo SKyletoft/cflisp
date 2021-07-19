@@ -1,4 +1,3 @@
-split Num into Signed and Unsigned
 labels/gotos
 
 Cast to bool: Bit-and with itself and then TRF C -> A
@@ -6,7 +5,6 @@ maybe?
 
 Optimisation: copy out a single calculation of address when array is used a lot
 
-Merge functions in optimise_flisp
 Merge BinOp in structless IR
 
 BUG: Writing to a struct pointer doesn't write each field.
