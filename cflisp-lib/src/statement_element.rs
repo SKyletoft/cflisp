@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::*;
 
@@ -93,7 +93,7 @@ pub enum StatementElement<'a> {
 	BitNot(Box<StatementElement<'a>>),
 	BoolNot(Box<StatementElement<'a>>),
 	Var(Cow<'a, str>),
-	Num(isize),
+	Num(Number),
 	Char(char),
 	Bool(bool),
 	Array(Vec<StatementElement<'a>>),
@@ -291,7 +291,7 @@ impl<'a> StatementElement<'a> {
 			gen_unary_op!(BoolNot),
 			(Unparsed(StatementToken::Sub), |r| {
 				Ok(StatementElement::Sub {
-					lhs: Box::new(StatementElement::Num(0)),
+					lhs: Box::new(StatementElement::Num(Number::ZERO)),
 					rhs: Box::new(r),
 				})
 			}),
@@ -357,6 +357,57 @@ impl<'a> StatementElement<'a> {
 				"Internal error: Last element in statement parsing vector was unparsed",
 			))
 		}
+	}
+
+	pub(crate) fn signedness(
+		&self,
+		symbols: &HashMap<Cow<str>, NativeType>,
+	) -> Result<NumberType, ParseError> {
+		let res = match self {
+			StatementElement::Add { lhs, rhs }
+			| StatementElement::Sub { lhs, rhs }
+			| StatementElement::Mul { lhs, rhs }
+			| StatementElement::Div { lhs, rhs }
+			| StatementElement::Mod { lhs, rhs }
+			| StatementElement::BitAnd { lhs, rhs }
+			| StatementElement::BitOr { lhs, rhs }
+			| StatementElement::Xor { lhs, rhs } => {
+				lhs.signedness(symbols)?.promote(rhs.signedness(symbols)?)
+			}
+			StatementElement::LShift { lhs, .. }
+			| StatementElement::RShift { lhs, .. }
+			| StatementElement::BitNot(lhs) => lhs.signedness(symbols)?,
+			StatementElement::GreaterThan { .. }
+			| StatementElement::LessThan { .. }
+			| StatementElement::GreaterThanEqual { .. }
+			| StatementElement::LessThanEqual { .. }
+			| StatementElement::Cmp { .. }
+			| StatementElement::NotCmp { .. }
+			| StatementElement::Bool(_) => NumberType::BOOL_SIGNEDNESS,
+			StatementElement::FunctionCall { name, .. } | StatementElement::Var(name) => symbols
+				.get(name)
+				.ok_or_else(|| {
+					dbg!(name, symbols);
+					ParseError(line!(), "Unknown symbol")
+				})?
+				.into(),
+			StatementElement::Num(Number { signedness, .. }) => *signedness,
+			StatementElement::Char(_) => NumberType::CHAR_SIGNEDNESS,
+			StatementElement::Array(arr) => arr
+				.first()
+				.map(|first| first.signedness(symbols))
+				.unwrap_or(Ok(NumberType::Unknown))?,
+			StatementElement::Deref(_) => NumberType::Unknown,
+			StatementElement::AdrOf(_) => NumberType::Unsigned,
+
+			StatementElement::BoolAnd { lhs, rhs } => todo!(),
+			StatementElement::BoolOr { lhs, rhs } => todo!(),
+			StatementElement::Cast { typ, value } => todo!(),
+			StatementElement::Ternary { cond, lhs, rhs } => todo!(),
+			StatementElement::BoolNot(_) => todo!(),
+			StatementElement::FieldPointerAccess(..) => todo!(),
+		};
+		Ok(res)
 	}
 }
 

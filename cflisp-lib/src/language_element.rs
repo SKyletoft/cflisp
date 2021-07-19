@@ -56,7 +56,7 @@ pub enum LanguageElement<'a> {
 	},
 	StructDefinition {
 		name: Cow<'a, str>,
-		members: Vec<Variable<'a>>,
+		members: Vec<NativeVariable<'a>>,
 	},
 	IfStatement {
 		condition: StatementElement<'a>,

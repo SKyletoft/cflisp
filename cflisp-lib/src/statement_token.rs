@@ -3,7 +3,7 @@ use crate::*;
 ///A reduced set of tokens for use in statements
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatementToken<'a> {
-	Num(isize),
+	Num(Number),
 	Bool(bool),
 	Char(char),
 	Var(&'a str),
@@ -70,8 +70,9 @@ impl<'a> StatementToken<'a> {
 				Token::FieldAccess => StatementToken::FieldAccess,
 				Token::FieldPointerAccess => StatementToken::FieldPointerAccess,
 				Token::BoolCast => StatementToken::Cast(NativeType::Bool),
-				Token::IntCast => StatementToken::Cast(NativeType::Int),
 				Token::CharCast => StatementToken::Cast(NativeType::Char),
+				Token::IntCast => StatementToken::Cast(NativeType::Int),
+				Token::UintCast => StatementToken::Cast(NativeType::Uint),
 				Token::Ternary(b) => {
 					let tokenised = Token::by_byte(b)?;
 					let as_statement = StatementToken::from_tokens(&tokenised)?;

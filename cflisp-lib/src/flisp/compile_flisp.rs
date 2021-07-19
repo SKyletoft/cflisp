@@ -171,7 +171,7 @@ fn compile_element<'a>(
 			..
 		} => {
 			let global_def = |val: &StructlessStatement| match val {
-				StructlessStatement::Num(n) => Ok(*n),
+				StructlessStatement::Num(n) => Ok(n.val),
 				StructlessStatement::Char(c) => Ok(*c as isize),
 				StructlessStatement::Bool(b) => Ok(*b as isize),
 				_ => {
@@ -273,7 +273,10 @@ fn compile_element<'a>(
 							)?),
 							None,
 						),
-						(Instruction::STA(Addressing::Xn(*idx)), Some(name.clone())),
+						(
+							Instruction::STA(Addressing::Xn(idx.val)),
+							Some(name.clone()),
+						),
 					]);
 					statement
 				}
@@ -475,13 +478,13 @@ fn compile_statement_inner<'a>(
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		//Commutative operations
-		StructlessStatement::Add { lhs, rhs }
-		| StructlessStatement::Mul { lhs, rhs }
-		| StructlessStatement::And { lhs, rhs }
-		| StructlessStatement::Or { lhs, rhs }
-		| StructlessStatement::Xor { lhs, rhs }
-		| StructlessStatement::NotCmp { lhs, rhs }
-		| StructlessStatement::Cmp { lhs, rhs } => {
+		StructlessStatement::Add { lhs, rhs, .. }
+		| StructlessStatement::Mul { lhs, rhs, .. }
+		| StructlessStatement::And { lhs, rhs, .. }
+		| StructlessStatement::Or { lhs, rhs, .. }
+		| StructlessStatement::Xor { lhs, rhs, .. }
+		| StructlessStatement::NotCmp { lhs, rhs, .. }
+		| StructlessStatement::Cmp { lhs, rhs, .. } => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right) = if left_depth > right_depth {
@@ -564,15 +567,52 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StructlessStatement::Sub { lhs, rhs }
-		| StructlessStatement::Div { lhs: rhs, rhs: lhs }
-		| StructlessStatement::Mod { lhs: rhs, rhs: lhs }
-		| StructlessStatement::LShift { lhs, rhs }
-		| StructlessStatement::RShift { lhs, rhs }
-		| StructlessStatement::GreaterThan { lhs: rhs, rhs: lhs }
-		| StructlessStatement::LessThanEqual { lhs: rhs, rhs: lhs }
-		| StructlessStatement::LessThan { lhs, rhs }
-		| StructlessStatement::GreaterThanEqual { lhs, rhs } => {
+		StructlessStatement::Sub {
+			lhs,
+			rhs,
+			signedness,
+		}
+		| StructlessStatement::Div {
+			lhs: rhs,
+			rhs: lhs,
+			signedness,
+		}
+		| StructlessStatement::Mod {
+			lhs: rhs,
+			rhs: lhs,
+			signedness,
+		}
+		| StructlessStatement::LShift {
+			lhs,
+			rhs,
+			signedness,
+		}
+		| StructlessStatement::RShift {
+			lhs,
+			rhs,
+			signedness,
+		}
+		| StructlessStatement::GreaterThan {
+			lhs: rhs,
+			rhs: lhs,
+			signedness,
+		}
+		| StructlessStatement::LessThanEqual {
+			lhs: rhs,
+			rhs: lhs,
+			signedness,
+		}
+		| StructlessStatement::LessThan {
+			lhs,
+			rhs,
+			signedness,
+		}
+		| StructlessStatement::GreaterThanEqual {
+			lhs,
+			rhs,
+			signedness,
+		} => {
+			let signed = matches!(*signedness, NumberType::Signed | NumberType::Unknown);
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
 			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
 			let mut right_instructions_plus_one = || {
@@ -612,20 +652,30 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StructlessStatement::GreaterThan { .. } | StructlessStatement::LessThan { .. } => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("gt rhs"))));
+					let (comment, function_name) = if signed {
+						("gts rhs", "__gts_")
+					} else {
+						("gtu rhs", "__gtu_")
+					};
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__gt__"))),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed(function_name))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
 				StructlessStatement::LessThanEqual { .. }
 				| StructlessStatement::GreaterThanEqual { .. } => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("lte rhs"))));
+					let (comment, function_name) = if signed {
+						("ltes rhs", "__gts_")
+					} else {
+						("lteu rhs", "__gtu_")
+					};
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__gt__"))),
+						Instruction::JSR(Addressing::Label(Cow::Borrowed(function_name))),
 						None,
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
@@ -634,7 +684,7 @@ fn compile_statement_inner<'a>(
 				StructlessStatement::RShift { .. } | StructlessStatement::LShift { .. } => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StructlessStatement::Num(n) = rhs.as_ref() {
-						if *n < 0 {
+						if *n < Number::ZERO {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
 						}
 						let inst = if matches!(statement, StructlessStatement::RShift { .. }) {
@@ -642,7 +692,7 @@ fn compile_statement_inner<'a>(
 						} else {
 							Instruction::LSLA
 						};
-						instructions.append(&mut vec![(inst, None); *n as usize]);
+						instructions.append(&mut vec![(inst, None); n.val as usize]);
 					} else {
 						//The byte to be shifted is in SP(tmps_used) as it's the left hand side
 						// and the amount of shifts are in the A register.
@@ -742,7 +792,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::Num(n) => {
-			vec![(Instruction::LDA(Addressing::Data(*n)), None)]
+			vec![(Instruction::LDA(Addressing::Data(n.val)), None)]
 		}
 
 		StructlessStatement::Char(c) => {
@@ -777,7 +827,7 @@ fn compile_statement_inner<'a>(
 					)?;
 					vec![
 						(Instruction::LDY(adr), Some(Cow::Borrowed(name.as_ref()))),
-						(Instruction::LDA(Addressing::Yn(offset)), None),
+						(Instruction::LDA(Addressing::Yn(offset.val)), None),
 					]
 				}
 				//General opt
@@ -801,7 +851,7 @@ fn compile_statement_inner<'a>(
 				| (&StructlessStatement::Add { .. }, Some((rhs, StructlessStatement::Num(idx)))) => {
 					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
-						(Instruction::LDY(Addressing::Data(*idx)), None),
+						(Instruction::LDY(Addressing::Data(idx.val)), None),
 						(Instruction::LDA(Addressing::AY), None),
 					]);
 					statement
@@ -872,7 +922,7 @@ fn adr_for_name<'a>(
 			Ok(Addressing::Label(Cow::Borrowed(name)))
 		}
 	} else {
-		eprintln!("Error: {}", name);
+		dbg!(name, variables, global_variables);
 		Err(CompileError(
 			line!(),
 			"Name resolution failed? Shouldn't that have be checked by now?",

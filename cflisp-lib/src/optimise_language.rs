@@ -187,22 +187,22 @@ fn find_variables_le<'a>(vars: &mut HashSet<String>, elements: &'a [StructlessLa
 
 fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StructlessStatement<'a>) {
 	match element {
-		StructlessStatement::Add { lhs, rhs }
-		| StructlessStatement::Sub { lhs, rhs }
-		| StructlessStatement::Mul { lhs, rhs }
-		| StructlessStatement::Div { lhs, rhs }
-		| StructlessStatement::Mod { lhs, rhs }
-		| StructlessStatement::LShift { lhs, rhs }
-		| StructlessStatement::RShift { lhs, rhs }
-		| StructlessStatement::And { lhs, rhs }
-		| StructlessStatement::Or { lhs, rhs }
-		| StructlessStatement::Xor { lhs, rhs }
-		| StructlessStatement::GreaterThan { lhs, rhs }
-		| StructlessStatement::LessThan { lhs, rhs }
-		| StructlessStatement::GreaterThanEqual { lhs, rhs }
-		| StructlessStatement::LessThanEqual { lhs, rhs }
-		| StructlessStatement::Cmp { lhs, rhs }
-		| StructlessStatement::NotCmp { lhs, rhs } => {
+		StructlessStatement::Add { lhs, rhs, .. }
+		| StructlessStatement::Sub { lhs, rhs, .. }
+		| StructlessStatement::Mul { lhs, rhs, .. }
+		| StructlessStatement::Div { lhs, rhs, .. }
+		| StructlessStatement::Mod { lhs, rhs, .. }
+		| StructlessStatement::LShift { lhs, rhs, .. }
+		| StructlessStatement::RShift { lhs, rhs, .. }
+		| StructlessStatement::And { lhs, rhs, .. }
+		| StructlessStatement::Or { lhs, rhs, .. }
+		| StructlessStatement::Xor { lhs, rhs, .. }
+		| StructlessStatement::GreaterThan { lhs, rhs, .. }
+		| StructlessStatement::LessThan { lhs, rhs, .. }
+		| StructlessStatement::GreaterThanEqual { lhs, rhs, .. }
+		| StructlessStatement::LessThanEqual { lhs, rhs, .. }
+		| StructlessStatement::Cmp { lhs, rhs, .. }
+		| StructlessStatement::NotCmp { lhs, rhs, .. } => {
 			find_variables_se(vars, lhs);
 			find_variables_se(vars, rhs);
 		}

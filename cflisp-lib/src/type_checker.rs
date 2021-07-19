@@ -20,7 +20,7 @@ pub(crate) fn language_element<'a>(
 	block: &'a [LanguageElement<'a>],
 	variables: &mut HashMap<Cow<'a, str>, Type<'a>>,
 	functions: &mut HashMap<Cow<'a, str>, Function<'a>>,
-	structs: &mut HashMap<&'a str, Vec<Variable<'a>>>,
+	structs: &mut HashMap<&'a str, Vec<NativeVariable<'a>>>,
 	constants: &mut HashSet<&'a str>,
 ) -> Result<(), TypeError> {
 	for line in block {
@@ -40,7 +40,7 @@ pub(crate) fn language_element<'a>(
 			LanguageElement::VariableAssignment { name, value, .. } => {
 				statement_element(value, variables, functions, structs)?;
 				let correct_type = variables.get(name).ok_or_else(|| {
-					dbg!(line, name);
+					dbg!(line, name, &variables);
 					TypeError(line!(), "Undefined variable")
 				})?;
 				let actual_type = type_of(value, variables, functions, structs)?;
@@ -297,7 +297,7 @@ pub(crate) fn language_element<'a>(
 				})?;
 				let field_type = fields
 					.iter()
-					.find(|Variable { name, typ: _ }| name == field)
+					.find(|NativeVariable { name, .. }| name == field)
 					.ok_or_else(|| {
 						dbg!(line, field);
 						TypeError(line!(), "Undefined field")
@@ -328,7 +328,7 @@ pub(crate) fn verify_function_return_type<'a>(
 	elems: &[LanguageElement<'a>],
 	variables: &'a HashMap<Cow<'a, str>, Type>,
 	functions: &'a HashMap<Cow<'a, str>, Function>,
-	structs: &'a HashMap<&'a str, Vec<Variable<'a>>>,
+	structs: &'a HashMap<&'a str, Vec<NativeVariable<'a>>>,
 	correct_return: &Type,
 ) -> Result<(), TypeError> {
 	macro_rules! chain_blocks {
@@ -395,7 +395,7 @@ pub(crate) fn type_of<'a>(
 	elem: &StatementElement<'a>,
 	variables: &'a HashMap<Cow<'a, str>, Type>,
 	functions: &'a HashMap<Cow<'a, str>, Function>,
-	structs: &'a HashMap<&'a str, Vec<Variable<'a>>>,
+	structs: &'a HashMap<&'a str, Vec<NativeVariable<'a>>>,
 ) -> Result<Type<'a>, TypeError> {
 	let res = match elem {
 		StatementElement::Xor { lhs, rhs } => {
@@ -496,20 +496,20 @@ pub(crate) fn type_of<'a>(
 				Err(TypeError(line!(), "Variable isn't a pointer"))
 			}?;
 
-			structs
+			(&structs
 				.get(struct_type)
 				.ok_or_else(|| {
 					dbg!(elem, struct_type);
 					TypeError(line!(), "Cannot resolve struct type")
 				})?
 				.iter()
-				.find(|f| f.name == field)
+				.find(|f| &f.name == field)
 				.ok_or_else(|| {
 					dbg!(elem, field);
 					TypeError(line!(), "Cannot resolve field name")
 				})?
-				.typ
-				.clone()
+				.typ)
+				.into()
 		}
 		StatementElement::Cast { typ, .. } => typ.into(),
 	};
@@ -520,7 +520,7 @@ pub fn statement_element(
 	elem: &StatementElement,
 	variables: &HashMap<Cow<str>, Type>,
 	functions: &HashMap<Cow<str>, Function>,
-	structs: &HashMap<&str, Vec<Variable>>,
+	structs: &HashMap<&str, Vec<NativeVariable>>,
 ) -> Result<(), TypeError> {
 	let res = match elem {
 		StatementElement::FunctionCall { name, parametres } => {
@@ -596,7 +596,10 @@ pub fn statement_element(
 			}
 			if let Some(Type::Struct(struct_type)) = variables.get(name) {
 				if let Some(fields) = structs.get(struct_type) {
-					if !fields.iter().any(|Variable { name, .. }| name == field) {
+					if !fields
+						.iter()
+						.any(|NativeVariable { name, .. }| name == field)
+					{
 						dbg!(elem);
 						return Err(TypeError(line!(), "Unknown field name"));
 					}

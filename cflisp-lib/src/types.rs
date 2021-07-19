@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, cmp, collections::HashMap, default::Default, fmt, ops};
 
 use crate::*;
 
@@ -10,29 +10,19 @@ pub struct Variable<'a> {
 }
 
 impl<'a> Variable<'a> {
+	///Get the inner field list with each member prepended with the struct type name, e.g. `[Foo::A, Foo::B, Foo::C]`
 	pub(crate) fn split_into_native(
 		self,
-		struct_defs: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
+		struct_defs: &HashMap<Cow<'a, str>, Vec<NativeVariable<'a>>>,
 	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
 		let res = if let Type::Struct(struct_type) = self.typ {
-			let mut vec = vec![NativeVariable {
-				name: Cow::Borrowed(self.name),
-				typ: NativeType::Void,
-			}];
-			struct_defs
+			let mut vec = struct_defs
 				.get(struct_type)
 				.ok_or(ParseError(line!(), "Undefined struct type"))?
-				.iter()
-				.map(
-					|Variable {
-					     typ: var_typ,
-					     name: var_name,
-					 }| NativeVariable {
-						typ: var_typ.into(),
-						name: helper::merge_name_and_field(self.name, var_name),
-					},
-				)
-				.for_each(|field| vec.push(field));
+				.clone();
+			for NativeVariable { name, .. } in vec.iter_mut() {
+				*name = helper::merge_name_and_field(self.name, name);
+			}
 			vec
 		} else {
 			vec![NativeVariable {
@@ -215,15 +205,10 @@ impl<'a> PartialEq<NativeType> for Type<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NumberType {
+pub enum NumberType {
 	Signed,
 	Unsigned,
 	Unknown,
-}
-
-struct Number {
-	val: isize,
-	signedness: NumberType,
 }
 
 impl From<isize> for NumberType {
@@ -238,8 +223,31 @@ impl From<isize> for NumberType {
 	}
 }
 
+impl From<&NativeType> for NumberType {
+	fn from(typ: &NativeType) -> Self {
+		match typ {
+			NativeType::Uint => NumberType::Unsigned,
+			NativeType::Int => NumberType::Signed,
+			NativeType::Char => NumberType::CHAR_SIGNEDNESS,
+			NativeType::Bool => NumberType::BOOL_SIGNEDNESS,
+			NativeType::Void => NumberType::Unknown,
+			NativeType::Ptr(_) => NumberType::PTR_SIGNEDNESS,
+		}
+	}
+}
+
+impl Default for NumberType {
+	fn default() -> Self {
+		NumberType::Unknown
+	}
+}
+
 impl NumberType {
-	pub fn promote(self, other: Self) -> Self {
+	pub const BOOL_SIGNEDNESS: Self = NumberType::Unsigned;
+	pub const CHAR_SIGNEDNESS: Self = NumberType::Unknown;
+	pub const PTR_SIGNEDNESS: Self = NumberType::Unsigned;
+
+	pub(crate) fn promote(self, other: Self) -> Self {
 		if self == other {
 			return self;
 		}
@@ -253,5 +261,180 @@ impl NumberType {
 			return NumberType::Signed;
 		}
 		unreachable!()
+	}
+
+	fn make_in_range(&self, n: isize) -> isize {
+		match self {
+			NumberType::Signed => n % (i8::MAX as isize + 1),
+			NumberType::Unsigned => (n + u8::MAX as isize + 1) % u8::MAX as isize,
+			NumberType::Unknown => {
+				assert!(n >= 0 && n <= i8::MAX as isize + 1, "{}", n);
+				n
+			}
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Number {
+	pub val: isize,
+	pub signedness: NumberType,
+}
+
+impl From<isize> for Number {
+	fn from(n: isize) -> Self {
+		Self {
+			val: n,
+			signedness: n.into(),
+		}
+	}
+}
+
+impl ops::Add for Number {
+	type Output = Self;
+
+	fn add(self, rhs: Self) -> Self::Output {
+		let signedness = self.signedness.promote(rhs.signedness);
+		let raw_val = self.val + rhs.val;
+		let val = signedness.make_in_range(raw_val);
+		Self { val, signedness }
+	}
+}
+
+impl ops::Sub for Number {
+	type Output = Self;
+
+	fn sub(self, rhs: Self) -> Self::Output {
+		let signedness = self.signedness.promote(rhs.signedness);
+		let raw_val = self.val - rhs.val;
+		let val = signedness.make_in_range(raw_val);
+		Self { val, signedness }
+	}
+}
+
+impl ops::Mul for Number {
+	type Output = Self;
+
+	fn mul(self, rhs: Self) -> Self::Output {
+		let signedness = self.signedness.promote(rhs.signedness);
+		let raw_val = self.val * rhs.val;
+		let val = signedness.make_in_range(raw_val);
+		Self { val, signedness }
+	}
+}
+
+impl ops::Div for Number {
+	type Output = Self;
+
+	fn div(self, rhs: Self) -> Self::Output {
+		let signedness = self.signedness.promote(rhs.signedness);
+		let raw_val = self.val / rhs.val;
+		let val = signedness.make_in_range(raw_val);
+		Self { val, signedness }
+	}
+}
+
+impl ops::Rem for Number {
+	type Output = Self;
+
+	fn rem(self, rhs: Self) -> Self::Output {
+		let signedness = self.signedness.promote(rhs.signedness);
+		let raw_val = self.val % rhs.val;
+		let val = signedness.make_in_range(raw_val);
+		Self { val, signedness }
+	}
+}
+
+impl ops::Shl for Number {
+	type Output = Self;
+
+	fn shl(self, rhs: Self) -> Self::Output {
+		let val = self.val << rhs.val;
+		Self {
+			val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl ops::Shr for Number {
+	type Output = Self;
+
+	fn shr(self, rhs: Self) -> Self::Output {
+		let val = self.val >> rhs.val;
+		Self {
+			val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl ops::BitAnd for Number {
+	type Output = Self;
+
+	fn bitand(self, rhs: Self) -> Self::Output {
+		let val = self.val & rhs.val;
+		Self {
+			val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl ops::BitOr for Number {
+	type Output = Self;
+
+	fn bitor(self, rhs: Self) -> Self::Output {
+		let val = self.val | rhs.val;
+		Self {
+			val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl ops::BitXor for Number {
+	type Output = Self;
+
+	fn bitxor(self, rhs: Self) -> Self::Output {
+		let val = self.val ^ rhs.val;
+		Self {
+			val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl ops::Not for Number {
+	type Output = Self;
+
+	fn not(self) -> Self::Output {
+		Number {
+			val: !self.val,
+			signedness: self.signedness,
+		}
+	}
+}
+
+impl cmp::PartialOrd for Number {
+	fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+		self.val.partial_cmp(&other.val)
+	}
+}
+
+impl fmt::Display for Number {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.val)
+	}
+}
+
+impl Number {
+	pub const ZERO: Self = Number {
+		val: 0,
+		signedness: NumberType::Unknown,
+	};
+
+	pub fn new(val: isize, signedness: NumberType) -> Self {
+		Self { val, signedness }
 	}
 }

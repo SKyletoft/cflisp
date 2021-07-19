@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::*;
 
 ///All possible tokens in the source (after comments have been removed)
@@ -63,7 +65,7 @@ pub enum Token<'a> {
 	NewLine,
 	NoReturn,
 	NotCmp,
-	Num(isize),
+	Num(Number),
 	Register,
 	Restrict,
 	Return,
@@ -80,6 +82,7 @@ pub enum Token<'a> {
 	ThreadLocal,
 	Ternary(&'a str),
 	TypeDef,
+	UintCast,
 	Union,
 	UnparsedArrayAccess(&'a str),
 	UnparsedBlock(&'a str),
@@ -169,7 +172,9 @@ impl<'a> Token<'a> {
 	}
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
-	pub(crate) fn parse_struct_member_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+	pub(crate) fn parse_struct_member_tokens(
+		s: &'a str,
+	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
@@ -177,9 +182,9 @@ impl<'a> Token<'a> {
 		let mut arguments = Vec::new();
 		for slice in tokens.windows(3).step_by(3) {
 			if let [Decl(t), Name(n), NewLine] = slice {
-				arguments.push(Variable {
-					typ: t.into(),
-					name: *n,
+				arguments.push(NativeVariable {
+					typ: t.clone(),
+					name: Cow::Borrowed(n),
 				})
 			} else {
 				dbg!(s, tokens);

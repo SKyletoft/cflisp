@@ -40,8 +40,10 @@ pub enum Instruction<'a> {
 	JMP(Addressing<'a>),
 	BNE(Addressing<'a>),
 	BEQ(Addressing<'a>),
-	BGE(Addressing<'a>),
-	BLT(Addressing<'a>),
+	BGE(Addressing<'a>), //Signed
+	BLT(Addressing<'a>), //Signed
+	BHS(Addressing<'a>), //Unsigned
+	BLO(Addressing<'a>), //Unsigned
 
 	INC(Addressing<'a>),
 	DEC(Addressing<'a>),
@@ -81,6 +83,8 @@ impl<'a> fmt::Display for Instruction<'a> {
 			Instruction::BEQ(a) => write!(f, "\tBEQ\t{}", *a),
 			Instruction::BGE(a) => write!(f, "\tBGE\t{}", *a),
 			Instruction::BLT(a) => write!(f, "\tBLT\t{}", *a),
+			Instruction::BHS(a) => write!(f, "\tBHS\t{}", *a),
+			Instruction::BLO(a) => write!(f, "\tBLO\t{}", *a),
 			Instruction::LEASP(a) => write!(f, "\tLEASP\t{}", *a),
 			Instruction::JSR(a) => write!(f, "\tJSR\t{}", *a),
 			Instruction::CMPA(a) => write!(f, "\tCMPA\t{}", *a),
@@ -220,6 +224,8 @@ impl<'a> Instruction<'a> {
 			| Instruction::BEQ(a)
 			| Instruction::BGE(a)
 			| Instruction::BLT(a)
+			| Instruction::BHS(a)
+			| Instruction::BLO(a)
 			| Instruction::JSR(a)
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
@@ -265,6 +271,8 @@ impl<'a> Instruction<'a> {
 			| Instruction::BEQ(a)
 			| Instruction::BGE(a)
 			| Instruction::BLT(a)
+			| Instruction::BHS(a)
+			| Instruction::BLO(a)
 			| Instruction::JSR(a)
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)
@@ -311,6 +319,8 @@ impl<'a> Instruction<'a> {
 			| Instruction::BEQ(a)
 			| Instruction::BGE(a)
 			| Instruction::BLT(a)
+			| Instruction::BHS(a)
+			| Instruction::BLO(a)
 			| Instruction::JSR(a)
 			| Instruction::CMPA(a)
 			| Instruction::INC(a)

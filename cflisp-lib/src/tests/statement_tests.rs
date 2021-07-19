@@ -8,29 +8,35 @@ fn fast_mul() {
 	let x = Cow::Borrowed("x");
 
 	let mut case_1 = StructlessStatement::Mul {
-		lhs: Box::new(StructlessStatement::Num(5)),
-		rhs: Box::new(StructlessStatement::Num(6)),
+		lhs: Box::new(StructlessStatement::Num(5.into())),
+		rhs: Box::new(StructlessStatement::Num(6.into())),
+		signedness: NumberType::Unknown,
 	};
-	let expected_1 = StructlessStatement::Num(5 * 6);
+	let expected_1 = StructlessStatement::Num((5 * 6).into());
 	optimise_statement::fast_mul(&mut case_1);
 	assert_eq!(case_1, expected_1);
 
 	let mut case_2 = StructlessStatement::Mul {
-		lhs: Box::new(StructlessStatement::Num(0b10101)),
+		lhs: Box::new(StructlessStatement::Num(0b10101.into())),
 		rhs: Box::new(StructlessStatement::Var(x.clone())),
+		signedness: NumberType::Unknown,
 	};
 	let expected_2 = StructlessStatement::Add {
 		lhs: Box::new(StructlessStatement::Add {
 			lhs: Box::new(StructlessStatement::Var(x.clone())),
 			rhs: Box::new(StructlessStatement::LShift {
 				lhs: Box::new(StructlessStatement::Var(x.clone())),
-				rhs: Box::new(StructlessStatement::Num(2)),
+				rhs: Box::new(StructlessStatement::Num(2.into())),
+				signedness: NumberType::Unknown,
 			}),
+			signedness: NumberType::Unknown,
 		}),
 		rhs: Box::new(StructlessStatement::LShift {
 			lhs: Box::new(StructlessStatement::Var(x.clone())),
-			rhs: Box::new(StructlessStatement::Num(4)),
+			rhs: Box::new(StructlessStatement::Num(4.into())),
+			signedness: NumberType::Unknown,
 		}),
+		signedness: NumberType::Unknown,
 	};
 	optimise_statement::fast_mul(&mut case_2);
 	assert_eq!(case_2, expected_2);
@@ -40,11 +46,13 @@ fn fast_mul() {
 fn fast_div() {
 	let mut case_1 = StructlessStatement::Div {
 		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
-		rhs: Box::new(StructlessStatement::Num(8)),
+		rhs: Box::new(StructlessStatement::Num(8.into())),
+		signedness: NumberType::Unknown,
 	};
 	let expected_1 = StructlessStatement::RShift {
 		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
-		rhs: Box::new(StructlessStatement::Num(3)),
+		rhs: Box::new(StructlessStatement::Num(3.into())),
+		signedness: NumberType::Unknown,
 	};
 	optimise_statement::fast_div(&mut case_1);
 	assert_eq!(case_1, expected_1);
@@ -54,11 +62,13 @@ fn fast_div() {
 fn fast_mod() {
 	let mut case_1 = StructlessStatement::Mod {
 		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
-		rhs: Box::new(StructlessStatement::Num(8)),
+		rhs: Box::new(StructlessStatement::Num(8.into())),
+		signedness: NumberType::Unknown,
 	};
 	let expected_1 = StructlessStatement::And {
 		lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
-		rhs: Box::new(StructlessStatement::Num(0b0000_0111)),
+		rhs: Box::new(StructlessStatement::Num(0b0000_0111.into())),
+		signedness: NumberType::Unknown,
 	};
 	optimise_statement::fast_mod(&mut case_1);
 	assert_eq!(case_1, expected_1);
@@ -67,41 +77,49 @@ fn fast_mod() {
 #[test]
 fn const_eval() {
 	let mut case_1 = StructlessStatement::Add {
-		lhs: Box::new(StructlessStatement::Num(5)),
-		rhs: Box::new(StructlessStatement::Num(3)),
+		lhs: Box::new(StructlessStatement::Num(5.into())),
+		rhs: Box::new(StructlessStatement::Num(3.into())),
+		signedness: NumberType::Unknown,
 	};
-	let expected_1 = StructlessStatement::Num(5 + 3);
+	let expected_1 = StructlessStatement::Num((5 + 3).into());
 	optimise_statement::const_eval(&mut case_1);
 	assert_eq!(case_1, expected_1);
 
 	let mut case_2 = StructlessStatement::Div {
 		lhs: Box::new(StructlessStatement::Mul {
 			lhs: Box::new(StructlessStatement::Add {
-				lhs: Box::new(StructlessStatement::Num(5)),
-				rhs: Box::new(StructlessStatement::Num(3)),
+				lhs: Box::new(StructlessStatement::Num(5.into())),
+				rhs: Box::new(StructlessStatement::Num(3.into())),
+				signedness: NumberType::Unknown,
 			}),
-			rhs: Box::new(StructlessStatement::Num(2)),
+			rhs: Box::new(StructlessStatement::Num(2.into())),
+			signedness: NumberType::Unknown,
 		}),
 		rhs: Box::new(StructlessStatement::Add {
 			lhs: Box::new(StructlessStatement::Sub {
-				lhs: Box::new(StructlessStatement::Num(8)),
-				rhs: Box::new(StructlessStatement::Num(12)),
+				lhs: Box::new(StructlessStatement::Num(8.into())),
+				rhs: Box::new(StructlessStatement::Num(12.into())),
+				signedness: NumberType::Unknown,
 			}),
-			rhs: Box::new(StructlessStatement::Num(34)),
+			rhs: Box::new(StructlessStatement::Num(34.into())),
+			signedness: NumberType::Unknown,
 		}),
+		signedness: NumberType::Unknown,
 	};
-	let expected_2 = StructlessStatement::Num(0);
+	let expected_2 = StructlessStatement::Num(0.into());
 	optimise_statement::const_eval(&mut case_2);
 	assert_eq!(case_2, expected_2);
 
 	let mut case_3 = StructlessStatement::Mul {
 		lhs: Box::new(StructlessStatement::Add {
-			lhs: Box::new(StructlessStatement::Num(5)),
-			rhs: Box::new(StructlessStatement::Num(3)),
+			lhs: Box::new(StructlessStatement::Num(5.into())),
+			rhs: Box::new(StructlessStatement::Num(3.into())),
+			signedness: NumberType::Unknown,
 		}),
-		rhs: Box::new(StructlessStatement::Num(2)),
+		rhs: Box::new(StructlessStatement::Num(2.into())),
+		signedness: NumberType::Unknown,
 	};
-	let expected_3 = StructlessStatement::Num((5 + 3) * 2);
+	let expected_3 = StructlessStatement::Num(((5 + 3) * 2).into());
 	optimise_statement::const_eval(&mut case_3);
 	assert_eq!(case_3, expected_3);
 }
@@ -112,7 +130,7 @@ fn remove_unused_variables() {
 		StructlessLanguage::VariableDeclarationAssignment {
 			name: Cow::Borrowed("x"),
 			typ: NativeType::Int,
-			value: StructlessStatement::Num(5),
+			value: StructlessStatement::Num(5.into()),
 			is_static: false,
 			is_const: false,
 			is_volatile: false,
@@ -121,8 +139,9 @@ fn remove_unused_variables() {
 			name: Cow::Borrowed("y"),
 			typ: NativeType::Int,
 			value: StructlessStatement::Add {
-				lhs: Box::new(StructlessStatement::Num(1)),
+				lhs: Box::new(StructlessStatement::Num(1.into())),
 				rhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+				signedness: NumberType::Unknown,
 			},
 			is_static: false,
 			is_const: false,
@@ -131,7 +150,7 @@ fn remove_unused_variables() {
 		StructlessLanguage::VariableDeclarationAssignment {
 			name: Cow::Borrowed("z"),
 			typ: NativeType::Int,
-			value: StructlessStatement::Num(5),
+			value: StructlessStatement::Num(5.into()),
 			is_static: false,
 			is_const: false,
 			is_volatile: false,
@@ -142,7 +161,7 @@ fn remove_unused_variables() {
 		StructlessLanguage::VariableDeclarationAssignment {
 			name: Cow::Borrowed("x"),
 			typ: NativeType::Int,
-			value: StructlessStatement::Num(5),
+			value: StructlessStatement::Num(5.into()),
 			is_static: false,
 			is_const: false,
 			is_volatile: false,
@@ -151,8 +170,9 @@ fn remove_unused_variables() {
 			name: Cow::Borrowed("y"),
 			typ: NativeType::Int,
 			value: StructlessStatement::Add {
-				lhs: Box::new(StructlessStatement::Num(1)),
+				lhs: Box::new(StructlessStatement::Num(1.into())),
 				rhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
+				signedness: NumberType::Unknown,
 			},
 			is_static: false,
 			is_const: false,
@@ -170,32 +190,34 @@ fn const_prop() {
 		StructlessLanguage::VariableDeclarationAssignment {
 			typ: NativeType::Int,
 			name: Cow::Borrowed("x"),
-			value: StructlessStatement::Num(5),
+			value: StructlessStatement::Num(5.into()),
 			is_const: true,
 			is_static: false,
 			is_volatile: false,
 		},
 		StructlessLanguage::Return(Some(StructlessStatement::Add {
 			lhs: Box::new(StructlessStatement::Var(Cow::Borrowed("x"))),
-			rhs: Box::new(StructlessStatement::Num(2)),
+			rhs: Box::new(StructlessStatement::Num(2.into())),
+			signedness: NumberType::Unknown,
 		})),
 	];
 	let expected_1_mid = vec![
 		StructlessLanguage::VariableDeclarationAssignment {
 			typ: NativeType::Int,
 			name: Cow::Borrowed("x"),
-			value: StructlessStatement::Num(5),
+			value: StructlessStatement::Num(5.into()),
 			is_const: true,
 			is_static: false,
 			is_volatile: false,
 		},
 		StructlessLanguage::Return(Some(StructlessStatement::Add {
-			lhs: Box::new(StructlessStatement::Num(5)),
-			rhs: Box::new(StructlessStatement::Num(2)),
+			lhs: Box::new(StructlessStatement::Num(5.into())),
+			rhs: Box::new(StructlessStatement::Num(2.into())),
+			signedness: NumberType::Unknown,
 		})),
 	];
 	let expected_1_end = vec![StructlessLanguage::Return(Some(StructlessStatement::Num(
-		7,
+		7.into(),
 	)))];
 	optimise_language::const_prop(&mut case_1);
 	assert_eq!(&case_1, &expected_1_mid);
@@ -219,7 +241,7 @@ fn extract_statics() {
 			},
 			LanguageElement::VariableAssignment {
 				name: Cow::Borrowed("alpha_beta_gamma"),
-				value: StatementElement::Num(3),
+				value: StatementElement::Num(3.into()),
 			},
 		],
 	}];
@@ -237,7 +259,7 @@ fn extract_statics() {
 			args: vec![],
 			block: vec![StructlessLanguage::VariableAssignment {
 				name: Cow::Borrowed("main::alpha_beta_gamma"),
-				value: StructlessStatement::Num(3),
+				value: StructlessStatement::Num(3.into()),
 			}],
 		},
 	];

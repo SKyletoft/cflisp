@@ -31,6 +31,11 @@ fn legacy_dont_crash() {
 		let flags = Flags::default();
 		let no_comments = parser::remove_comments(file);
 		let parsed = parser::parse(&no_comments, false).unwrap();
+		let type_checked = type_checker::type_check(&parsed);
+		if let Err(err) = type_checked {
+			dbg!(err);
+			panic!("Type check failed");
+		}
 		let no_structs = StructlessLanguage::from_language_elements(parsed).unwrap();
 		let asm = flisp::compile_flisp::compile(&no_structs, &flags).unwrap();
 		let text = flisp::text::instructions_to_text(&asm, &flags).unwrap();
@@ -60,8 +65,8 @@ fn legacy_dont_crash() {
 		include_str!("../../../cflisp-cli/legacy_tests/test27.c"),
 	];
 
-	for file in files.iter() {
-		eprintln!("{}", file);
+	for (index, file) in files.iter().enumerate() {
+		eprintln!("-[{}]------------------------------\n{}", index, file);
 		run(file);
 	}
 }
@@ -98,7 +103,7 @@ fn init_native_variables() {
 			LanguageElement::VariableDeclarationAssignment {
 				typ: Type::Int,
 				name: "y".into(),
-				value: StatementElement::Num(5),
+				value: StatementElement::Num(5.into()),
 				is_static: false,
 				is_const: false,
 				is_volatile: false,
@@ -107,8 +112,8 @@ fn init_native_variables() {
 				typ: Type::Int,
 				name: "z".into(),
 				value: StatementElement::Add {
-					lhs: Box::new(StatementElement::Num(6)),
-					rhs: Box::new(StatementElement::Num(2)),
+					lhs: Box::new(StatementElement::Num(6.into())),
+					rhs: Box::new(StatementElement::Num(2.into())),
 				},
 				is_static: false,
 				is_const: false,
@@ -140,7 +145,7 @@ fn parse_numbers() {
 		let as_string = format!("{}", expected);
 		let (parsed, rest) = lexer::get_token(&as_string).unwrap();
 		if let Token::Num(n) = parsed {
-			assert_eq!(expected as i8, n as i8);
+			assert_eq!(expected as i8, n.val as i8);
 			assert!(rest.is_empty());
 		} else {
 			panic!();
@@ -151,7 +156,7 @@ fn parse_numbers() {
 		let as_string = format!("0x{:x}", expected);
 		let (parsed_hex_lo, rest) = lexer::get_token(&as_string).unwrap();
 		if let Token::Num(n) = parsed_hex_lo {
-			assert_eq!(expected, n as i8);
+			assert_eq!(expected, n.val as i8);
 			assert!(rest.is_empty());
 		} else {
 			panic!();
@@ -160,7 +165,7 @@ fn parse_numbers() {
 		let as_string = format!("0X{:X}", expected);
 		let (parsed_hex_hi, rest) = lexer::get_token(&as_string).unwrap();
 		if let Token::Num(n) = parsed_hex_hi {
-			assert_eq!(expected, n as i8);
+			assert_eq!(expected, n.val as i8);
 			assert!(rest.is_empty());
 		} else {
 			panic!();
@@ -205,11 +210,11 @@ fn ternary_op() {
 	let case_1 = "5 < 6 ? 1 : 0";
 	let expected_1 = StatementElement::Ternary {
 		cond: Box::new(StatementElement::LessThan {
-			lhs: Box::new(StatementElement::Num(5)),
-			rhs: Box::new(StatementElement::Num(6)),
+			lhs: Box::new(StatementElement::Num(5.into())),
+			rhs: Box::new(StatementElement::Num(6.into())),
 		}),
-		lhs: Box::new(StatementElement::Num(1)),
-		rhs: Box::new(StatementElement::Num(0)),
+		lhs: Box::new(StatementElement::Num(1.into())),
+		rhs: Box::new(StatementElement::Num(0.into())),
 	};
 	let res_1 = StatementElement::from_source_str(case_1).unwrap();
 	assert_eq!(res_1, expected_1);
@@ -235,7 +240,7 @@ fn ternary_op() {
 fn negate() {
 	let case_1 = "-x";
 	let expected_1 = StatementElement::Sub {
-		lhs: Box::new(StatementElement::Num(0)),
+		lhs: Box::new(StatementElement::Num(0.into())),
 		rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
 	};
 	let res_1 = StatementElement::from_source_str(case_1).unwrap();
@@ -243,9 +248,9 @@ fn negate() {
 
 	let case_2 = "-(-x)";
 	let expected_2 = StatementElement::Sub {
-		lhs: Box::new(StatementElement::Num(0)),
+		lhs: Box::new(StatementElement::Num(0.into())),
 		rhs: Box::new(StatementElement::Sub {
-			lhs: Box::new(StatementElement::Num(0)),
+			lhs: Box::new(StatementElement::Num(0.into())),
 			rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
 		}),
 	};

@@ -58,8 +58,11 @@ pub fn automatic_imports(instructions: &mut String, debug: bool, kill_interrupts
 	if instructions.contains("__eq__") {
 		instructions.push_str(include_str!("asm_deps/eq.sflisp"));
 	}
-	if instructions.contains("__gt__") {
-		instructions.push_str(include_str!("asm_deps/gt.sflisp"));
+	if instructions.contains("__gts_") {
+		instructions.push_str(include_str!("asm_deps/gts.sflisp"));
+	}
+	if instructions.contains("__gtu_") {
+		instructions.push_str(include_str!("asm_deps/gtu.sflisp"));
 	}
 	if instructions.contains("__div__") {
 		instructions.push_str(include_str!("asm_deps/div.sflisp"));

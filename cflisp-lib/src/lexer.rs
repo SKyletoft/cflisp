@@ -24,7 +24,10 @@ fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 			.fold((0, 0), |(_, acc), (len, curr)| {
 				(len, acc * 16 + hex_digit_value(curr))
 			});
-		Some((Token::Num(num), &s[(len + 1)..]))
+		Some((
+			Token::Num(Number::new(num, NumberType::Unsigned)),
+			&s[(len + 1)..],
+		))
 	} else {
 		None
 	}
@@ -43,7 +46,7 @@ fn get_negative_number(s: &str) -> Option<(Token, &str)> {
 				len += 1;
 				acc * 10 + (curr - b'0') as isize
 			});
-		Some((Token::Num(-num), &s[len..]))
+		Some((Token::Num(Number::new(-num, NumberType::Signed)), &s[len..]))
 	} else {
 		None
 	}
@@ -60,7 +63,7 @@ fn get_positive_number(s: &str) -> Option<(Token, &str)> {
 				len += 1;
 				acc * 10 + (curr - b'0') as isize
 			});
-		Some((Token::Num(num), &s[len..]))
+		Some((Token::Num(num.into()), &s[len..]))
 	} else {
 		None
 	}
@@ -281,11 +284,12 @@ const KEYWORDS: [(&str, TokenFunction); 59] = [
 	("void", || Decl(NativeType::Void)),
 ];
 
-const OPERATORS: [(&str, TokenFunction); 31] = [
-	("(bool)", || BoolCast),
-	("(int)", || IntCast),
-	("(char)", || CharCast),
+const OPERATORS: [(&str, TokenFunction); 32] = [
 	("(any)", || AnyCast),
+	("(bool)", || BoolCast),
+	("(char)", || CharCast),
+	("(int)", || IntCast),
+	("(uint)", || UintCast),
 	("==", || Cmp),
 	("!=", || NotCmp),
 	(">=", || GreaterThanEqual),

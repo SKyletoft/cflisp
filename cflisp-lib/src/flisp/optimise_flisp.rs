@@ -737,6 +737,7 @@ fn deca(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces the generated function call to __eq__ and a jump that is required for
 /// chained boolean operators with a BEQ instruction directly
 fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
+	return;
 	let mut idx = 0;
 	while instructions.len() >= 6 && idx <= instructions.len() - 6 {
 		if let (
@@ -779,6 +780,7 @@ fn cmp_eq_jmp(instructions: &mut Vec<CommentedInstruction>) {
 ///Replaces the generated function call to __eq__ and a jump that is required for
 /// chained boolean operators with a BNE instruction directly
 fn cmp_neq_jmp(instructions: &mut Vec<CommentedInstruction>) {
+	return;
 	let mut idx = 0;
 	while instructions.len() >= 7 && idx <= instructions.len() - 7 {
 		if let (
@@ -841,19 +843,25 @@ fn cmp_gt_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 4],
 			&instructions[idx + 5],
 		) {
-			if !(function_name == "__gt__" && text == "gt rhs") {
-				idx += 1;
-				continue;
-			}
+			let function_name: &str = function_name;
+			let text: &str = text;
+			let jump_instruction = match (function_name, text) {
+				("__gts_", "gts rhs") => Instruction::BGE(jump_adr.clone()),
+				("__gtu_", "gtu rhs") => Instruction::BHS(jump_adr.clone()),
+				("__eq__", "cmp rhs") => Instruction::BNE(jump_adr.clone()),
+				_ => {
+					idx += 1;
+					continue;
+				}
+			};
 			let lhs = if let Addressing::SP(n) = lhs {
 				Addressing::SP(n - 1) //We're removing a PSHA
 			} else {
 				lhs.clone()
 			};
 			let lhs_comment = lhs_comment.clone();
-			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx + 1] = (Instruction::BGE(jump_adr), None);
+			instructions[idx + 1] = (jump_instruction, None);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);
 			instructions.remove(idx + 3);
@@ -885,19 +893,25 @@ fn cmp_gte_jmp(instructions: &mut Vec<CommentedInstruction>) {
 			&instructions[idx + 5],
 			&instructions[idx + 6],
 		) {
-			if !(function_name == "__gt__" && text == "lte rhs") {
-				idx += 1;
-				continue;
-			}
+			let function_name: &str = function_name;
+			let text: &str = text;
+			let jump_instruction = match (function_name, text) {
+				("__gts_", "ltes rhs") => Instruction::BLT(jump_adr.clone()),
+				("__gtu_", "lteu rhs") => Instruction::BLO(jump_adr.clone()),
+				("__eq__", "cmp rhs") => Instruction::BEQ(jump_adr.clone()),
+				_ => {
+					idx += 1;
+					continue;
+				}
+			};
 			let lhs = if let Addressing::SP(n) = lhs {
 				Addressing::SP(n - 1) //We're removing a PSHA
 			} else {
 				lhs.clone()
 			};
 			let lhs_comment = lhs_comment.clone();
-			let jump_adr = jump_adr.clone();
 			instructions[idx] = (Instruction::CMPA(lhs), lhs_comment);
-			instructions[idx + 1] = (Instruction::BLT(jump_adr), None);
+			instructions[idx + 1] = (jump_instruction, None);
 			instructions.remove(idx + 6);
 			instructions.remove(idx + 5);
 			instructions.remove(idx + 4);
