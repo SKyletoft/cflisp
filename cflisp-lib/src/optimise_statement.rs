@@ -185,7 +185,13 @@ pub(crate) fn const_eval<'a>(
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a * b))
 		}
 		StructlessStatement::Div { lhs, rhs, .. }
-			if !matches!(rhs.as_ref(), &StructlessStatement::Num(Number::ZERO)) =>
+			if !matches!(
+				rhs.as_ref(),
+				&StructlessStatement::Num(Number {
+					val: 0,
+					signedness: _
+				})
+			) =>
 		{
 			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a / b))
 		}

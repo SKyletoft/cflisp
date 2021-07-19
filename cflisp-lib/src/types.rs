@@ -275,7 +275,7 @@ impl NumberType {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Number {
 	pub val: isize,
 	pub signedness: NumberType,
@@ -413,6 +413,12 @@ impl ops::Not for Number {
 			val: !self.val,
 			signedness: self.signedness,
 		}
+	}
+}
+
+impl PartialEq for Number {
+	fn eq(&self, other: &Self) -> bool {
+		(self.val as u8).eq(&(other.val as u8))
 	}
 }
 

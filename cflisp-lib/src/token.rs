@@ -98,6 +98,9 @@ impl<'a> Token<'a> {
 	///Splits a string into a list of tokens by matching pattern by pattern instead of
 	/// splitting and then converting into tokens
 	pub(crate) fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
+		if source.is_empty() {
+			return Ok(Vec::new());
+		}
 		let mut src = source.trim_start();
 		let mut vec = Vec::new();
 		while !src.is_empty() {
@@ -140,35 +143,33 @@ impl<'a> Token<'a> {
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Function *declaration*, not call)
 	pub(crate) fn parse_argument_list_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
+		let get_pattern = |slice: &[Token<'a>]| -> Result<Variable<'a>, ParseError> {
+			let mut typ = match slice.get(0) {
+				Some(Decl(t)) => t.into(),
+				Some(Name(t)) => Type::Struct(t),
+				_ => {
+					dbg!(slice);
+					return Err(ParseError(line!(), "Couldn't parse argument list"));
+				}
+			};
+			let mut reduced = &slice[1..];
+			while reduced.get(0) == Some(&Mul) {
+				typ = Type::ptr(typ);
+				reduced = &reduced[1..];
+			}
+			if let [Token::Name(n)] = reduced {
+				Ok(Variable { typ, name: *n })
+			} else {
+				Err(ParseError(line!(), "Couldn't parse argument list"))
+			}
+		};
 		if s.is_empty() {
 			return Ok(Vec::new());
 		}
-		let tokens = Token::by_byte(s)?;
-		if tokens.contains(&NewLine) {
-			dbg!(s, tokens);
-			return Err(ParseError(line!(), "Statement ended early?"));
-		}
-
-		let mut arguments = Vec::new();
-		let mut remaining_slice = tokens.as_slice();
-
-		while !remaining_slice.is_empty() {
-			let (var, rest) = get_pattern(remaining_slice)?;
-			remaining_slice = rest;
-			if remaining_slice.get(0) == Some(&Comma) {
-				remaining_slice = &remaining_slice[1..];
-			}
-			arguments.push(var);
-		}
-		if !remaining_slice.is_empty() {
-			dbg!(&tokens, s, arguments, remaining_slice);
-			return Err(ParseError(
-				line!(),
-				"Argument list wasn't empty when done? Trailing comma?",
-			));
-		}
-
-		Ok(arguments)
+		Token::by_byte(s)?
+			.split(|t| t == &Token::Comma)
+			.map(get_pattern)
+			.collect()
 	}
 
 	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
@@ -192,29 +193,5 @@ impl<'a> Token<'a> {
 			}
 		}
 		Ok(arguments)
-	}
-}
-
-fn get_pattern<'a, 'b>(
-	slice: &'b [Token<'a>],
-) -> Result<(Variable<'a>, &'b [Token<'a>]), ParseError> {
-	let mut typ: Type;
-	let mut reduced = &slice[1..];
-	match slice.get(0) {
-		Some(Decl(t)) => typ = t.into(),
-		Some(Name(t)) => typ = Type::Struct(t),
-		_ => {
-			dbg!(slice);
-			return Err(ParseError(line!(), "Couldn't parse argument list"));
-		}
-	}
-	while reduced.get(0) == Some(&Mul) {
-		typ = Type::ptr(typ);
-		reduced = &reduced[1..];
-	}
-	if let Some(Name(n)) = reduced.get(0) {
-		Ok((Variable { typ, name: *n }, &reduced[1..]))
-	} else {
-		Err(ParseError(line!(), "Couldn't parse argument list"))
 	}
 }
