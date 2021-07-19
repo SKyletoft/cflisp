@@ -15,22 +15,7 @@ pub(crate) fn const_prop<'a>(
 	constants: &HashMap<String, StructlessStatement<'a>>,
 ) {
 	match elem {
-		StructlessStatement::Add { lhs, rhs, .. }
-		| StructlessStatement::Sub { lhs, rhs, .. }
-		| StructlessStatement::Mul { lhs, rhs, .. }
-		| StructlessStatement::Div { lhs, rhs, .. }
-		| StructlessStatement::Mod { lhs, rhs, .. }
-		| StructlessStatement::LShift { lhs, rhs, .. }
-		| StructlessStatement::RShift { lhs, rhs, .. }
-		| StructlessStatement::And { lhs, rhs, .. }
-		| StructlessStatement::Or { lhs, rhs, .. }
-		| StructlessStatement::Xor { lhs, rhs, .. }
-		| StructlessStatement::GreaterThan { lhs, rhs, .. }
-		| StructlessStatement::LessThan { lhs, rhs, .. }
-		| StructlessStatement::GreaterThanEqual { lhs, rhs, .. }
-		| StructlessStatement::LessThanEqual { lhs, rhs, .. }
-		| StructlessStatement::Cmp { lhs, rhs, .. }
-		| StructlessStatement::NotCmp { lhs, rhs, .. } => {
+		StructlessStatement::BinOp { lhs, rhs, .. } => {
 			const_prop(lhs, constants);
 			const_prop(rhs, constants);
 		}
@@ -50,7 +35,8 @@ pub(crate) fn const_prop<'a>(
 }
 
 pub(crate) fn fast_mul(elem: &mut StructlessStatement) {
-	if let StructlessStatement::Mul {
+	if let StructlessStatement::BinOp {
+		op: BinOp::Mul,
 		lhs,
 		rhs,
 		signedness,
@@ -67,9 +53,11 @@ pub(crate) fn fast_mul(elem: &mut StructlessStatement) {
 				for bit in 1..compiler_word_size {
 					let set_bit = 1 << bit;
 					if a & set_bit == set_bit {
-						inner = StructlessStatement::Add {
+						inner = StructlessStatement::BinOp {
+							op: BinOp::Add,
 							lhs: Box::new(inner),
-							rhs: Box::new(StructlessStatement::LShift {
+							rhs: Box::new(StructlessStatement::BinOp {
+								op: BinOp::LShift,
 								lhs: Box::new(b.clone()),
 								rhs: Box::new(StructlessStatement::Num((bit as isize).into())),
 								signedness: *signedness,
@@ -86,7 +74,8 @@ pub(crate) fn fast_mul(elem: &mut StructlessStatement) {
 }
 
 pub(crate) fn fast_div(elem: &mut StructlessStatement) {
-	if let StructlessStatement::Div {
+	if let StructlessStatement::BinOp {
+		op: BinOp::Div,
 		lhs,
 		rhs,
 		signedness,
@@ -108,7 +97,8 @@ pub(crate) fn fast_div(elem: &mut StructlessStatement) {
 						b_copy >>= 1;
 						shifts += 1;
 					}
-					*elem = StructlessStatement::RShift {
+					*elem = StructlessStatement::BinOp {
+						op: BinOp::RShift,
 						lhs: Box::new(a.clone()),
 						rhs: Box::new(StructlessStatement::Num(shifts.into())),
 						signedness: *signedness,
@@ -121,7 +111,8 @@ pub(crate) fn fast_div(elem: &mut StructlessStatement) {
 }
 
 pub(crate) fn fast_mod(elem: &mut StructlessStatement) {
-	if let StructlessStatement::Mod {
+	if let StructlessStatement::BinOp {
+		op: BinOp::Mod,
 		lhs,
 		rhs,
 		signedness,
@@ -135,7 +126,8 @@ pub(crate) fn fast_mod(elem: &mut StructlessStatement) {
 				// = is a multiple of two
 				if b.val.count_ones() == 1 && b.val >= 0 {
 					let mask = b.val - 1;
-					*elem = StructlessStatement::And {
+					*elem = StructlessStatement::BinOp {
+						op: BinOp::And,
 						lhs: Box::new(a.clone()),
 						rhs: Box::new(StructlessStatement::Num(mask.into())),
 						signedness: *signedness,
@@ -175,70 +167,87 @@ pub(crate) fn const_eval<'a>(
 	};
 
 	let this = match elem {
-		StructlessStatement::Add { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a + b))
-		}
-		StructlessStatement::Sub { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a - b))
-		}
-		StructlessStatement::Mul { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a * b))
-		}
-		StructlessStatement::Div { lhs, rhs, .. }
-			if !matches!(
-				rhs.as_ref(),
-				&StructlessStatement::Num(Number {
-					val: 0,
-					signedness: _
-				})
-			) =>
-		{
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a / b))
-		}
-		StructlessStatement::Mod { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a % b))
-		}
-		StructlessStatement::LShift { lhs, rhs, .. } => {
-			if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < Number::ZERO) {
-				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a << b))
-			} else {
-				None
+		StructlessStatement::BinOp { op, lhs, rhs, .. } => match op {
+			BinOp::Add => maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a + b)),
+			BinOp::Sub => maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a - b)),
+			BinOp::Mul => maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a * b)),
+			BinOp::GreaterThan => {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a > b))
 			}
-		}
-		StructlessStatement::RShift { lhs, rhs, .. } => {
-			if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < Number::ZERO) {
-				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a >> b))
-			} else {
-				None
+			BinOp::LessThan => {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a < b))
 			}
-		}
-		StructlessStatement::GreaterThan { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a > b))
-		}
-		StructlessStatement::LessThan { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a < b))
-		}
-		StructlessStatement::GreaterThanEqual { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a >= b))
-		}
-		StructlessStatement::LessThanEqual { lhs, rhs, .. } => {
-			maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a <= b))
-		}
-		StructlessStatement::And { lhs, rhs, .. } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StructlessStatement::Num(a & b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a && b))),
-		StructlessStatement::Or { lhs, rhs, .. } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StructlessStatement::Num(a | b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a || b))),
-		StructlessStatement::Cmp { lhs, rhs, .. } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StructlessStatement::Bool(a == b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a == b))),
-		StructlessStatement::NotCmp { lhs, rhs, .. } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StructlessStatement::Bool(a != b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a != b))),
-		StructlessStatement::Xor { lhs, rhs, .. } => maybe_get_nums(lhs, rhs)
-			.map(|(a, b)| StructlessStatement::Num(a ^ b))
-			.or_else(|| maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a ^ b))),
+			BinOp::GreaterThanEqual => {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a >= b))
+			}
+			BinOp::LessThanEqual => {
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a <= b))
+			}
+			BinOp::And => maybe_get_nums(lhs, rhs)
+				.map(|(a, b)| StructlessStatement::Num(a & b))
+				.or_else(|| {
+					maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a && b))
+				}),
+			BinOp::Or => maybe_get_nums(lhs, rhs)
+				.map(|(a, b)| StructlessStatement::Num(a | b))
+				.or_else(|| {
+					maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a || b))
+				}),
+			BinOp::Cmp => maybe_get_nums(lhs, rhs)
+				.map(|(a, b)| StructlessStatement::Bool(a == b))
+				.or_else(|| {
+					maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a == b))
+				}),
+			BinOp::NotCmp => maybe_get_nums(lhs, rhs)
+				.map(|(a, b)| StructlessStatement::Bool(a != b))
+				.or_else(|| {
+					maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a != b))
+				}),
+			BinOp::Xor => maybe_get_nums(lhs, rhs)
+				.map(|(a, b)| StructlessStatement::Num(a ^ b))
+				.or_else(|| {
+					maybe_get_bools(lhs, rhs).map(|(a, b)| StructlessStatement::Bool(a ^ b))
+				}),
+			BinOp::Div
+				if !matches!(
+					rhs.as_ref(),
+					&StructlessStatement::Num(Number {
+						val: 0,
+						signedness: _
+					})
+				) =>
+			{
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a / b))
+			}
+			BinOp::Mod
+				if !matches!(
+					rhs.as_ref(),
+					&StructlessStatement::Num(Number {
+						val: 0,
+						signedness: _
+					})
+				) =>
+			{
+				maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a % b))
+			}
+
+			BinOp::LShift => {
+				if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < Number::ZERO) {
+					maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a << b))
+				} else {
+					None
+				}
+			}
+			BinOp::RShift => {
+				if !matches!(rhs.as_ref(), &StructlessStatement::Num(n) if n < Number::ZERO) {
+					maybe_get_nums(lhs, rhs).map(|(a, b)| StructlessStatement::Num(a >> b))
+				} else {
+					None
+				}
+			}
+			_ => None,
+		},
+
 		StructlessStatement::Not(lhs) => match const_eval(lhs.as_mut()) {
 			Some(StructlessStatement::Num(a)) => Some(StructlessStatement::Num(!a)),
 			Some(StructlessStatement::Bool(a)) => Some(StructlessStatement::Bool(!a)),

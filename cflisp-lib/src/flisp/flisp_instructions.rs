@@ -165,28 +165,30 @@ impl<'a> Instruction<'a> {
 		adr: Addressing<'a>,
 	) -> Result<Instruction<'a>, CompileError> {
 		let res = match elem {
-			StructlessStatement::Add { .. } => Instruction::ADDA(adr),
-			StructlessStatement::Sub { .. } => Instruction::SUBA(adr),
-			StructlessStatement::Mul { .. }
-			| StructlessStatement::Div { .. }
-			| StructlessStatement::Mod { .. } => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: function call, not instruction?",
-				));
-			}
-			StructlessStatement::LShift { .. } => Instruction::LSLA,
-			StructlessStatement::RShift { .. } => Instruction::LSRA,
-			StructlessStatement::And { .. } => Instruction::ANDA(adr),
-			StructlessStatement::Or { .. } => Instruction::ORA(adr),
-			StructlessStatement::Xor { .. } => Instruction::EORA(adr),
+			StructlessStatement::BinOp { op, .. } => match op {
+				BinOp::Add => Instruction::ADDA(adr),
+				BinOp::Sub => Instruction::SUBA(adr),
+				BinOp::Mul
+				| BinOp::Div
+				| BinOp::Mod
+				| BinOp::LShift
+				| BinOp::RShift
+				| BinOp::GreaterThan
+				| BinOp::LessThan
+				| BinOp::GreaterThanEqual
+				| BinOp::LessThanEqual
+				| BinOp::Cmp
+				| BinOp::NotCmp => {
+					return Err(CompileError(
+						line!(),
+						"Internal error: function call, not instruction?",
+					));
+				}
+				BinOp::And => Instruction::ANDA(adr),
+				BinOp::Or => Instruction::ORA(adr),
+				BinOp::Xor => Instruction::EORA(adr),
+			},
 			StructlessStatement::Not(_) => Instruction::COMA,
-			StructlessStatement::GreaterThan { .. } => Instruction::SUBA(adr),
-			StructlessStatement::LessThan { .. } => Instruction::SUBA(adr),
-			StructlessStatement::GreaterThanEqual { .. } => Instruction::SUBA(adr),
-			StructlessStatement::LessThanEqual { .. } => Instruction::SUBA(adr),
-			StructlessStatement::Cmp { .. } => Instruction::SUBA(adr),
-			StructlessStatement::NotCmp { .. } => Instruction::SUBA(adr),
 			StructlessStatement::Var(_)
 			| StructlessStatement::Num(_)
 			| StructlessStatement::Char(_)

@@ -605,7 +605,8 @@ impl<'a> StructlessLanguage<'a> {
 					let new_ptr = if idx == 0 {
 						StructlessStatement::Var(name)
 					} else {
-						StructlessStatement::Add {
+						StructlessStatement::BinOp {
+							op: BinOp::Add,
 							lhs: Box::new(StructlessStatement::Num((idx as isize).into())),
 							rhs: Box::new(StructlessStatement::Var(name)),
 							signedness,

@@ -5,82 +5,8 @@ use crate::*;
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructlessStatement<'a> {
-	Add {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Sub {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Mul {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Div {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Mod {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	LShift {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	RShift {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	And {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Or {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Xor {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	GreaterThan {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	LessThan {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	GreaterThanEqual {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	LessThanEqual {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	Cmp {
-		lhs: Box<StructlessStatement<'a>>,
-		rhs: Box<StructlessStatement<'a>>,
-		signedness: NumberType,
-	},
-	NotCmp {
+	BinOp {
+		op: BinOp,
 		lhs: Box<StructlessStatement<'a>>,
 		rhs: Box<StructlessStatement<'a>>,
 		signedness: NumberType,
@@ -107,29 +33,26 @@ impl<'a> StructlessStatement<'a> {
 		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		symbols: &HashMap<Cow<'a, str>, NativeType>,
 	) -> Result<Self, ParseError> {
-		macro_rules! bin_op {
-			($i: ident, $lhs: expr, $rhs: expr) => {{
-				let lhs: &StatementElement = $lhs;
-				let rhs: &StatementElement = $rhs;
-				StructlessStatement::$i {
-					lhs: Box::new(StructlessStatement::from(
-						lhs,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?),
-					rhs: Box::new(StructlessStatement::from(
-						rhs,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?),
-					signedness: lhs.signedness(symbols)?.promote(rhs.signedness(symbols)?),
-				}
-			}};
-		}
+		let bin_op = |op, lhs, rhs| {
+			Ok(StructlessStatement::BinOp {
+				op,
+				lhs: Box::new(StructlessStatement::from(
+					lhs,
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+					symbols,
+				)?),
+				rhs: Box::new(StructlessStatement::from(
+					rhs,
+					struct_types,
+					structs_and_struct_pointers,
+					functions,
+					symbols,
+				)?),
+				signedness: lhs.signedness(symbols)?.promote(rhs.signedness(symbols)?),
+			})
+		};
 		macro_rules! un_op {
 			($i: ident, $lhs: expr) => {
 				StructlessStatement::$i(Box::new(StructlessStatement::from(
@@ -143,25 +66,27 @@ impl<'a> StructlessStatement<'a> {
 		}
 
 		let res = match other {
-			StatementElement::Add { lhs, rhs } => bin_op!(Add, lhs, rhs),
-			StatementElement::Sub { lhs, rhs } => bin_op!(Sub, lhs, rhs),
-			StatementElement::Mul { lhs, rhs } => bin_op!(Mul, lhs, rhs),
-			StatementElement::Div { lhs, rhs } => bin_op!(Div, lhs, rhs),
-			StatementElement::Mod { lhs, rhs } => bin_op!(Mod, lhs, rhs),
-			StatementElement::LShift { lhs, rhs } => bin_op!(LShift, lhs, rhs),
-			StatementElement::RShift { lhs, rhs } => bin_op!(RShift, lhs, rhs),
-			StatementElement::Xor { lhs, rhs } => bin_op!(Xor, lhs, rhs),
-			StatementElement::GreaterThan { lhs, rhs } => bin_op!(GreaterThan, lhs, rhs),
-			StatementElement::LessThan { lhs, rhs } => bin_op!(LessThan, lhs, rhs),
-			StatementElement::GreaterThanEqual { lhs, rhs } => bin_op!(GreaterThanEqual, lhs, rhs),
-			StatementElement::LessThanEqual { lhs, rhs } => bin_op!(LessThanEqual, lhs, rhs),
-			StatementElement::Cmp { lhs, rhs } => bin_op!(Cmp, lhs, rhs),
-			StatementElement::NotCmp { lhs, rhs } => bin_op!(NotCmp, lhs, rhs),
+			StatementElement::Add { lhs, rhs } => bin_op(BinOp::Add, lhs, rhs)?,
+			StatementElement::Sub { lhs, rhs } => bin_op(BinOp::Sub, lhs, rhs)?,
+			StatementElement::Mul { lhs, rhs } => bin_op(BinOp::Mul, lhs, rhs)?,
+			StatementElement::Div { lhs, rhs } => bin_op(BinOp::Div, lhs, rhs)?,
+			StatementElement::Mod { lhs, rhs } => bin_op(BinOp::Mod, lhs, rhs)?,
+			StatementElement::LShift { lhs, rhs } => bin_op(BinOp::LShift, lhs, rhs)?,
+			StatementElement::RShift { lhs, rhs } => bin_op(BinOp::RShift, lhs, rhs)?,
+			StatementElement::Xor { lhs, rhs } => bin_op(BinOp::Xor, lhs, rhs)?,
+			StatementElement::GreaterThan { lhs, rhs } => bin_op(BinOp::GreaterThan, lhs, rhs)?,
+			StatementElement::LessThan { lhs, rhs } => bin_op(BinOp::LessThan, lhs, rhs)?,
+			StatementElement::GreaterThanEqual { lhs, rhs } => {
+				bin_op(BinOp::GreaterThanEqual, lhs, rhs)?
+			}
+			StatementElement::LessThanEqual { lhs, rhs } => bin_op(BinOp::LessThanEqual, lhs, rhs)?,
+			StatementElement::Cmp { lhs, rhs } => bin_op(BinOp::Cmp, lhs, rhs)?,
+			StatementElement::NotCmp { lhs, rhs } => bin_op(BinOp::NotCmp, lhs, rhs)?,
 			StatementElement::BoolAnd { lhs, rhs } | StatementElement::BitAnd { lhs, rhs } => {
-				bin_op!(And, lhs, rhs)
+				bin_op(BinOp::And, lhs, rhs)?
 			}
 			StatementElement::BoolOr { lhs, rhs } | StatementElement::BitOr { lhs, rhs } => {
-				bin_op!(Or, lhs, rhs)
+				bin_op(BinOp::Or, lhs, rhs)?
 			}
 			StatementElement::BoolNot(lhs) | StatementElement::BitNot(lhs) => {
 				un_op!(Not, lhs)
@@ -238,7 +163,8 @@ impl<'a> StructlessStatement<'a> {
 					.position(|field_name| &field_name.name == field)
 					.ok_or(ParseError(line!(), "Unknown field type"))?;
 				let signedness = NumberType::from(&fields[idx].typ);
-				StructlessStatement::Deref(Box::new(StructlessStatement::Add {
+				StructlessStatement::Deref(Box::new(StructlessStatement::BinOp {
+					op: BinOp::Add,
 					lhs: Box::new(StructlessStatement::Num((idx as isize).into())),
 					rhs: Box::new(StructlessStatement::Var(name.clone())),
 					signedness,
@@ -281,22 +207,9 @@ impl<'a> StructlessStatement<'a> {
 
 	pub(crate) fn depth(&self) -> usize {
 		let rest = match self {
-			StructlessStatement::Add { lhs, rhs, .. }
-			| StructlessStatement::Sub { lhs, rhs, .. }
-			| StructlessStatement::Mul { lhs, rhs, .. }
-			| StructlessStatement::Div { lhs, rhs, .. }
-			| StructlessStatement::Mod { lhs, rhs, .. }
-			| StructlessStatement::LShift { lhs, rhs, .. }
-			| StructlessStatement::RShift { lhs, rhs, .. }
-			| StructlessStatement::And { lhs, rhs, .. }
-			| StructlessStatement::Or { lhs, rhs, .. }
-			| StructlessStatement::Xor { lhs, rhs, .. }
-			| StructlessStatement::GreaterThan { lhs, rhs, .. }
-			| StructlessStatement::LessThan { lhs, rhs, .. }
-			| StructlessStatement::GreaterThanEqual { lhs, rhs, .. }
-			| StructlessStatement::LessThanEqual { lhs, rhs, .. }
-			| StructlessStatement::Cmp { lhs, rhs, .. }
-			| StructlessStatement::NotCmp { lhs, rhs, .. } => lhs.as_ref().depth().max(rhs.as_ref().depth()),
+			StructlessStatement::BinOp { lhs, rhs, .. } => {
+				lhs.as_ref().depth().max(rhs.as_ref().depth())
+			}
 			StructlessStatement::Not(lhs) => lhs.as_ref().depth(),
 			StructlessStatement::Array(n) => n.iter().map(|e| e.depth()).max().unwrap_or(0),
 			StructlessStatement::Deref(n) => n.as_ref().depth(),
@@ -312,22 +225,7 @@ impl<'a> StructlessStatement<'a> {
 
 	pub(crate) fn internal_ref(&self) -> Option<(&StructlessStatement, &StructlessStatement)> {
 		match self {
-			StructlessStatement::Add { lhs, rhs, .. }
-			| StructlessStatement::Sub { lhs, rhs, .. }
-			| StructlessStatement::Mul { lhs, rhs, .. }
-			| StructlessStatement::Div { lhs, rhs, .. }
-			| StructlessStatement::Mod { lhs, rhs, .. }
-			| StructlessStatement::LShift { lhs, rhs, .. }
-			| StructlessStatement::RShift { lhs, rhs, .. }
-			| StructlessStatement::And { lhs, rhs, .. }
-			| StructlessStatement::Or { lhs, rhs, .. }
-			| StructlessStatement::Xor { lhs, rhs, .. }
-			| StructlessStatement::GreaterThan { lhs, rhs, .. }
-			| StructlessStatement::LessThan { lhs, rhs, .. }
-			| StructlessStatement::GreaterThanEqual { lhs, rhs, .. }
-			| StructlessStatement::LessThanEqual { lhs, rhs, .. }
-			| StructlessStatement::NotCmp { lhs, rhs, .. }
-			| StructlessStatement::Cmp { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+			StructlessStatement::BinOp { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
 			StructlessStatement::Not(_)
 			| StructlessStatement::FunctionCall { .. }
 			| StructlessStatement::Var(_)

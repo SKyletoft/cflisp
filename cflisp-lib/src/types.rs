@@ -444,3 +444,23 @@ impl Number {
 		Self { val, signedness }
 	}
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BinOp {
+	Add,
+	Sub,
+	Mul,
+	Div,
+	Mod,
+	LShift,
+	RShift,
+	And,
+	Or,
+	Xor,
+	GreaterThan,
+	LessThan,
+	GreaterThanEqual,
+	LessThanEqual,
+	Cmp,
+	NotCmp,
+}

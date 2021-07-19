@@ -255,11 +255,11 @@ fn compile_element<'a>(
 
 			match (ptr, ptr.internal_ref()) {
 				(
-					StructlessStatement::Add { .. },
+					StructlessStatement::BinOp { op: BinOp::Add, .. },
 					Some((StructlessStatement::Num(idx), StructlessStatement::Var(name))),
 				)
 				| (
-					StructlessStatement::Add { .. },
+					StructlessStatement::BinOp { op: BinOp::Add, .. },
 					Some((StructlessStatement::Var(name), StructlessStatement::Num(idx))),
 				) => {
 					let mut statement = compile_statement(value, state)?;
@@ -478,13 +478,21 @@ fn compile_statement_inner<'a>(
 ) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
 	let instructions = match statement {
 		//Commutative operations
-		StructlessStatement::Add { lhs, rhs, .. }
-		| StructlessStatement::Mul { lhs, rhs, .. }
-		| StructlessStatement::And { lhs, rhs, .. }
-		| StructlessStatement::Or { lhs, rhs, .. }
-		| StructlessStatement::Xor { lhs, rhs, .. }
-		| StructlessStatement::NotCmp { lhs, rhs, .. }
-		| StructlessStatement::Cmp { lhs, rhs, .. } => {
+		StructlessStatement::BinOp {
+			op:
+				op
+				@
+				(BinOp::Add
+				| BinOp::Mul
+				| BinOp::And
+				| BinOp::Or
+				| BinOp::Xor
+				| BinOp::NotCmp
+				| BinOp::Cmp),
+			lhs,
+			rhs,
+			..
+		} => {
 			let left_depth = lhs.depth();
 			let right_depth = rhs.depth();
 			let (left, right) = if left_depth > right_depth {
@@ -510,8 +518,8 @@ fn compile_statement_inner<'a>(
 				*tmps_used += 1;
 				res
 			};
-			match statement {
-				StructlessStatement::Mul { .. } => {
+			match op {
+				BinOp::Mul => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -520,7 +528,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StructlessStatement::Cmp { .. } => {
+				BinOp::Cmp => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -529,7 +537,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StructlessStatement::NotCmp { .. } => {
+				BinOp::NotCmp => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -567,49 +575,25 @@ fn compile_statement_inner<'a>(
 		}
 
 		//Non-commutative operations
-		StructlessStatement::Sub {
+		StructlessStatement::BinOp {
+			op:
+				op
+				@
+				(BinOp::Sub
+				| BinOp::Div
+				| BinOp::Mod
+				| BinOp::LShift
+				| BinOp::RShift
+				| BinOp::LessThan
+				| BinOp::GreaterThanEqual),
 			lhs,
 			rhs,
 			signedness,
 		}
-		| StructlessStatement::Div {
+		| StructlessStatement::BinOp {
+			op: op @ (BinOp::LessThanEqual | BinOp::GreaterThan),
 			lhs: rhs,
 			rhs: lhs,
-			signedness,
-		}
-		| StructlessStatement::Mod {
-			lhs: rhs,
-			rhs: lhs,
-			signedness,
-		}
-		| StructlessStatement::LShift {
-			lhs,
-			rhs,
-			signedness,
-		}
-		| StructlessStatement::RShift {
-			lhs,
-			rhs,
-			signedness,
-		}
-		| StructlessStatement::GreaterThan {
-			lhs: rhs,
-			rhs: lhs,
-			signedness,
-		}
-		| StructlessStatement::LessThanEqual {
-			lhs: rhs,
-			rhs: lhs,
-			signedness,
-		}
-		| StructlessStatement::LessThan {
-			lhs,
-			rhs,
-			signedness,
-		}
-		| StructlessStatement::GreaterThanEqual {
-			lhs,
-			rhs,
 			signedness,
 		} => {
 			let signed = matches!(*signedness, NumberType::Signed | NumberType::Unknown);
@@ -632,8 +616,8 @@ fn compile_statement_inner<'a>(
 				*tmps_used += 1;
 				res
 			};
-			match statement {
-				StructlessStatement::Div { .. } => {
+			match op {
+				BinOp::Div => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("div rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -642,7 +626,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StructlessStatement::Mod { .. } => {
+				BinOp::Mod => {
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mod rhs"))));
 					instructions.append(&mut right_instructions_plus_one()?);
 					instructions.push((
@@ -651,7 +635,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StructlessStatement::GreaterThan { .. } | StructlessStatement::LessThan { .. } => {
+				BinOp::GreaterThan | BinOp::LessThan => {
 					let (comment, function_name) = if signed {
 						("gts rhs", "__gts_")
 					} else {
@@ -665,8 +649,7 @@ fn compile_statement_inner<'a>(
 					));
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 				}
-				StructlessStatement::LessThanEqual { .. }
-				| StructlessStatement::GreaterThanEqual { .. } => {
+				BinOp::LessThanEqual | BinOp::GreaterThanEqual => {
 					let (comment, function_name) = if signed {
 						("ltes rhs", "__gts_")
 					} else {
@@ -681,13 +664,13 @@ fn compile_statement_inner<'a>(
 					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
 					instructions.push((Instruction::COMA, None));
 				}
-				StructlessStatement::RShift { .. } | StructlessStatement::LShift { .. } => {
+				BinOp::RShift | BinOp::LShift => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StructlessStatement::Num(n) = rhs.as_ref() {
 						if *n < Number::ZERO {
 							return Err(CompileError(line!(), "Cannot shift by negative amount"));
 						}
-						let inst = if matches!(statement, StructlessStatement::RShift { .. }) {
+						let inst = if matches!(op, BinOp::RShift) {
 							Instruction::LSRA
 						} else {
 							Instruction::LSLA
@@ -700,7 +683,7 @@ fn compile_statement_inner<'a>(
 							format!("bit_shift_start_{}_{}", state.scope_name, state.line_id);
 						let end_str =
 							format!("bit_shift_end_{}_{}", state.scope_name, state.line_id);
-						let inst = if matches!(statement, StructlessStatement::RShift { .. }) {
+						let inst = if matches!(op, BinOp::RShift) {
 							Instruction::LSR(Addressing::SP(*tmps_used))
 						} else {
 							Instruction::LSL(Addressing::SP(*tmps_used))
@@ -812,11 +795,11 @@ fn compile_statement_inner<'a>(
 			match (adr.as_ref(), adr.internal_ref()) {
 				//Array opt
 				(
-					&StructlessStatement::Add { .. },
+					StructlessStatement::BinOp { op: BinOp::Add, .. },
 					Some((StructlessStatement::Var(name), &StructlessStatement::Num(offset))),
 				)
 				| (
-					&StructlessStatement::Add { .. },
+					StructlessStatement::BinOp { op: BinOp::Add, .. },
 					Some((&StructlessStatement::Num(offset), StructlessStatement::Var(name))),
 				) => {
 					let adr = adr_for_name(
@@ -831,8 +814,14 @@ fn compile_statement_inner<'a>(
 					]
 				}
 				//General opt
-				(&StructlessStatement::Add { .. }, Some((StructlessStatement::Var(name), rhs)))
-				| (&StructlessStatement::Add { .. }, Some((rhs, StructlessStatement::Var(name)))) => {
+				(
+					&StructlessStatement::BinOp { op: BinOp::Add, .. },
+					Some((StructlessStatement::Var(name), rhs)),
+				)
+				| (
+					&StructlessStatement::BinOp { op: BinOp::Add, .. },
+					Some((rhs, StructlessStatement::Var(name))),
+				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
 						state.variables,
@@ -847,8 +836,14 @@ fn compile_statement_inner<'a>(
 					statement
 				}
 				//General opt
-				(&StructlessStatement::Add { .. }, Some((StructlessStatement::Num(idx), rhs)))
-				| (&StructlessStatement::Add { .. }, Some((rhs, StructlessStatement::Num(idx)))) => {
+				(
+					&StructlessStatement::BinOp { op: BinOp::Add, .. },
+					Some((StructlessStatement::Num(idx), rhs)),
+				)
+				| (
+					&StructlessStatement::BinOp { op: BinOp::Add, .. },
+					Some((rhs, StructlessStatement::Num(idx))),
+				) => {
 					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
 						(Instruction::LDY(Addressing::Data(idx.val)), None),

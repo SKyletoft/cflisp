@@ -27,6 +27,6 @@ use structless_language::StructlessLanguage;
 use structless_statement::StructlessStatement;
 use token::{Token, Token::*};
 use types::{
-	Block, BlockStructless, Function, NativeType, NativeVariable, Number, NumberType, Statement,
-	Type, Variable,
+	BinOp, Block, BlockStructless, Function, NativeType, NativeVariable, Number, NumberType,
+	Statement, Type, Variable,
 };
