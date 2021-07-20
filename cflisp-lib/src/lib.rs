@@ -25,7 +25,7 @@ use statement_element::StatementElement;
 use statement_token::StatementToken;
 use structless_language::StructlessLanguage;
 use structless_statement::StructlessStatement;
-use token::{Token, Token::*};
+use token::Token;
 use types::{
 	BinOp, Block, BlockStructless, Function, NativeType, NativeVariable, Number, NumberType,
 	Statement, Type, Variable,

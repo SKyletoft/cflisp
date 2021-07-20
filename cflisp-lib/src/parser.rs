@@ -45,14 +45,14 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 	let element = {
 		match tokens {
 			//Struct member assignment
-			[Token::Name(n), FieldAccess, Token::Name(field), Assign, ..] => {
+			[Token::Name(n), Token::FieldAccess, Token::Name(field), Token::Assign, ..] => {
 				let name = helper::merge_name_and_field(n, field);
 				let rhs = StatementElement::from_tokens(&tokens[4..])?;
 				LanguageElement::VariableAssignment { name, value: rhs }
 			}
 
 			//Struct member assignment through pointer
-			[Token::Name(n), FieldPointerAccess, Token::Name(field), Assign, ..] => {
+			[Token::Name(n), Token::FieldPointerAccess, Token::Name(field), Token::Assign, ..] => {
 				let rhs = StatementElement::from_tokens(&tokens[4..])?;
 				LanguageElement::StructFieldPointerAssignment {
 					name: Cow::Borrowed(n),
@@ -62,7 +62,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Variable assignment
-			[Token::Name(n), Assign, ..] => {
+			[Token::Name(n), Token::Assign, ..] => {
 				let rhs = StatementElement::from_tokens(&tokens[2..])?;
 				LanguageElement::VariableAssignment {
 					name: Cow::Borrowed(n),
@@ -71,7 +71,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Array assignment
-			[Token::Name(n), Token::UnparsedArrayAccess(idx), Assign, ..] => {
+			[Token::Name(n), Token::UnparsedArrayAccess(idx), Token::Assign, ..] => {
 				let lhs = StatementElement::from_source_str(idx)?;
 				let rhs = StatementElement::from_tokens(&tokens[3..])?;
 				LanguageElement::PointerAssignment {
@@ -84,23 +84,26 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Switch statement
-			[Switch, UnparsedParentheses(expr), UnparsedBlock(cases)] => {
+			[Token::Switch, Token::UnparsedParentheses(expr), Token::UnparsedBlock(cases)] => {
 				let _expr = StatementElement::from_source_str(expr)?;
 				let _cases_parsed = parse(cases, move_first)?;
 				return Err(ParseError::SwitchStatement(line!()));
 			}
 
 			//Case
-			[Case, constant, Colon, ..] if matches!(constant, Bool(_) | Char(_) | Num(_)) => {
+			[Token::Case, constant, Token::Colon, ..]
+				if matches!(constant, Token::Bool(_) | Token::Char(_) | Token::Num(_)) =>
+			{
 				return Err(ParseError::SwitchStatement(line!()));
 			}
 
-			[Break, ..] | [Continue, ..] => {
+			[Token::Break, ..] | [Token::Continue, ..] => {
 				return Err(ParseError::BreakContinue(line!()));
 			}
 
 			//If else if
-			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, If, ..] => {
+			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(then_code), Token::Else, Token::If, ..] =>
+			{
 				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
 				let else_if_tokens = &tokens[4..];
@@ -113,7 +116,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//If else
-			[If, UnparsedParentheses(cond), UnparsedBlock(then_code), Else, UnparsedBlock(else_code)] =>
+			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(then_code), Token::Else, Token::UnparsedBlock(else_code)] =>
 			{
 				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(then_code, move_first)?;
@@ -126,7 +129,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//If
-			[If, UnparsedParentheses(cond), UnparsedBlock(code)] => {
+			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(code)] => {
 				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let then_parsed = parse(code, move_first)?;
 				LanguageElement::IfStatement {
@@ -137,7 +140,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//For
-			[For, UnparsedParentheses(init_cond_post), UnparsedBlock(code)] => {
+			[Token::For, Token::UnparsedParentheses(init_cond_post), Token::UnparsedBlock(code)] => {
 				let split = init_cond_post.split(';').map(str::trim).collect::<Vec<_>>();
 				if split.len() != 3 {
 					return Err(ParseError::BrokenForLoop(line!()));
@@ -158,7 +161,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//While
-			[While, UnparsedParentheses(cond), UnparsedBlock(code)] => {
+			[Token::While, Token::UnparsedParentheses(cond), Token::UnparsedBlock(code)] => {
 				let condition_parsed = StatementElement::from_source_str(cond)?;
 				let body_parsed = parse(code, move_first)?;
 				LanguageElement::While {
@@ -167,25 +170,30 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 			}
 
-			[Return] => LanguageElement::Return(None),
+			[Token::Return] => LanguageElement::Return(None),
 
-			[Return, ..] => {
+			[Token::Return, ..] => {
 				let return_statement = StatementElement::from_tokens(&tokens[1..])?;
 				LanguageElement::Return(Some(return_statement))
 			}
 
-			[TypeDef, Struct, Name(name), UnparsedBlock(members), Name(name2)] => {
+			[Token::TypeDef, Token::Struct, Token::Name(name), Token::UnparsedBlock(members), Token::Name(name2)] =>
+			{
 				if name != name2 {
 					return Err(ParseError::BadStructName(line!()));
 				}
 				//Reuse second definition
 				construct_structure_from_tokens(
-					&[Struct, Name(name), UnparsedBlock(members)],
+					&[
+						Token::Struct,
+						Token::Name(name),
+						Token::UnparsedBlock(members),
+					],
 					move_first,
 				)?
 			}
 
-			[Struct, Name(name), UnparsedBlock(members)] => {
+			[Token::Struct, Token::Name(name), Token::UnparsedBlock(members)] => {
 				let members_parsed = Token::parse_struct_member_tokens(members)?;
 				LanguageElement::StructDefinition {
 					name: Cow::Borrowed(name),
@@ -193,7 +201,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				}
 			}
 
-			_ if !tokens.contains(&Assign) => {
+			_ if !tokens.contains(&Token::Assign) => {
 				let element = StatementElement::from_tokens(tokens)?;
 				LanguageElement::Statement(element)
 			}
@@ -235,29 +243,29 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 	 *		static struct_name* name;
 	 */
 	match &tokens[0] {
-		Static => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+		Token::Static => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
 			.map(|res| res.and_then(LanguageElement::make_static)),
-		Const => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+		Token::Const => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
 			.map(|res| res.and_then(LanguageElement::make_const)),
-		Volatile => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
+		Token::Volatile => construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)
 			.map(|res| res.and_then(LanguageElement::make_volatile)),
 		//	`type* name` and `type* name` =
-		Decl(t) => {
+		Token::Decl(t) => {
 			let mut tokens_slice = &tokens[1..];
 			let mut t = t.into();
-			while let Some(Mul) = tokens_slice.get(0) {
+			while let Some(Token::Mul) = tokens_slice.get(0) {
 				tokens_slice = &tokens_slice[1..];
 				t = Type::ptr(t);
 			}
 			match tokens_slice {
-				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
+				[Token::Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
 					typ: t,
 					name: Cow::Borrowed(n),
 					is_static: false,
 					is_const: false,
 					is_volatile: false,
 				})),
-				[Name(n), UnparsedArrayAccess(len)] => {
+				[Token::Name(n), Token::UnparsedArrayAccess(len)] => {
 					let res = len
 						.parse::<isize>()
 						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
@@ -273,7 +281,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 						});
 					Some(res)
 				}
-				[Name(n), Assign, ..] => {
+				[Token::Name(n), Token::Assign, ..] => {
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|statement| {
 						LanguageElement::VariableDeclarationAssignment {
 							typ: t,
@@ -286,7 +294,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
-				[Name(n), UnparsedArrayAccess(len), Assign, ..] => {
+				[Token::Name(n), Token::UnparsedArrayAccess(len), Token::Assign, ..] => {
 					let res = len
 						.parse::<isize>()
 						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
@@ -306,7 +314,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					Some(res)
 				}
 				//Function
-				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+				[Token::Name(n), Token::UnparsedParentheses(args), Token::UnparsedBlock(code)] => {
 					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
 						Token::parse_block_tokens(code).and_then(|code_tokenised| {
 							construct_block(&code_tokenised, move_first).map(|code_parsed| {
@@ -325,22 +333,22 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 			}
 		}
 		//Struct type name
-		Name(n) => {
+		Token::Name(n) => {
 			let mut tokens_slice = &tokens[1..];
 			let mut t = Type::Struct(n);
-			while let Some(Mul) = tokens_slice.get(0) {
+			while let Some(Token::Mul) = tokens_slice.get(0) {
 				tokens_slice = &tokens_slice[1..];
 				t = Type::ptr(t);
 			}
 			match tokens_slice {
-				[Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
+				[Token::Name(n)] => Some(Ok(LanguageElement::VariableDeclaration {
 					typ: t,
 					name: Cow::Borrowed(n),
 					is_static: false,
 					is_const: false,
 					is_volatile: false,
 				})),
-				[Name(n), Assign, UnparsedBlock(s)] => {
+				[Token::Name(n), Token::Assign, Token::UnparsedBlock(s)] => {
 					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
 						tokens
 							.into_iter()
@@ -357,7 +365,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
-				[Name(n), Assign, ..] => {
+				[Token::Name(n), Token::Assign, ..] => {
 					let res = StatementElement::from_tokens(&tokens_slice[2..]).map(|rhs| {
 						LanguageElement::VariableDeclarationAssignment {
 							typ: t,
@@ -371,7 +379,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					Some(res)
 				}
 				//Function
-				[Name(n), UnparsedParentheses(args), UnparsedBlock(code)] => {
+				[Token::Name(n), Token::UnparsedParentheses(args), Token::UnparsedBlock(code)] => {
 					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
 						Token::parse_block_tokens(code).and_then(|code_tokenised| {
 							construct_block(&code_tokenised, move_first).map(|code_parsed| {
@@ -389,8 +397,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				_ => None,
 			}
 		}
-		Mul => {
-			let assign_idx = tokens.iter().position(|t| t == &Assign);
+		Token::Mul => {
+			let assign_idx = tokens.iter().position(|t| t == &Token::Assign);
 			assign_idx.map(|assign_idx| {
 				//Skip the first deref as the LanaguageElement::PointerAssignment::ptr already expects a pointer
 				let lhs = StatementElement::from_tokens(&tokens[1..assign_idx]);
@@ -403,8 +411,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				})
 			})
 		}
-		Struct => {
-			if !matches!(tokens.get(1), Some(Name(_))) {
+		Token::Struct => {
+			if !matches!(tokens.get(1), Some(Token::Name(_))) {
 				return None;
 			}
 			construct_structure_with_pointers_from_tokens(&tokens[1..], move_first)

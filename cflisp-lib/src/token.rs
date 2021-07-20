@@ -124,7 +124,7 @@ impl<'a> Token<'a> {
 		s: &'a str,
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
 		let res = Token::by_byte(s)?;
-		if res.contains(&NewLine) {
+		if res.contains(&Token::NewLine) {
 			return Err(ParseError::IncompleteStatement(line!()));
 		}
 		StatementToken::from_tokens(&res)
@@ -145,22 +145,22 @@ impl<'a> Token<'a> {
 	pub(crate) fn parse_argument_list_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
 		let get_pattern = |slice: &[Token<'a>]| -> Result<Variable<'a>, ParseError> {
 			let mut typ = match slice.get(0) {
-				Some(Decl(t)) => t.into(),
-				Some(Name(t)) => Type::Struct(t),
+				Some(Token::Decl(t)) => t.into(),
+				Some(Token::Name(t)) => Type::Struct(t),
 				_ => {
 					dbg!(slice);
 					return Err(ParseError::InvalidArguments(line!()));
 				}
 			};
 			let mut reduced = &slice[1..];
-			while reduced.get(0) == Some(&Mul) {
+			while reduced.get(0) == Some(&Token::Mul) {
 				typ = Type::ptr(typ);
 				reduced = &reduced[1..];
 			}
 			if let [Token::Name(n)] = reduced {
 				Ok(Variable { typ, name: *n })
 			} else {
-				return Err(ParseError::InvalidArguments(line!()));
+				Err(ParseError::InvalidArguments(line!()))
 			}
 		};
 		if s.is_empty() {
@@ -182,7 +182,7 @@ impl<'a> Token<'a> {
 		let tokens = Token::by_byte(s)?;
 		let mut arguments = Vec::new();
 		for slice in tokens.windows(3).step_by(3) {
-			if let [Decl(t), Name(n), NewLine] = slice {
+			if let [Token::Decl(t), Token::Name(n), Token::NewLine] = slice {
 				arguments.push(NativeVariable {
 					typ: t.clone(),
 					name: Cow::Borrowed(n),
