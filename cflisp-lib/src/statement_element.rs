@@ -394,12 +394,15 @@ impl<'a> StatementElement<'a> {
 			StatementElement::Deref(_) => NumberType::Unknown,
 			StatementElement::AdrOf(_) => NumberType::Unsigned,
 
-			StatementElement::BoolAnd { lhs, rhs } => todo!(),
-			StatementElement::BoolOr { lhs, rhs } => todo!(),
-			StatementElement::Cast { typ, value } => todo!(),
-			StatementElement::Ternary { cond, lhs, rhs } => todo!(),
-			StatementElement::BoolNot(_) => todo!(),
-			StatementElement::FieldPointerAccess(..) => todo!(),
+			StatementElement::BoolAnd { .. }
+			| StatementElement::BoolOr { .. }
+			| StatementElement::BoolNot(_) => NumberType::BOOL_SIGNEDNESS,
+			StatementElement::Ternary { lhs, .. } => lhs.signedness(symbols)?,
+			StatementElement::FieldPointerAccess(name, field) => symbols
+				.get(&helper::merge_name_and_field(name, field))
+				.map(|typ| typ.into())
+				.unwrap_or(NumberType::Unknown),
+			StatementElement::Cast { typ, .. } => typ.into(),
 		};
 		Ok(res)
 	}
