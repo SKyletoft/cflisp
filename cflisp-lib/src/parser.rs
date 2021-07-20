@@ -87,16 +87,16 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			[Switch, UnparsedParentheses(expr), UnparsedBlock(cases)] => {
 				let _expr = StatementElement::from_source_str(expr)?;
 				let _cases_parsed = parse(cases, move_first)?;
-				return Err(ParseError(line!(), "Switch statements are not supported"));
+				return Err(ParseError::SwitchStatement(line!()));
 			}
 
 			//Case
 			[Case, constant, Colon, ..] if matches!(constant, Bool(_) | Char(_) | Num(_)) => {
-				return Err(ParseError(line!(), "Switch statements are not supported"));
+				return Err(ParseError::SwitchStatement(line!()));
 			}
 
 			[Break, ..] | [Continue, ..] => {
-				return Err(ParseError(line!(), "Break and continue are not supported"));
+				return Err(ParseError::BreakContinue(line!()));
 			}
 
 			//If else if
@@ -140,10 +140,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			[For, UnparsedParentheses(init_cond_post), UnparsedBlock(code)] => {
 				let split = init_cond_post.split(';').map(str::trim).collect::<Vec<_>>();
 				if split.len() != 3 {
-					return Err(ParseError(
-						line!(),
-						"For loop didn't contain three sections!",
-					));
+					return Err(ParseError::BrokenForLoop(line!()));
 				}
 
 				let condition = StatementElement::from_source_str(split[1])?;
@@ -179,10 +176,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			[TypeDef, Struct, Name(name), UnparsedBlock(members), Name(name2)] => {
 				if name != name2 {
-					return Err(ParseError(
-						line!(),
-						"Struct doesn't have the same name as its typedef",
-					));
+					return Err(ParseError::BadStructName(line!()));
 				}
 				//Reuse second definition
 				construct_structure_from_tokens(
@@ -206,7 +200,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 
 			_ => {
 				dbg!(tokens);
-				return Err(ParseError(line!(), "Couldn't match language pattern"));
+				return Err(ParseError::MatchFail(line!()));
 			}
 		}
 	};
@@ -266,7 +260,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				[Name(n), UnparsedArrayAccess(len)] => {
 					let res = len
 						.parse::<isize>()
-						.map_err(|_| ParseError(line!(), "Array length wasn't constant"))
+						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
 						.map(|len| {
 							t = Type::Arr(Box::new(t), len);
 							LanguageElement::VariableDeclaration {
@@ -295,7 +289,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				[Name(n), UnparsedArrayAccess(len), Assign, ..] => {
 					let res = len
 						.parse::<isize>()
-						.map_err(|_| ParseError(line!(), "Array length wasn't constant"))
+						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
 						.and_then(|len| {
 							t = Type::Arr(Box::new(t), len);
 							StatementElement::from_tokens(&tokens_slice[3..]).map(|statement| {

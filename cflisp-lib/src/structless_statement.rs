@@ -96,20 +96,16 @@ impl<'a> StructlessStatement<'a> {
 				let mut new_parametres = Vec::new();
 				let arguments = functions
 					.get(name)
-					.ok_or(ParseError(line!(), "Undefined function"))?;
+					.ok_or(ParseError::UndefinedFunction(line!()))?;
 				for (arg, param) in arguments.iter().zip(parametres.iter()) {
 					if let Type::Struct(struct_type) = arg.typ {
 						let fields = struct_types
 							.get(struct_type)
-							.ok_or(ParseError(line!(), "Undefined struct type"))?;
+							.ok_or(ParseError::UndefinedType(line!()))?;
 						let var_name = if let StatementElement::Var(var_name) = param {
 							Ok(var_name)
 						} else {
-							Err(ParseError(
-								line!(),
-								"Only struct variables can be passed into functions with struct \
-								 arguments (not literals)",
-							))
+							Err(ParseError::IllegalStructLiteral(line!()))
 						}?;
 						for field in fields.iter() {
 							let param_name = helper::merge_name_and_field(var_name, &field.name);
@@ -153,15 +149,15 @@ impl<'a> StructlessStatement<'a> {
 			StatementElement::FieldPointerAccess(name, field) => {
 				let struct_type = structs_and_struct_pointers.get(name).ok_or_else(|| {
 					dbg!(name, structs_and_struct_pointers);
-					ParseError(line!(), "Variable wasn't of struct or struct pointer type")
+					ParseError::WrongTypeWasNative(line!())
 				})?;
 				let fields = struct_types
 					.get(*struct_type)
-					.ok_or(ParseError(line!(), "Undefined struct type"))?;
+					.ok_or(ParseError::UndefinedType(line!()))?;
 				let idx = fields
 					.iter()
 					.position(|field_name| &field_name.name == field)
-					.ok_or(ParseError(line!(), "Unknown field type"))?;
+					.ok_or(ParseError::UndefinedStructField(line!()))?;
 				let signedness = NumberType::from(&fields[idx].typ);
 				StructlessStatement::Deref(Box::new(StructlessStatement::BinOp {
 					op: BinOp::Add,

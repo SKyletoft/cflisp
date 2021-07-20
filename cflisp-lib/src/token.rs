@@ -125,7 +125,7 @@ impl<'a> Token<'a> {
 	) -> Result<Vec<StatementToken<'a>>, ParseError> {
 		let res = Token::by_byte(s)?;
 		if res.contains(&NewLine) {
-			return Err(ParseError(line!(), "Statement ended early?"));
+			return Err(ParseError::IncompleteStatement(line!()));
 		}
 		StatementToken::from_tokens(&res)
 	}
@@ -149,7 +149,7 @@ impl<'a> Token<'a> {
 				Some(Name(t)) => Type::Struct(t),
 				_ => {
 					dbg!(slice);
-					return Err(ParseError(line!(), "Couldn't parse argument list"));
+					return Err(ParseError::InvalidArguments(line!()));
 				}
 			};
 			let mut reduced = &slice[1..];
@@ -160,7 +160,7 @@ impl<'a> Token<'a> {
 			if let [Token::Name(n)] = reduced {
 				Ok(Variable { typ, name: *n })
 			} else {
-				Err(ParseError(line!(), "Couldn't parse argument list"))
+				return Err(ParseError::InvalidArguments(line!()));
 			}
 		};
 		if s.is_empty() {
@@ -189,7 +189,7 @@ impl<'a> Token<'a> {
 				})
 			} else {
 				dbg!(s, tokens);
-				return Err(ParseError(line!(), "Couldn't struct members"));
+				return Err(ParseError::BadStructFields(line!()));
 			}
 		}
 		Ok(arguments)

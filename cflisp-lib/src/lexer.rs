@@ -210,7 +210,7 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_name(s))
 		.ok_or_else(|| {
 			dbg!(s);
-			ParseError(line!(), "Couldn't parse token")
+			ParseError::TokenFail(line!())
 		})
 }
 

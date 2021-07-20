@@ -18,7 +18,7 @@ impl<'a> Variable<'a> {
 		let res = if let Type::Struct(struct_type) = self.typ {
 			let mut vec = struct_defs
 				.get(struct_type)
-				.ok_or(ParseError(line!(), "Undefined struct type"))?
+				.ok_or(ParseError::UndefinedType(line!()))?
 				.clone();
 			for NativeVariable { name, .. } in vec.iter_mut() {
 				*name = helper::merge_name_and_field(self.name, name);

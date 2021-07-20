@@ -114,7 +114,7 @@ impl<'a> StatementToken<'a> {
 				),
 				_ => {
 					dbg!(tokens, token);
-					return Err(ParseError(line!(), "Token is not valid in this context"));
+					return Err(ParseError::InvalidToken(line!()));
 				}
 			};
 			res.push(new);

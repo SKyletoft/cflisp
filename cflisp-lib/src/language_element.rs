@@ -89,12 +89,7 @@ impl<'a> LanguageElement<'a> {
 			LanguageElement::StructDeclarationAssignment { is_static, .. } if !*is_static => {
 				*is_static = true;
 			}
-			_ => {
-				return Err(ParseError(
-					line!(),
-					"Internal error: cannot make element static",
-				))
-			}
+			_ => return Err(ParseError::InternalFailedStatic(line!())),
 		}
 		Ok(self)
 	}
@@ -110,12 +105,7 @@ impl<'a> LanguageElement<'a> {
 			LanguageElement::StructDeclarationAssignment { is_const, .. } if !*is_const => {
 				*is_const = true;
 			}
-			_ => {
-				return Err(ParseError(
-					line!(),
-					"Internal error: cannot make element const",
-				))
-			}
+			_ => return Err(ParseError::InternalFailedConst(line!())),
 		}
 		Ok(self)
 	}
@@ -131,12 +121,7 @@ impl<'a> LanguageElement<'a> {
 			LanguageElement::StructDeclarationAssignment { is_volatile, .. } if !*is_volatile => {
 				*is_volatile = true;
 			}
-			_ => {
-				return Err(ParseError(
-					line!(),
-					"Internal error: cannot make element volatile",
-				))
-			}
+			_ => return Err(ParseError::InternalFailedVolatile(line!())),
 		}
 		Ok(self)
 	}

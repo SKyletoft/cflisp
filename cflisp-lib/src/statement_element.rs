@@ -256,14 +256,14 @@ impl<'a> StatementElement<'a> {
 						&lhs, &rhs,
 					)))
 				} else {
-					Err(ParseError(line!(), "Field access between non-names"))
+					Err(ParseError::FieldAccessOnNonNames(line!()))
 				}
 			}),
 			(Unparsed(StatementToken::FieldPointerAccess), |l, r| {
 				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (l, r) {
 					Ok(StatementElement::FieldPointerAccess(lhs, rhs))
 				} else {
-					Err(ParseError(line!(), "Field access between non-names"))
+					Err(ParseError::FieldAccessOnNonNames(line!()))
 				}
 			}),
 		];
@@ -302,10 +302,7 @@ impl<'a> StatementElement<'a> {
 				if let StatementElement::Var(n) = r {
 					Ok(StatementElement::AdrOf(n))
 				} else {
-					Err(ParseError(
-						line!(),
-						"Internal error: Tried to take address of on a non variable",
-					))
+					Err(ParseError::AddressOfTemporary(line!()))
 				}
 			}),
 		];
@@ -346,16 +343,13 @@ impl<'a> StatementElement<'a> {
 
 		if working_tokens.len() != 1 {
 			dbg!(working_tokens);
-			return Err(ParseError(line!(), "Internal tree construction error"));
+			return Err(ParseError::InternalTreeFail(line!()));
 		}
 		if let Parsed(elem) = working_tokens.remove(0) {
 			Ok(elem)
 		} else {
 			dbg!(working_tokens);
-			Err(ParseError(
-				line!(),
-				"Internal error: Last element in statement parsing vector was unparsed",
-			))
+			Err(ParseError::InternalUnparsed(line!()))
 		}
 	}
 
@@ -388,7 +382,7 @@ impl<'a> StatementElement<'a> {
 				.get(name)
 				.ok_or_else(|| {
 					dbg!(name, symbols);
-					ParseError(line!(), "Unknown symbol")
+					ParseError::UnknownSymbol(line!())
 				})?
 				.into(),
 			StatementElement::Num(Number { signedness, .. }) => *signedness,
@@ -422,11 +416,7 @@ fn do_binary_operation<'a>(
 	while let Some(idx) = tokens.iter().position(|t| t == op_from) {
 		if idx == 0 || idx + 1 == tokens.len() {
 			dbg!(tokens);
-			return Err(ParseError(
-				line!(),
-				"Couldn't construct tree from statement. Are you sure the operators are correctly \
-				 placed?",
-			));
+			return Err(ParseError::MisplacedOperators(line!()));
 		}
 		let right = tokens.remove(idx + 1);
 		let left = tokens.remove(idx - 1);
@@ -435,11 +425,7 @@ fn do_binary_operation<'a>(
 			tokens[idx - 1] = Parsed(op_to(lhs, rhs)?);
 		} else {
 			dbg!(tokens);
-			return Err(ParseError(
-				line!(),
-				"Couldn't construct tree from statement. Element that should've been parsed first \
-				 has not been parsed",
-			));
+			return Err(ParseError::TreeConstructionFail(line!()));
 		}
 	}
 	Ok(())
@@ -460,11 +446,7 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 					rhs: Box::new(rhs),
 				});
 			} else {
-				return Err(ParseError(
-					line!(),
-					"Couldn't construct tree from statement. Element that should've been parsed \
-					 first has not been parsed. (In ternary)",
-				));
+				return Err(ParseError::MalformedTernary(line!()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -495,11 +477,7 @@ fn do_unary_operation_left<'a>(
 			if let Parsed(right) = next {
 				tokens[idx] = Parsed(op_to(right)?);
 			} else {
-				return Err(ParseError(
-					line!(),
-					"Couldn't construct tree from statement. Element that should've been parsed \
-					 first has not been parsed",
-				));
+				return Err(ParseError::TreeConstructionFail(line!()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -532,11 +510,7 @@ fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 					value: Box::new(value),
 				});
 			} else {
-				return Err(ParseError(
-					line!(),
-					"Couldn't construct tree from statement. Element that should've been parsed \
-					 first has not been parsed. (In cast)",
-				));
+				return Err(ParseError::TreeConstructionFail(line!()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -558,11 +532,7 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 						rhs: Box::new(i),
 					})));
 			} else {
-				return Err(ParseError(
-					line!(),
-					"Couldn't construct tree from statement. Element that should've been parsed \
-					 first has not been parsed",
-				));
+				return Err(ParseError::TreeConstructionFail(line!()));
 			}
 		}
 		idx = idx.wrapping_sub(1);

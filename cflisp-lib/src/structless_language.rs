@@ -117,7 +117,7 @@ impl<'a> StructlessLanguage<'a> {
 				} => {
 					let fields = struct_types
 						.get(n)
-						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+						.ok_or(ParseError::UndefinedType(line!()))?;
 					let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 					rename_map.insert(name.to_string(), new_name.to_string());
 					symbols.insert(new_name.clone(), NativeType::Void);
@@ -152,7 +152,7 @@ impl<'a> StructlessLanguage<'a> {
 				} => {
 					let fields = struct_types
 						.get(n)
-						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+						.ok_or(ParseError::UndefinedType(line!()))?;
 					structs_and_struct_pointers.insert(name.clone(), n);
 					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
@@ -288,10 +288,10 @@ impl<'a> StructlessLanguage<'a> {
 					let name: &str = &name;
 					let struct_type = structs
 						.get(name)
-						.ok_or(ParseError(line!(), "Struct variable missing!"))?;
+						.ok_or(ParseError::UndefinedVariable(line!()))?;
 					let fields = struct_types
 						.get(struct_type)
-						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+						.ok_or(ParseError::UndefinedType(line!()))?;
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(StructlessLanguage::VariableAssignment {
 							name: helper::merge_name_and_field(name, &field.name),
@@ -464,7 +464,7 @@ impl<'a> StructlessLanguage<'a> {
 						Ok(struct_type)
 					} else {
 						dbg!(&typ);
-						Err(ParseError(line!(), "Internal error: Type is not struct"))
+						Err(ParseError::InternalNotStruct(line!()))
 					}?;
 					structs_and_struct_pointers.insert(new_name.clone(), struct_type);
 					rename_map.insert(name.to_string(), new_name.to_string());
@@ -481,7 +481,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_volatile,
 						});
 						dbg!(struct_types, structs_and_struct_pointers);
-						return Err(ParseError(line!(), "Undefined struct type"));
+						return Err(ParseError::UndefinedType(line!()));
 					};
 					upper.push(StructlessLanguage::VariableLabelTag {
 						name: new_name.clone(),
@@ -522,7 +522,7 @@ impl<'a> StructlessLanguage<'a> {
 						Ok(struct_type)
 					} else {
 						dbg!(&typ);
-						Err(ParseError(line!(), "Internal error: Type is not struct"))
+						Err(ParseError::InternalNotStruct(line!()))
 					}?;
 					structs_and_struct_pointers.insert(name.clone(), struct_type);
 					let fields = if let Some(fields) = struct_types.get(struct_type) {
@@ -537,7 +537,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_volatile,
 						});
 						dbg!(struct_types, structs_and_struct_pointers);
-						return Err(ParseError(line!(), "Undefined struct type"));
+						return Err(ParseError::UndefinedType(line!()));
 					};
 					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
@@ -592,15 +592,15 @@ impl<'a> StructlessLanguage<'a> {
 						.ok_or_else(|| {
 							eprintln!("{}->{} = {:?}", name, field, value);
 							dbg!(name_borrowed, &structs_and_struct_pointers);
-							ParseError(line!(), "Variable wasn't of struct or struct pointer type")
+							ParseError::WrongTypeWasNative(line!())
 						})?;
 					let fields = struct_types
 						.get(struct_type_name)
-						.ok_or(ParseError(line!(), "Undefined struct type"))?;
+						.ok_or(ParseError::UndefinedType(line!()))?;
 					let idx = fields
 						.iter()
 						.position(|NativeVariable { name, .. }| name == &field)
-						.ok_or(ParseError(line!(), "Unknown field name"))?;
+						.ok_or(ParseError::UndefinedStructField(line!()))?;
 					let signedness = NumberType::from(&fields[idx].typ);
 					let new_ptr = if idx == 0 {
 						StructlessStatement::Var(name)
@@ -631,11 +631,7 @@ impl<'a> StructlessLanguage<'a> {
 					block,
 				} => {
 					if matches!(typ, Type::Struct(_)) {
-						return Err(ParseError(
-							line!(),
-							"Cannot return struct from function due to ABI limitation. Maybe try \
-							 having an out pointer parametre instead? (Sorry)",
-						));
+						return Err(ParseError::ReturnStruct(line!()));
 					}
 					functions.insert(name.clone(), args.clone());
 					let mut new_structs_and_struct_pointers = structs_and_struct_pointers.clone();

@@ -5,7 +5,7 @@ maybe?
 
 Optimisation: copy out a single calculation of address when array is used a lot
 
-Merge BinOp in structless IR
-
 BUG: Writing to a struct pointer doesn't write each field.
      It used to do *something*, but now it just crashes
+
+Separate out the repeated operator function call code in codegen
