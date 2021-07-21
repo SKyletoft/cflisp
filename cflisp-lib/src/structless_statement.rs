@@ -1,6 +1,6 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
-use crate::*;
+use crate::{structless_language::State, *};
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]
@@ -28,40 +28,21 @@ pub enum StructlessStatement<'a> {
 impl<'a> StructlessStatement<'a> {
 	pub(crate) fn from(
 		other: &StatementElement<'a>,
-		struct_types: &HashMap<Cow<'a, str>, Vec<NativeVariable<'a>>>,
-		structs_and_struct_pointers: &HashMap<Cow<'a, str>, &'a str>,
-		functions: &HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
-		symbols: &HashMap<Cow<'a, str>, NativeType>,
+		state: &State<'a, '_, '_, '_, '_>,
 	) -> Result<Self, ParseError> {
 		let bin_op = |op, lhs, rhs| {
 			Ok(StructlessStatement::BinOp {
 				op,
-				lhs: Box::new(StructlessStatement::from(
-					lhs,
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-					symbols,
-				)?),
-				rhs: Box::new(StructlessStatement::from(
-					rhs,
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-					symbols,
-				)?),
-				signedness: lhs.signedness(symbols)?.promote(rhs.signedness(symbols)?),
+				lhs: Box::new(StructlessStatement::from(lhs, state)?),
+				rhs: Box::new(StructlessStatement::from(rhs, state)?),
+				signedness: lhs
+					.signedness(state.symbols)?
+					.promote(rhs.signedness(state.symbols)?),
 			})
 		};
 		macro_rules! un_op {
 			($i: ident, $lhs: expr) => {
-				StructlessStatement::$i(Box::new(StructlessStatement::from(
-					$lhs.as_ref(),
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-					symbols,
-				)?))
+				StructlessStatement::$i(Box::new(StructlessStatement::from($lhs.as_ref(), state)?))
 			};
 		}
 
@@ -94,12 +75,14 @@ impl<'a> StructlessStatement<'a> {
 
 			StatementElement::FunctionCall { name, parametres } => {
 				let mut new_parametres = Vec::new();
-				let arguments = functions
+				let arguments = state
+					.functions
 					.get(name)
 					.ok_or(ParseError::UndefinedFunction(line!()))?;
 				for (arg, param) in arguments.iter().zip(parametres.iter()) {
 					if let Type::Struct(struct_type) = arg.typ {
-						let fields = struct_types
+						let fields = state
+							.struct_types
 							.get(struct_type)
 							.ok_or(ParseError::UndefinedType(line!()))?;
 						let var_name = if let StatementElement::Var(var_name) = param {
@@ -112,13 +95,7 @@ impl<'a> StructlessStatement<'a> {
 							new_parametres.push(StructlessStatement::Var(param_name))
 						}
 					} else {
-						new_parametres.push(StructlessStatement::from(
-							param,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?);
+						new_parametres.push(StructlessStatement::from(param, state)?);
 					}
 				}
 				StructlessStatement::FunctionCall {
@@ -132,26 +109,19 @@ impl<'a> StructlessStatement<'a> {
 			StatementElement::Bool(b) => StructlessStatement::Bool(*b),
 			StatementElement::Array(arr) => StructlessStatement::Array(
 				arr.iter()
-					.map(|parametre| {
-						StructlessStatement::from(
-							parametre,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)
-					})
+					.map(|parametre| StructlessStatement::from(parametre, state))
 					.collect::<Result<_, _>>()?,
 			),
 			StatementElement::Deref(n) => un_op!(Deref, n),
 			StatementElement::AdrOf(n) => StructlessStatement::AdrOf(n.clone()),
 
 			StatementElement::FieldPointerAccess(name, field) => {
-				let struct_type = structs_and_struct_pointers.get(name).ok_or_else(|| {
-					dbg!(name, structs_and_struct_pointers);
+				let struct_type = state.structs_and_struct_pointers.get(name).ok_or_else(|| {
+					dbg!(name, &state.structs_and_struct_pointers);
 					ParseError::WrongTypeWasNative(line!())
 				})?;
-				let fields = struct_types
+				let fields = state
+					.struct_types
 					.get(*struct_type)
 					.ok_or(ParseError::UndefinedType(line!()))?;
 				let idx = fields
@@ -172,13 +142,7 @@ impl<'a> StructlessStatement<'a> {
 				value,
 			} => StructlessStatement::FunctionCall {
 				name: Cow::Borrowed("__tb__"),
-				parametres: vec![StructlessStatement::from(
-					value,
-					struct_types,
-					structs_and_struct_pointers,
-					functions,
-					symbols,
-				)?],
+				parametres: vec![StructlessStatement::from(value, state)?],
 			},
 
 			StatementElement::Cast {
@@ -188,13 +152,7 @@ impl<'a> StructlessStatement<'a> {
 			| StatementElement::Cast {
 				typ: NativeType::Int,
 				value,
-			} => StructlessStatement::from(
-				value,
-				struct_types,
-				structs_and_struct_pointers,
-				functions,
-				symbols,
-			)?,
+			} => StructlessStatement::from(value, state)?,
 
 			StatementElement::Cast { .. } | StatementElement::Ternary { .. } => todo!(),
 		};

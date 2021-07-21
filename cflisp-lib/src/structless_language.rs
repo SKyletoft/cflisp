@@ -74,13 +74,15 @@ impl<'a> StructlessLanguage<'a> {
 
 		let mut res = StructlessLanguage::from_language_elements_internal(
 			elements,
-			&mut struct_types,
-			&mut structs_and_struct_pointers,
-			&mut functions,
 			&mut upper,
 			scope,
 			&mut rename_map,
-			&mut symbols,
+			&mut State {
+				struct_types: &mut struct_types,
+				structs_and_struct_pointers: &mut structs_and_struct_pointers,
+				functions: &mut functions,
+				symbols: &mut symbols,
+			},
 		)?;
 
 		upper.append(&mut res);
@@ -89,13 +91,10 @@ impl<'a> StructlessLanguage<'a> {
 
 	fn from_language_elements_internal(
 		elements: Vec<LanguageElement<'a>>,
-		struct_types: &mut HashMap<Cow<'a, str>, Vec<NativeVariable<'a>>>,
-		structs_and_struct_pointers: &mut HashMap<Cow<'a, str>, &'a str>,
-		functions: &mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
 		upper: &mut Vec<StructlessLanguage<'a>>,
 		scope: Cow<'a, str>,
 		rename_map: &mut HashMap<String, String>,
-		symbols: &mut HashMap<Cow<'a, str>, NativeType>,
+		state: &mut State<'a, '_, '_, '_, '_>,
 	) -> Result<Vec<StructlessLanguage<'a>>, ParseError> {
 		let mut new_elements = Vec::new();
 		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
@@ -105,7 +104,7 @@ impl<'a> StructlessLanguage<'a> {
 			}
 			match element {
 				LanguageElement::StructDefinition { name, members } => {
-					struct_types.insert(name, members);
+					state.struct_types.insert(name, members);
 				}
 
 				LanguageElement::VariableDeclaration {
@@ -115,13 +114,16 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					let fields = struct_types
+					let fields = state
+						.struct_types
 						.get(n)
 						.ok_or(ParseError::UndefinedType(line!()))?;
 					let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 					rename_map.insert(name.to_string(), new_name.to_string());
-					symbols.insert(new_name.clone(), NativeType::Void);
-					structs_and_struct_pointers.insert(new_name.clone(), n);
+					state.symbols.insert(new_name.clone(), NativeType::Void);
+					state
+						.structs_and_struct_pointers
+						.insert(new_name.clone(), n);
 					upper.push(StructlessLanguage::VariableLabelTag {
 						name: new_name,
 						is_static: true,
@@ -132,7 +134,9 @@ impl<'a> StructlessLanguage<'a> {
 						let new_field_name = format!("{}::{}::{}", &scope, &name, field.name);
 						rename_map
 							.insert(format!("{}::{}", &name, field.name), new_field_name.clone());
-						symbols.insert(Cow::Owned(new_field_name.clone()), field.typ.clone());
+						state
+							.symbols
+							.insert(Cow::Owned(new_field_name.clone()), field.typ.clone());
 						upper.push(StructlessLanguage::VariableDeclaration {
 							name: Cow::Owned(new_field_name),
 							typ: field.typ.clone(),
@@ -150,10 +154,11 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					let fields = struct_types
+					let fields = state
+						.struct_types
 						.get(n)
 						.ok_or(ParseError::UndefinedType(line!()))?;
-					structs_and_struct_pointers.insert(name.clone(), n);
+					state.structs_and_struct_pointers.insert(name.clone(), n);
 					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
 						is_static: false,
@@ -162,7 +167,9 @@ impl<'a> StructlessLanguage<'a> {
 					});
 					for field in fields {
 						let new_field_name = helper::merge_name_and_field(&name, &field.name);
-						symbols.insert(new_field_name.clone(), field.typ.clone());
+						state
+							.symbols
+							.insert(new_field_name.clone(), field.typ.clone());
 						new_elements.push(StructlessLanguage::VariableDeclaration {
 							name: new_field_name,
 							typ: field.typ.clone(),
@@ -182,7 +189,9 @@ impl<'a> StructlessLanguage<'a> {
 				} => {
 					let new_name = format!("{}::{}", &scope, &name);
 					rename_map.insert(name.to_string(), new_name.clone());
-					symbols.insert(new_name.clone().into(), t.as_ref().into());
+					state
+						.symbols
+						.insert(new_name.clone().into(), t.as_ref().into());
 					let t = t.as_ref();
 					upper.push(StructlessLanguage::VariableLabelTag {
 						name: Cow::Owned(new_name),
@@ -194,7 +203,9 @@ impl<'a> StructlessLanguage<'a> {
 					for idx in 0..len {
 						let new_element_name = format!("{}::{}[{}]", &scope, &name, idx);
 						rename_map.insert(format!("{}[{}]", &name, idx), new_element_name.clone());
-						symbols.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
+						state
+							.symbols
+							.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
 						upper.push(StructlessLanguage::VariableDeclaration {
 							typ: converted_t.clone(),
 							name: Cow::Owned(new_element_name),
@@ -215,7 +226,9 @@ impl<'a> StructlessLanguage<'a> {
 					let converted_t = NativeType::from(t.as_ref());
 					for idx in (0..len).rev() {
 						let new_element_name = format!("{}[{}]", &name, idx);
-						symbols.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
+						state
+							.symbols
+							.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
 						new_elements.push(StructlessLanguage::VariableDeclaration {
 							typ: converted_t.clone(),
 							name: Cow::Owned(new_element_name),
@@ -244,7 +257,9 @@ impl<'a> StructlessLanguage<'a> {
 				} => {
 					let new_name = format!("{}::{}", scope, name);
 					rename_map.insert(name.to_string(), new_name.clone());
-					symbols.insert(Cow::Owned(new_name.clone()), (&typ).into());
+					state
+						.symbols
+						.insert(Cow::Owned(new_name.clone()), (&typ).into());
 					upper.push(StructlessLanguage::VariableDeclaration {
 						typ: typ.into(),
 						name: Cow::Owned(new_name),
@@ -261,7 +276,7 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					symbols.insert(name.clone(), (&typ).into());
+					state.symbols.insert(name.clone(), (&typ).into());
 					new_elements.push(StructlessLanguage::VariableDeclaration {
 						typ: typ.into(),
 						name,
@@ -274,13 +289,7 @@ impl<'a> StructlessLanguage<'a> {
 				LanguageElement::VariableAssignment { name, value } => {
 					new_elements.push(StructlessLanguage::VariableAssignment {
 						name,
-						value: StructlessStatement::from(
-							&value,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
+						value: StructlessStatement::from(&value, state)?,
 					})
 				}
 
@@ -289,19 +298,14 @@ impl<'a> StructlessLanguage<'a> {
 					let struct_type = structs
 						.get(name)
 						.ok_or(ParseError::UndefinedVariable(line!()))?;
-					let fields = struct_types
+					let fields = state
+						.struct_types
 						.get(struct_type)
 						.ok_or(ParseError::UndefinedType(line!()))?;
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(StructlessLanguage::VariableAssignment {
 							name: helper::merge_name_and_field(name, &field.name),
-							value: StructlessStatement::from(
-								&val,
-								struct_types,
-								structs_and_struct_pointers,
-								functions,
-								symbols,
-							)?,
+							value: StructlessStatement::from(&val, state)?,
 						});
 					}
 				}
@@ -316,14 +320,10 @@ impl<'a> StructlessLanguage<'a> {
 				} => {
 					let new_name = format!("{}::{}", scope, name);
 					rename_map.insert(name.to_string(), new_name.clone());
-					symbols.insert(Cow::Owned(new_name.clone()), t.as_ref().into());
-					let mut value = StructlessStatement::from(
-						&value,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?;
+					state
+						.symbols
+						.insert(Cow::Owned(new_name.clone()), t.as_ref().into());
+					let mut value = StructlessStatement::from(&value, state)?;
 					if let StructlessStatement::Array(arr) = &mut value {
 						while arr.len() < len as usize {
 							arr.push(StructlessStatement::Num(Number::ZERO));
@@ -331,7 +331,7 @@ impl<'a> StructlessLanguage<'a> {
 						arr.truncate(len as usize);
 					}
 					if let Some(n) = t.as_ref().get_struct_type() {
-						structs_and_struct_pointers.insert(name.clone(), n);
+						state.structs_and_struct_pointers.insert(name.clone(), n);
 					}
 					let typ = NativeType::ptr(t.as_ref().into());
 					upper.push(StructlessLanguage::VariableDeclarationAssignment {
@@ -352,13 +352,7 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					let mut value = StructlessStatement::from(
-						&value,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?;
+					let mut value = StructlessStatement::from(&value, state)?;
 					if let StructlessStatement::Array(arr) = &mut value {
 						while arr.len() < len as usize {
 							arr.push(StructlessStatement::Num(Number::ZERO));
@@ -366,12 +360,12 @@ impl<'a> StructlessLanguage<'a> {
 						arr.truncate(len as usize);
 					}
 					if let Some(n) = t.as_ref().get_struct_type() {
-						structs_and_struct_pointers.insert(name.clone(), n);
+						state.structs_and_struct_pointers.insert(name.clone(), n);
 					}
 					let typ = NativeType::ptr(t.as_ref().into());
 					let alloc_name: Cow<'a, str> = Cow::Owned(format!("{}_alloc", name));
-					symbols.insert(alloc_name.clone(), t.as_ref().into());
-					symbols.insert(name.clone(), typ.clone());
+					state.symbols.insert(alloc_name.clone(), t.as_ref().into());
+					state.symbols.insert(name.clone(), typ.clone());
 					new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 						typ: t.as_ref().into(),
 						name: alloc_name.clone(),
@@ -398,20 +392,16 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					let value = StructlessStatement::from(
-						&value,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?;
+					let value = StructlessStatement::from(&value, state)?;
 					if let Some(n) = typ.get_struct_type() {
-						structs_and_struct_pointers.insert(name.clone(), n);
+						state.structs_and_struct_pointers.insert(name.clone(), n);
 					}
 					let new_name = format!("{}::{}", scope, name);
 					rename_map.insert(name.to_string(), new_name.clone());
-					symbols.insert(name.clone(), (&typ).into());
-					symbols.insert(Cow::Owned(new_name.clone()), (&typ).into());
+					state.symbols.insert(name.clone(), (&typ).into());
+					state
+						.symbols
+						.insert(Cow::Owned(new_name.clone()), (&typ).into());
 					upper.push(StructlessLanguage::VariableDeclarationAssignment {
 						typ: typ.into(),
 						name: Cow::Owned(new_name),
@@ -430,17 +420,11 @@ impl<'a> StructlessLanguage<'a> {
 					is_const,
 					is_volatile,
 				} => {
-					let value = StructlessStatement::from(
-						&value,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?;
+					let value = StructlessStatement::from(&value, state)?;
 					if let Some(n) = typ.get_struct_type() {
-						structs_and_struct_pointers.insert(name.clone(), n);
+						state.structs_and_struct_pointers.insert(name.clone(), n);
 					}
-					symbols.insert(name.clone(), (&typ).into());
+					state.symbols.insert(name.clone(), (&typ).into());
 					new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 						typ: typ.into(),
 						name,
@@ -466,10 +450,12 @@ impl<'a> StructlessLanguage<'a> {
 						dbg!(&typ);
 						Err(ParseError::InternalNotStruct(line!()))
 					}?;
-					structs_and_struct_pointers.insert(new_name.clone(), struct_type);
+					state
+						.structs_and_struct_pointers
+						.insert(new_name.clone(), struct_type);
 					rename_map.insert(name.to_string(), new_name.to_string());
-					symbols.insert(name.clone(), (&typ).into());
-					let fields = if let Some(fields) = struct_types.get(struct_type) {
+					state.symbols.insert(name.clone(), (&typ).into());
+					let fields = if let Some(fields) = state.struct_types.get(struct_type) {
 						fields
 					} else {
 						dbg!(LanguageElement::StructDeclarationAssignment {
@@ -480,7 +466,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_const,
 							is_volatile,
 						});
-						dbg!(struct_types, structs_and_struct_pointers);
+						dbg!(&state.struct_types, &state.structs_and_struct_pointers);
 						return Err(ParseError::UndefinedType(line!()));
 					};
 					upper.push(StructlessLanguage::VariableLabelTag {
@@ -491,16 +477,12 @@ impl<'a> StructlessLanguage<'a> {
 					});
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						let new_field_name = helper::merge_name_and_field(&new_name, &field.name);
-						symbols.insert(new_field_name.clone(), (&field.typ).clone());
+						state
+							.symbols
+							.insert(new_field_name.clone(), (&field.typ).clone());
 						upper.push(StructlessLanguage::VariableDeclarationAssignment {
 							name: new_field_name,
-							value: StructlessStatement::from(
-								&val,
-								struct_types,
-								structs_and_struct_pointers,
-								functions,
-								symbols,
-							)?,
+							value: StructlessStatement::from(&val, state)?,
 							typ: field.typ.clone(),
 							is_static: true,
 							is_const,
@@ -524,8 +506,10 @@ impl<'a> StructlessLanguage<'a> {
 						dbg!(&typ);
 						Err(ParseError::InternalNotStruct(line!()))
 					}?;
-					structs_and_struct_pointers.insert(name.clone(), struct_type);
-					let fields = if let Some(fields) = struct_types.get(struct_type) {
+					state
+						.structs_and_struct_pointers
+						.insert(name.clone(), struct_type);
+					let fields = if let Some(fields) = state.struct_types.get(struct_type) {
 						fields
 					} else {
 						dbg!(LanguageElement::StructDeclarationAssignment {
@@ -536,7 +520,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_const,
 							is_volatile,
 						});
-						dbg!(struct_types, structs_and_struct_pointers);
+						dbg!(&state.struct_types, &state.structs_and_struct_pointers);
 						return Err(ParseError::UndefinedType(line!()));
 					};
 					new_elements.push(StructlessLanguage::VariableLabelTag {
@@ -547,16 +531,12 @@ impl<'a> StructlessLanguage<'a> {
 					});
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						let new_field_name = helper::merge_name_and_field(&name, &field.name);
-						symbols.insert(new_field_name.clone(), (&field.typ).clone());
+						state
+							.symbols
+							.insert(new_field_name.clone(), (&field.typ).clone());
 						new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 							name: new_field_name,
-							value: StructlessStatement::from(
-								&val,
-								struct_types,
-								structs_and_struct_pointers,
-								functions,
-								symbols,
-							)?,
+							value: StructlessStatement::from(&val, state)?,
 							typ: field.typ.clone(),
 							is_static: false,
 							is_const,
@@ -568,33 +548,23 @@ impl<'a> StructlessLanguage<'a> {
 
 				LanguageElement::PointerAssignment { ptr, value } => {
 					new_elements.push(StructlessLanguage::PointerAssignment {
-						ptr: StructlessStatement::from(
-							&ptr,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
-						value: StructlessStatement::from(
-							&value,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
+						ptr: StructlessStatement::from(&ptr, state)?,
+						value: StructlessStatement::from(&value, state)?,
 					})
 				}
 
 				LanguageElement::StructFieldPointerAssignment { name, field, value } => {
 					let name_borrowed: &str = &name;
-					let struct_type_name = *structs_and_struct_pointers
+					let struct_type_name = *state
+						.structs_and_struct_pointers
 						.get(name_borrowed)
 						.ok_or_else(|| {
 							eprintln!("{}->{} = {:?}", name, field, value);
-							dbg!(name_borrowed, &structs_and_struct_pointers);
+							dbg!(name_borrowed, &state.structs_and_struct_pointers);
 							ParseError::WrongTypeWasNative(line!())
 						})?;
-					let fields = struct_types
+					let fields = state
+						.struct_types
 						.get(struct_type_name)
 						.ok_or(ParseError::UndefinedType(line!()))?;
 					let idx = fields
@@ -614,13 +584,7 @@ impl<'a> StructlessLanguage<'a> {
 					};
 					new_elements.push(StructlessLanguage::PointerAssignment {
 						ptr: new_ptr,
-						value: StructlessStatement::from(
-							&value,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
+						value: StructlessStatement::from(&value, state)?,
 					});
 				}
 
@@ -633,8 +597,9 @@ impl<'a> StructlessLanguage<'a> {
 					if matches!(typ, Type::Struct(_)) {
 						return Err(ParseError::ReturnStruct(line!()));
 					}
-					functions.insert(name.clone(), args.clone());
-					let mut new_structs_and_struct_pointers = structs_and_struct_pointers.clone();
+					state.functions.insert(name.clone(), args.clone());
+					let mut new_structs_and_struct_pointers =
+						state.structs_and_struct_pointers.clone();
 					for (name, typ) in args
 						.iter()
 						.filter_map(|v| v.typ.get_struct_type().map(|t| (v.name, t)))
@@ -643,31 +608,35 @@ impl<'a> StructlessLanguage<'a> {
 					}
 					let new_args = args
 						.into_iter()
-						.map(|v| v.split_into_native(struct_types))
+						.map(|v| v.split_into_native(state.struct_types))
 						.collect::<Result<Vec<_>, _>>()? //There must be a better way
 						.into_iter()
 						.flat_map(|vec| vec.into_iter())
 						.collect::<Vec<_>>();
-					let mut new_symbols = symbols.clone();
+					let mut new_symbols = state.symbols.clone();
 					new_symbols.insert(name.clone(), (&typ).into());
 					for NativeVariable { typ, name } in new_args.iter() {
 						new_symbols.insert(name.clone(), typ.clone());
 					}
 					let new_scope = name.clone();
+					let mut new_state = State {
+						struct_types: state.struct_types,
+						structs_and_struct_pointers: &mut new_structs_and_struct_pointers,
+						functions: state.functions,
+						symbols: state.symbols,
+					};
+					let block = StructlessLanguage::from_language_elements_internal(
+						block,
+						upper,
+						new_scope,
+						rename_map,
+						&mut new_state,
+					)?;
 					new_elements.push(StructlessLanguage::FunctionDeclaration {
 						typ: typ.into(),
 						name,
 						args: new_args,
-						block: StructlessLanguage::from_language_elements_internal(
-							block,
-							struct_types,
-							&mut new_structs_and_struct_pointers,
-							functions,
-							upper,
-							new_scope,
-							rename_map,
-							&mut new_symbols,
-						)?,
+						block,
 					})
 				}
 
@@ -676,41 +645,46 @@ impl<'a> StructlessLanguage<'a> {
 					then,
 					else_then,
 				} => {
-					let mut inner_rename_map = rename_map.clone();
-					let mut inner_structs_and_struct_pointers = structs_and_struct_pointers.clone();
+					let condition = StructlessStatement::from(&condition, state)?;
+					let mut inner_then_rename_map = rename_map.clone();
+					let mut inner_then_structs_and_struct_pointers =
+						state.structs_and_struct_pointers.clone();
+					let mut then_state = State {
+						struct_types: state.struct_types,
+						structs_and_struct_pointers: &mut inner_then_structs_and_struct_pointers,
+						functions: state.functions,
+						symbols: state.symbols,
+					};
 					new_elements.push(StructlessLanguage::IfStatement {
-						condition: StructlessStatement::from(
-							&condition,
-							struct_types,
-							&inner_structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
+						condition,
 						then: Box::new(StructlessLanguage::Block {
 							block: StructlessLanguage::from_language_elements_internal(
 								then,
-								struct_types,
-								&mut inner_structs_and_struct_pointers,
-								functions,
 								upper,
 								scope.clone(),
-								&mut inner_rename_map,
-								symbols,
+								&mut inner_then_rename_map,
+								&mut then_state,
 							)?,
 							scope_name: Cow::Borrowed("if_then"),
 						}),
-						//no, clippy, this can't be replaced with a Option::map
 						else_then: if let Some(else_then) = else_then {
+							let mut inner_else_rename_map = rename_map.clone();
+							let mut inner_else_structs_and_struct_pointers =
+								state.structs_and_struct_pointers.clone();
+							let mut else_state = State {
+								struct_types: state.struct_types,
+								structs_and_struct_pointers:
+									&mut inner_else_structs_and_struct_pointers,
+								functions: state.functions,
+								symbols: state.symbols,
+							};
 							Some(Box::new(StructlessLanguage::Block {
 								block: StructlessLanguage::from_language_elements_internal(
 									else_then,
-									struct_types,
-									&mut inner_structs_and_struct_pointers,
-									functions,
 									upper,
 									scope.clone(),
-									&mut inner_rename_map,
-									symbols,
+									&mut inner_else_rename_map,
+									&mut else_state,
 								)?,
 								scope_name: Cow::Borrowed("if_else"),
 							}))
@@ -727,43 +701,36 @@ impl<'a> StructlessLanguage<'a> {
 					body,
 				} => {
 					let mut inner_rename_map = rename_map.clone();
-					let mut inner_structs_and_struct_pointers = structs_and_struct_pointers.clone();
+					let mut inner_structs_and_struct_pointers =
+						state.structs_and_struct_pointers.clone();
+
+					let condition = StructlessStatement::from(&condition, state)?;
+					let mut new_state = State {
+						struct_types: state.struct_types,
+						structs_and_struct_pointers: &mut inner_structs_and_struct_pointers,
+						functions: state.functions,
+						symbols: state.symbols,
+					};
 					let mut init_block = StructlessLanguage::from_language_elements_internal(
 						init,
-						struct_types,
-						&mut inner_structs_and_struct_pointers,
-						functions,
 						upper,
 						scope.clone(),
 						&mut inner_rename_map,
-						symbols,
-					)?;
-					let condition = StructlessStatement::from(
-						&condition,
-						struct_types,
-						&inner_structs_and_struct_pointers,
-						functions,
-						symbols,
+						&mut new_state,
 					)?;
 					let mut body = StructlessLanguage::from_language_elements_internal(
 						body,
-						struct_types,
-						&mut inner_structs_and_struct_pointers,
-						functions,
 						upper,
 						scope.clone(),
 						&mut inner_rename_map,
-						symbols,
+						&mut new_state,
 					)?;
 					let mut post = StructlessLanguage::from_language_elements_internal(
 						post,
-						struct_types,
-						&mut inner_structs_and_struct_pointers,
-						functions,
 						upper,
 						scope.clone(),
 						&mut inner_rename_map,
-						symbols,
+						&mut new_state,
 					)?;
 
 					body.append(&mut post);
@@ -782,26 +749,25 @@ impl<'a> StructlessLanguage<'a> {
 				}
 
 				LanguageElement::While { condition, body } => {
+					let condition = StructlessStatement::from(&condition, state)?;
 					let mut inner_rename_map = rename_map.clone();
-					let mut inner_structs_and_struct_pointers = structs_and_struct_pointers.clone();
+					let mut inner_structs_and_struct_pointers =
+						state.structs_and_struct_pointers.clone();
+					let mut inner_state = State {
+						struct_types: state.struct_types,
+						structs_and_struct_pointers: &mut inner_structs_and_struct_pointers,
+						functions: state.functions,
+						symbols: state.symbols,
+					};
 					new_elements.push(StructlessLanguage::Loop {
-						condition: StructlessStatement::from(
-							&condition,
-							struct_types,
-							&inner_structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?,
+						condition,
 						body: Box::new(StructlessLanguage::Block {
 							block: StructlessLanguage::from_language_elements_internal(
 								body,
-								struct_types,
-								&mut inner_structs_and_struct_pointers,
-								functions,
 								upper,
 								scope.clone(),
 								&mut inner_rename_map,
-								symbols,
+								&mut inner_state,
 							)?,
 							scope_name: Cow::Borrowed("while_body"),
 						}),
@@ -810,30 +776,26 @@ impl<'a> StructlessLanguage<'a> {
 
 				LanguageElement::Return(ret) => {
 					let ret = if let Some(value) = ret {
-						Some(StructlessStatement::from(
-							&value,
-							struct_types,
-							structs_and_struct_pointers,
-							functions,
-							symbols,
-						)?)
+						Some(StructlessStatement::from(&value, state)?)
 					} else {
 						None
 					};
 					new_elements.push(StructlessLanguage::Return(ret))
 				}
 
-				LanguageElement::Statement(stat) => {
-					new_elements.push(StructlessLanguage::Statement(StructlessStatement::from(
-						&stat,
-						struct_types,
-						structs_and_struct_pointers,
-						functions,
-						symbols,
-					)?))
-				}
+				LanguageElement::Statement(stat) => new_elements.push(
+					StructlessLanguage::Statement(StructlessStatement::from(&stat, state)?),
+				),
 			}
 		}
 		Ok(new_elements)
 	}
+}
+
+#[derive(Debug, PartialEq)]
+pub struct State<'a, 'b, 'c, 'd, 'e> {
+	pub struct_types: &'b mut HashMap<Cow<'a, str>, Vec<NativeVariable<'a>>>,
+	pub structs_and_struct_pointers: &'c mut HashMap<Cow<'a, str>, &'a str>,
+	pub functions: &'d mut HashMap<Cow<'a, str>, Vec<Variable<'a>>>,
+	pub symbols: &'e mut HashMap<Cow<'a, str>, NativeType>,
 }
