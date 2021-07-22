@@ -12,7 +12,7 @@ pub fn instructions_to_text(
 		.sum::<usize>()
 		> DIGIFLISP_PROGRAM_LIMIT
 	{
-		return Err(CompileError(line!(), "Program is too large for digiflisp!"));
+		return Err(CompileError::ProgramTooLarge(line!()));
 	}
 	let mut output = String::new();
 	for ((i, c), (next, _)) in instructions.iter().zip(

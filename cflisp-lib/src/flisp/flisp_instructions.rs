@@ -179,10 +179,7 @@ impl<'a> Instruction<'a> {
 				| BinOp::LessThanEqual
 				| BinOp::Cmp
 				| BinOp::NotCmp => {
-					return Err(CompileError(
-						line!(),
-						"Internal error: function call, not instruction?",
-					));
+					return Err(CompileError::InternalOpOfFunction(line!()));
 				}
 				BinOp::And => Instruction::ANDA(adr),
 				BinOp::Or => Instruction::ORA(adr),
@@ -197,10 +194,7 @@ impl<'a> Instruction<'a> {
 			| StructlessStatement::Deref(_)
 			| StructlessStatement::AdrOf(_)
 			| StructlessStatement::FunctionCall { .. } => {
-				return Err(CompileError(
-					line!(),
-					"Internal error: special cases and literals, not instructions?",
-				))
+				return Err(CompileError::InternalOpOfLiteral(line!()))
 			}
 		};
 

@@ -123,22 +123,22 @@ impl fmt::Display for TypeError {
 			UndefinedVariable(line) => (line, "Undefined variable"),
 			TypeMismatch(line) => (line, "Type mismatch"),
 			AssignmentToConstant(line) => (line, "Assignment to constant"),
+			IllegalVoidArgument(line) => (line, "Function has void argument"),
+			MalformedInterruptHandlerArguments(line) => (line, "Interrupt handler takes arugments"),
+			UndefinedType(line) => (line, "Undefined struct type"),
+			UndefinedField(line) => (line, "Undefined struct field"),
+			UndefinedFunction(line) => (line, "Undefined function"),
+			MissingArguments(line) => (line, "Wrong amount of arguments in function call"),
 			InternalPointerAssignmentToNonPointer(line) => {
 				(line, "Internal: Pointer assignment to non pointer")
 			}
-			IllegalVoidArgument(line) => (line, "Function has void argument"),
 			MalformedInterruptHandlerReturn(line) => {
 				(line, "Interrupt handler does not return void")
 			}
-			MalformedInterruptHandlerArguments(line) => (line, "Interrupt handler takes arugments"),
-			UndefinedType(line) => (line, "Undefined struct type"),
 			MissingStructFields(line) => (
 				line,
 				"Not the correct amount of fields in struct initalisation",
 			),
-			UndefinedField(line) => (line, "Undefined struct field"),
-			UndefinedFunction(line) => (line, "Undefined function"),
-			MissingArguments(line) => (line, "Wrong amount of arguments in function call"),
 		};
 		write!(f, "Type Error ({}): {}", line, error)
 	}
@@ -148,11 +148,44 @@ impl error::Error for TypeError {}
 
 ///Error type for compiling and optimisation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct CompileError(pub u32, pub &'static str);
+pub enum CompileError {
+	ProgramTooLarge(u32),
+	DuplicateName(u32),
+	LoneGlobalStatement(u32),
+	NonConstInConstInit(u32),
+	NegativeShift(u32),
+	UndefinedVariable(u32),
+	IllegalArrayLiteral(u32),
+	InvalidAddressOf(u32),
+	InternalOpOfFunction(u32),
+	InternalOpOfLiteral(u32),
+}
 
 impl fmt::Display for CompileError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Compilation Error ({}): {}", self.0, self.1)
+		use CompileError::*;
+		let (line, error) = match self {
+			ProgramTooLarge(line) => (line, "Program is too large for digiflisp!"),
+			DuplicateName(line) => (line, "Name already exists in scope!"),
+			LoneGlobalStatement(line) => (line, "Lone statement in global scope"),
+			NonConstInConstInit(line) => (line, "Non constant in constant initialisation"),
+			NegativeShift(line) => (line, "Cannot shift by negative amount"),
+			IllegalArrayLiteral(line) => (line, "Illegal array literal"),
+			InternalOpOfFunction(line) => (line, "Internal error: function call, not instruction?"),
+			UndefinedVariable(line) => (
+				line,
+				"Internal: Name resolution failed? This should've failed in typecheck",
+			),
+			InvalidAddressOf(line) => (
+				line,
+				"Invalid address of operation (should've failed in parse)",
+			),
+			InternalOpOfLiteral(line) => (
+				line,
+				"Internal error: special cases and literals, not instructions?",
+			),
+		};
+		write!(f, "Compile Error ({}): {}", line, error)
 	}
 }
 

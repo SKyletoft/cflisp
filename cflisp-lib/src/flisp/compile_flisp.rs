@@ -92,7 +92,7 @@ fn compile_element<'a>(
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(line!(), "Name already exists in scope!"));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				state
 					.global_variables
@@ -100,10 +100,7 @@ fn compile_element<'a>(
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(
-						line!(),
-						"Name already exists in scope! (No shadowing)",
-					));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				state
 					.variables
@@ -120,7 +117,7 @@ fn compile_element<'a>(
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(line!(), "Name already exists in scope!"));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				state
 					.global_variables
@@ -132,10 +129,7 @@ fn compile_element<'a>(
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(
-						line!(),
-						"Name already exists in scope! (No shadowing)",
-					));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				state
 					.variables
@@ -150,7 +144,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::VariableAssignment { name, value } => {
 			if state.scope_name == "global" {
-				return Err(CompileError(line!(), "Lone statement in global scope"));
+				return Err(CompileError::LoneGlobalStatement(line!()));
 			}
 			let adr = adr_for_name(
 				name,
@@ -176,16 +170,13 @@ fn compile_element<'a>(
 				StructlessStatement::Bool(b) => Ok(*b as isize),
 				_ => {
 					dbg!(val);
-					Err(CompileError(
-						line!(),
-						"Non constant in constant initialisation",
-					))
+					Err(CompileError::NonConstInConstInit(line!()))
 				}
 			};
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(line!(), "Name already exists in scope!"));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				if let StructlessStatement::Array(elements) = value {
 					state
@@ -211,10 +202,7 @@ fn compile_element<'a>(
 			} else {
 				if state.variables.contains_key(name) || state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError(
-						line!(),
-						"Name already exists in scope! (No shadowing)",
-					));
+					return Err(CompileError::DuplicateName(line!()));
 				}
 				if let StructlessStatement::Array(elements) = value {
 					let mut statement = Vec::new();
@@ -250,7 +238,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::PointerAssignment { ptr, value } => {
 			if state.scope_name == "global" {
-				return Err(CompileError(line!(), "Lone statement in global scope"));
+				return Err(CompileError::LoneGlobalStatement(line!()));
 			}
 
 			match (ptr, ptr.internal_ref()) {
@@ -294,10 +282,7 @@ fn compile_element<'a>(
 			name, args, block, ..
 		} => {
 			if state.functions.contains_key(name) {
-				return Err(CompileError(
-					line!(),
-					"Function name already exists in scope!",
-				));
+				return Err(CompileError::DuplicateName(line!()));
 			}
 			state
 				.functions
@@ -406,7 +391,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::Statement(statement) => {
 			if state.scope_name == "global" {
-				return Err(CompileError(line!(), "Lone statement in global scope"));
+				return Err(CompileError::LoneGlobalStatement(line!()));
 			}
 			compile_statement(statement, state)?
 		}
@@ -640,7 +625,7 @@ fn compile_statement_inner<'a>(
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StructlessStatement::Num(n) = rhs.as_ref() {
 						if *n < Number::ZERO {
-							return Err(CompileError(line!(), "Cannot shift by negative amount"));
+							return Err(CompileError::NegativeShift(line!()));
 						}
 						let inst = if matches!(op, BinOp::RShift) {
 							Instruction::LSRA
@@ -710,10 +695,7 @@ fn compile_statement_inner<'a>(
 			let mut instructions = Vec::new();
 			let arg_names = state.functions.get(name).ok_or_else(|| {
 				dbg!(name);
-				CompileError(
-					line!(),
-					"Name resolution failed? Shouldn't it've been checked by now?",
-				)
+				CompileError::UndefinedVariable(line!())
 			})?;
 			for (statement, NativeVariable { name: v_name, .. }) in parametres.iter().zip(
 				arg_names
@@ -758,7 +740,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::Array(_) => {
-			return Err(CompileError(line!(), "Illegal array literal"));
+			return Err(CompileError::IllegalArrayLiteral(line!()));
 		}
 
 		StructlessStatement::Deref(adr) => {
@@ -849,7 +831,7 @@ fn compile_statement_inner<'a>(
 				Addressing::Label(lbl) => {
 					vec![(Instruction::LDA(Addressing::DataLabel(lbl)), None)]
 				}
-				_ => return Err(CompileError(line!(), "Illegal access type")),
+				_ => return Err(CompileError::InvalidAddressOf(line!())),
 			}
 		}
 
@@ -879,9 +861,6 @@ fn adr_for_name<'a>(
 		}
 	} else {
 		dbg!(name, variables, global_variables);
-		Err(CompileError(
-			line!(),
-			"Name resolution failed? Shouldn't that have be checked by now?",
-		))
+		Err(CompileError::UndefinedVariable(line!()))
 	}
 }
