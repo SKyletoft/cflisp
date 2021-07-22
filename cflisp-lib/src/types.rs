@@ -100,6 +100,14 @@ impl<'a> Type<'a> {
 	pub(crate) fn ptr(target: Type<'a>) -> Type<'a> {
 		Type::Ptr(Box::new(target))
 	}
+
+	pub(crate) fn get_inner(self) -> Option<Self> {
+		if let Type::Ptr(inner) = self {
+			Some(*inner)
+		} else {
+			None
+		}
+	}
 }
 
 ///The types that are currently supported by the compiler and their pointer types.

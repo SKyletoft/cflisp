@@ -288,3 +288,37 @@ fn extract_statics() {
 	let res_1 = StructlessLanguage::from_language_elements(case_1).unwrap();
 	assert_eq!(expected_1, res_1);
 }
+
+#[test]
+fn signedness_logic() {
+	for ux in 0..=u8::MAX {
+		let ix = ux as i8;
+		for uy in 1..=u8::MAX {
+			let iy = uy as i8;
+			assert_eq!(
+				ux.wrapping_add(uy),
+				ix.wrapping_add(iy) as u8,
+				"{} {}",
+				ux,
+				uy
+			);
+			assert_eq!(
+				ux.wrapping_sub(uy),
+				ix.wrapping_sub(iy) as u8,
+				"{} {}",
+				ux,
+				uy
+			);
+			assert_eq!(
+				ux.wrapping_mul(uy),
+				ix.wrapping_mul(iy) as u8,
+				"{} {}",
+				ux,
+				uy
+			);
+		}
+		assert_eq!(ux.wrapping_add(0), ix.wrapping_add(0) as u8, "{} 0", ux,);
+		assert_eq!(ux.wrapping_sub(0), ix.wrapping_sub(0) as u8, "{} 0", ux,);
+		assert_eq!(ux.wrapping_mul(0), ix.wrapping_mul(0) as u8, "{} 0", ux,);
+	}
+}

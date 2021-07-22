@@ -16,9 +16,9 @@ Install the rust toolchain from rust-lang.org, clone this repo and then just run
 ## Why rust?
 Rust is known for its correctness and safety guarantees without sacrificing performance. Here, however, rust was just chosen because the type system is really nice and idiomatic rust allows for some very functional style code without being fully functional. And performance doesn't hurt.
 
-```c
-//  legacy_tests/test1.c
 
+## An Example
+```c
 int main() {
     int *ptr = 0;
     int x    = 5;
@@ -32,7 +32,6 @@ int main() {
 into this:
 
 ```asm
-; legacy_tests/expected1.sflisp
         ORG     $20
 main    LDA     #$00
         PSHA            ; ptr
@@ -56,7 +55,6 @@ __init_ LDA     #0
         LDSP    #$FB
         JSR     main
 __end__ JMP     __end__
-
 
         ORG     $FF
         FCB     __init_

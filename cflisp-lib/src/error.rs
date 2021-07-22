@@ -37,70 +37,57 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use ParseError::*;
 		let (line, error) = match self {
-			ParseError::TokenFail(line) => (line, "Couldn't parse token"),
-			ParseError::SwitchStatement(line) => (line, "Switch statements are not supported"),
-			ParseError::BreakContinue(line) => (line, "Break and continue are not supported"),
-			ParseError::MatchFail(line) => (line, "Couldn't match language pattern"),
-			ParseError::NonConstantArrayLen(line) => (line, "Array length wasn't constant"),
-			ParseError::FieldAccessOnNonNames(line) => (line, "Field access between non-names"),
-			ParseError::InternalTreeFail(line) => (line, "Internal tree construction error"),
-			ParseError::IncompleteStatement(line) => (line, "Statement ended early?"),
-			ParseError::InvalidArguments(line) => (line, "Couldn't parse argument list"),
-			ParseError::BadStructFields(line) => (line, "Couldn't parse struct fields"),
-			ParseError::UnknownSymbol(line) => (line, "Unknown symbol"),
-			ParseError::InvalidToken(line) => (line, "Token is not valid in this context"),
-			ParseError::UndefinedType(line) => (line, "Undefined struct type"),
-			ParseError::UndefinedVariable(line) => (line, "Undefined Variable"),
-			ParseError::UndefinedStructField(line) => (line, "Undefined field name"),
-			ParseError::UndefinedFunction(line) => (line, "Undefined function"),
-			ParseError::BrokenForLoop(line) => (line, "For loop was malformed"),
-			ParseError::AddressOfTemporary(line) => {
-				(line, "Tried to take address of on a non variable")
-			}
-			ParseError::BadStructName(line) => {
-				(line, "Struct doesn't have the same name as its typedef")
-			}
-			ParseError::InternalUnparsed(line) => (
+			TokenFail(line) => (line, "Couldn't parse token"),
+			SwitchStatement(line) => (line, "Switch statements are not supported"),
+			BreakContinue(line) => (line, "Break and continue are not supported"),
+			MatchFail(line) => (line, "Couldn't match language pattern"),
+			NonConstantArrayLen(line) => (line, "Array length wasn't constant"),
+			FieldAccessOnNonNames(line) => (line, "Field access between non-names"),
+			InternalTreeFail(line) => (line, "Internal tree construction error"),
+			IncompleteStatement(line) => (line, "Statement ended early?"),
+			InvalidArguments(line) => (line, "Couldn't parse argument list"),
+			BadStructFields(line) => (line, "Couldn't parse struct fields"),
+			UnknownSymbol(line) => (line, "Unknown symbol"),
+			InvalidToken(line) => (line, "Token is not valid in this context"),
+			UndefinedType(line) => (line, "Undefined struct type"),
+			UndefinedVariable(line) => (line, "Undefined Variable"),
+			UndefinedStructField(line) => (line, "Undefined field name"),
+			UndefinedFunction(line) => (line, "Undefined function"),
+			BrokenForLoop(line) => (line, "For loop was malformed"),
+			AddressOfTemporary(line) => (line, "Tried to take address of on a non variable"),
+			BadStructName(line) => (line, "Struct doesn't have the same name as its typedef"),
+			InternalNotStruct(line) => (line, "Internal error: Type was not a struct type"),
+			WrongTypeWasNative(line) => (line, "Variable wasn't of struct or struct pointer type"),
+			InternalFailedConst(line) => (line, "Internal error: cannot make element const"),
+			InternalFailedStatic(line) => (line, "Internal error: cannot make element static"),
+			InternalFailedVolatile(line) => (line, "Internal error: cannot make element volatile"),
+			InternalUnparsed(line) => (
 				line,
 				"Internal error: Last element in statement parsing vector was unparsed",
 			),
-			ParseError::InternalNotStruct(line) => {
-				(line, "Internal error: Type was not a struct type")
-			}
-			ParseError::WrongTypeWasNative(line) => {
-				(line, "Variable wasn't of struct or struct pointer type")
-			}
-			ParseError::IllegalStructLiteral(line) => (
+			IllegalStructLiteral(line) => (
 				line,
 				"Only struct variables can be passed into functions with struct arguments (not \
 				 literals)",
 			),
-			ParseError::MisplacedOperators(line) => (
+			MisplacedOperators(line) => (
 				line,
 				"Couldn't construct tree from statement. Are you sure the operators are correctly \
 				 placed?",
 			),
-			ParseError::MalformedTernary(line) => (
+			MalformedTernary(line) => (
 				line,
 				"Couldn't construct tree from statement. Element that should've been parsed first \
 				 has not been parsed",
 			),
-			ParseError::InternalFailedConst(line) => {
-				(line, "Internal error: cannot make element const")
-			}
-			ParseError::InternalFailedStatic(line) => {
-				(line, "Internal error: cannot make element static")
-			}
-			ParseError::InternalFailedVolatile(line) => {
-				(line, "Internal error: cannot make element volatile")
-			}
-			ParseError::TreeConstructionFail(line) => (
+			TreeConstructionFail(line) => (
 				line,
 				"Couldn't construct tree from statement. Element that should've been parsed first \
 				 has not been parsed",
 			),
-			ParseError::ReturnStruct(line) => (
+			ReturnStruct(line) => (
 				line,
 				"Cannot return struct from function due to ABI limitation. Maybe try having an \
 				 out pointer parametre instead? (Sorry)",
@@ -114,11 +101,46 @@ impl error::Error for ParseError {}
 
 ///Error type for type checking
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct TypeError(pub u32, pub &'static str);
+pub enum TypeError {
+	UndefinedVariable(u32),
+	TypeMismatch(u32),
+	AssignmentToConstant(u32),
+	InternalPointerAssignmentToNonPointer(u32),
+	IllegalVoidArgument(u32),
+	MalformedInterruptHandlerReturn(u32),
+	MalformedInterruptHandlerArguments(u32),
+	UndefinedType(u32),
+	MissingStructFields(u32),
+	UndefinedField(u32),
+	UndefinedFunction(u32),
+	MissingArguments(u32),
+}
 
 impl fmt::Display for TypeError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "Parse Error ({}): {}", self.0, self.1)
+		use TypeError::*;
+		let (line, error) = match self {
+			UndefinedVariable(line) => (line, "Undefined variable"),
+			TypeMismatch(line) => (line, "Type mismatch"),
+			AssignmentToConstant(line) => (line, "Assignment to constant"),
+			InternalPointerAssignmentToNonPointer(line) => {
+				(line, "Internal: Pointer assignment to non pointer")
+			}
+			IllegalVoidArgument(line) => (line, "Function has void argument"),
+			MalformedInterruptHandlerReturn(line) => {
+				(line, "Interrupt handler does not return void")
+			}
+			MalformedInterruptHandlerArguments(line) => (line, "Interrupt handler takes arugments"),
+			UndefinedType(line) => (line, "Undefined struct type"),
+			MissingStructFields(line) => (
+				line,
+				"Not the correct amount of fields in struct initalisation",
+			),
+			UndefinedField(line) => (line, "Undefined struct field"),
+			UndefinedFunction(line) => (line, "Undefined function"),
+			MissingArguments(line) => (line, "Wrong amount of arguments in function call"),
+		};
+		write!(f, "Type Error ({}): {}", line, error)
 	}
 }
 

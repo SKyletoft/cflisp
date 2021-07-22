@@ -287,10 +287,31 @@ impl<'a> StructlessLanguage<'a> {
 				}
 
 				LanguageElement::VariableAssignment { name, value } => {
-					new_elements.push(StructlessLanguage::VariableAssignment {
-						name,
-						value: StructlessStatement::from(&value, state)?,
-					})
+					if let Some(struct_type) = state.structs_and_struct_pointers.get(&name) {
+						let struct_type: &str = struct_type;
+						let struct_fields = state
+							.struct_types
+							.get(struct_type)
+							.ok_or(ParseError::BadStructName(line!()))?;
+						let rhs_name = if let StatementElement::Var(name) = value {
+							Ok(name)
+						} else {
+							Err(ParseError::InternalNotStruct(line!()))
+						}?;
+						for NativeVariable { name: field, .. } in struct_fields.iter() {
+							let lhs = helper::merge_name_and_field(&name, field);
+							let rhs = helper::merge_name_and_field(&rhs_name, field);
+							new_elements.push(StructlessLanguage::VariableAssignment {
+								name: lhs,
+								value: StructlessStatement::Var(rhs),
+							})
+						}
+					} else {
+						new_elements.push(StructlessLanguage::VariableAssignment {
+							name,
+							value: StructlessStatement::from(&value, state)?,
+						})
+					}
 				}
 
 				LanguageElement::StructAssignment { name, value } => {
@@ -547,10 +568,65 @@ impl<'a> StructlessLanguage<'a> {
 				}
 
 				LanguageElement::PointerAssignment { ptr, value } => {
-					new_elements.push(StructlessLanguage::PointerAssignment {
-						ptr: StructlessStatement::from(&ptr, state)?,
-						value: StructlessStatement::from(&value, state)?,
-					})
+					let mut default = || {
+						new_elements.push(StructlessLanguage::PointerAssignment {
+							ptr: StructlessStatement::from(&ptr, state)?,
+							value: StructlessStatement::from(&value, state)?,
+						});
+						Ok(())
+					};
+					if let StatementElement::Var(name) = &ptr {
+						let borrowed_name: &str = name;
+						// *out = in; (struct in, out)
+						if let Some(struct_type) =
+							state.structs_and_struct_pointers.get(borrowed_name)
+						{
+							let struct_type: &str = struct_type;
+							let fields = state
+								.struct_types
+								.get(struct_type)
+								.ok_or(ParseError::UndefinedType(line!()))?;
+							let rhs_name = if let StatementElement::Var(name) = &value {
+								Ok(name)
+							} else {
+								Err(ParseError::WrongTypeWasNative(line!()))
+							}?;
+							for (idx, NativeVariable { name: field, .. }) in
+								fields.iter().enumerate()
+							{
+								new_elements.push(StructlessLanguage::PointerAssignment {
+									ptr: StructlessStatement::BinOp {
+										op: BinOp::Add,
+										lhs: Box::new(StructlessStatement::Var(name.clone())),
+										rhs: Box::new(StructlessStatement::Num(
+											(idx as isize).into(),
+										)),
+										signedness: NumberType::Unsigned,
+									},
+									value: StructlessStatement::Var(helper::merge_name_and_field(
+										rhs_name, field,
+									)),
+								});
+							}
+						} else {
+							default()?;
+						}
+					} else if let StatementElement::Var(name) = &value {
+						let name: &str = name;
+						// *(anything) = in; (struct in, out)
+						if let Some(struct_type) = state.structs_and_struct_pointers.get(name) {
+							let struct_type: &str = struct_type;
+							let _fields = state
+								.struct_types
+								.get(struct_type)
+								.ok_or(ParseError::UndefinedType(line!()))?;
+							todo!("Todo: Assign struct to any non named pointer");
+						} else {
+							default()?;
+						}
+					} else {
+						default()?;
+					}
 				}
 
 				LanguageElement::StructFieldPointerAssignment { name, field, value } => {

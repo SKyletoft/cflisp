@@ -256,11 +256,8 @@ fn compile_element<'a>(
 			match (ptr, ptr.internal_ref()) {
 				(
 					StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((StructlessStatement::Num(idx), StructlessStatement::Var(name))),
-				)
-				| (
-					StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((StructlessStatement::Var(name), StructlessStatement::Num(idx))),
+					Some((StructlessStatement::Num(idx), StructlessStatement::Var(name)))
+					| Some((StructlessStatement::Var(name), StructlessStatement::Num(idx))),
 				) => {
 					let mut statement = compile_statement(value, state)?;
 					statement.append(&mut vec![
@@ -518,35 +515,25 @@ fn compile_statement_inner<'a>(
 				*tmps_used += 1;
 				res
 			};
+			let mut op_as_function_call =
+				|function: &'a str, comment: &'a str, negate_result: bool| {
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
+					instructions.append(&mut right_instructions_plus_one()?);
+					instructions.push((
+						Instruction::JSR(Addressing::Label(Cow::Borrowed(function))),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+					if negate_result {
+						instructions.push((Instruction::COMA, None));
+					}
+					Ok(())
+				};
 			match op {
-				BinOp::Mul => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mul rhs"))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__mul__"))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-				}
-				BinOp::Cmp => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__eq__"))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-				}
-				BinOp::NotCmp => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("cmp rhs"))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__eq__"))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-					instructions.push((Instruction::COMA, None));
-				}
+				BinOp::Mul => op_as_function_call("__mul__", "mul rhs", false)?,
+				BinOp::Cmp => op_as_function_call("__eq__", "cmp rhs", false)?,
+				BinOp::NotCmp => op_as_function_call("__eq__", "cmp rhs", true)?,
+
 				//default:
 				_ => {
 					*tmps_used -= 1;
@@ -616,38 +603,30 @@ fn compile_statement_inner<'a>(
 				*tmps_used += 1;
 				res
 			};
+			let mut op_as_function_call =
+				|function: &'a str, comment: &'a str, negate_result: bool| {
+					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
+					instructions.append(&mut right_instructions_plus_one()?);
+					instructions.push((
+						Instruction::JSR(Addressing::Label(Cow::Borrowed(function))),
+						None,
+					));
+					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+					if negate_result {
+						instructions.push((Instruction::COMA, None));
+					}
+					Ok(())
+				};
 			match op {
-				BinOp::Div => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("div rhs"))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__div__"))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-				}
-				BinOp::Mod => {
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("mod rhs"))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed("__mod__"))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-				}
+				BinOp::Div => op_as_function_call("__div__", "div rhs", false)?,
+				BinOp::Mod => op_as_function_call("__mod__", "mod rhs", false)?,
 				BinOp::GreaterThan | BinOp::LessThan => {
 					let (comment, function_name) = if signed {
 						("gts rhs", "__gts_")
 					} else {
 						("gtu rhs", "__gtu_")
 					};
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed(function_name))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
+					op_as_function_call(function_name, comment, false)?;
 				}
 				BinOp::LessThanEqual | BinOp::GreaterThanEqual => {
 					let (comment, function_name) = if signed {
@@ -655,14 +634,7 @@ fn compile_statement_inner<'a>(
 					} else {
 						("lteu rhs", "__gtu_")
 					};
-					instructions.push((Instruction::PSHA, Some(Cow::Borrowed(comment))));
-					instructions.append(&mut right_instructions_plus_one()?);
-					instructions.push((
-						Instruction::JSR(Addressing::Label(Cow::Borrowed(function_name))),
-						None,
-					));
-					instructions.push((Instruction::LEASP(Addressing::SP(1)), None));
-					instructions.push((Instruction::COMA, None));
+					op_as_function_call(function_name, comment, true)?;
 				}
 				BinOp::RShift | BinOp::LShift => {
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
@@ -774,9 +746,7 @@ fn compile_statement_inner<'a>(
 			vec![(Instruction::LDA(adr), Some(Cow::Borrowed(name.as_ref())))]
 		}
 
-		StructlessStatement::Num(n) => {
-			vec![(Instruction::LDA(Addressing::Data(n.val)), None)]
-		}
+		StructlessStatement::Num(n) => vec![(Instruction::LDA(Addressing::Data(n.val)), None)],
 
 		StructlessStatement::Char(c) => {
 			vec![(Instruction::LDA(Addressing::Data(*c as isize)), None)]
@@ -788,7 +758,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::Array(_) => {
-			return Err(CompileError(line!(), "Illegal array literal"))
+			return Err(CompileError(line!(), "Illegal array literal"));
 		}
 
 		StructlessStatement::Deref(adr) => {
@@ -796,11 +766,8 @@ fn compile_statement_inner<'a>(
 				//Array opt
 				(
 					StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((StructlessStatement::Var(name), &StructlessStatement::Num(offset))),
-				)
-				| (
-					StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((&StructlessStatement::Num(offset), StructlessStatement::Var(name))),
+					Some((StructlessStatement::Var(name), &StructlessStatement::Num(offset)))
+					| Some((&StructlessStatement::Num(offset), StructlessStatement::Var(name))),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -816,11 +783,8 @@ fn compile_statement_inner<'a>(
 				//General opt
 				(
 					&StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((StructlessStatement::Var(name), rhs)),
-				)
-				| (
-					&StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((rhs, StructlessStatement::Var(name))),
+					Some((StructlessStatement::Var(name), rhs))
+					| Some((rhs, StructlessStatement::Var(name))),
 				) => {
 					let adr = adr_for_name(
 						name.as_ref(),
@@ -838,11 +802,8 @@ fn compile_statement_inner<'a>(
 				//General opt
 				(
 					&StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((StructlessStatement::Num(idx), rhs)),
-				)
-				| (
-					&StructlessStatement::BinOp { op: BinOp::Add, .. },
-					Some((rhs, StructlessStatement::Num(idx))),
+					Some((StructlessStatement::Num(idx), rhs))
+					| Some((rhs, StructlessStatement::Num(idx))),
 				) => {
 					let mut statement = compile_statement(rhs, state)?;
 					statement.append(&mut vec![
