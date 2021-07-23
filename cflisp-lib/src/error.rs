@@ -11,15 +11,7 @@ pub enum ParseError {
 	FieldAccessOnNonNames(u32),
 	InternalTreeFail(u32),
 	InternalUnparsed(u32),
-	UnknownSymbol(u32),
 	InvalidToken(u32),
-	UndefinedType(u32),
-	UndefinedVariable(u32),
-	InternalNotStruct(u32),
-	WrongTypeWasNative(u32),
-	UndefinedStructField(u32),
-	UndefinedFunction(u32),
-	IllegalStructLiteral(u32),
 	IncompleteStatement(u32),
 	InvalidArguments(u32),
 	BadStructFields(u32),
@@ -32,7 +24,6 @@ pub enum ParseError {
 	InternalFailedStatic(u32),
 	InternalFailedVolatile(u32),
 	TreeConstructionFail(u32),
-	ReturnStruct(u32),
 }
 
 impl fmt::Display for ParseError {
@@ -49,28 +40,16 @@ impl fmt::Display for ParseError {
 			IncompleteStatement(line) => (line, "Statement ended early?"),
 			InvalidArguments(line) => (line, "Couldn't parse argument list"),
 			BadStructFields(line) => (line, "Couldn't parse struct fields"),
-			UnknownSymbol(line) => (line, "Unknown symbol"),
 			InvalidToken(line) => (line, "Token is not valid in this context"),
-			UndefinedType(line) => (line, "Undefined struct type"),
-			UndefinedVariable(line) => (line, "Undefined Variable"),
-			UndefinedStructField(line) => (line, "Undefined field name"),
-			UndefinedFunction(line) => (line, "Undefined function"),
 			BrokenForLoop(line) => (line, "For loop was malformed"),
 			AddressOfTemporary(line) => (line, "Tried to take address of on a non variable"),
 			BadStructName(line) => (line, "Struct doesn't have the same name as its typedef"),
-			InternalNotStruct(line) => (line, "Internal error: Type was not a struct type"),
-			WrongTypeWasNative(line) => (line, "Variable wasn't of struct or struct pointer type"),
 			InternalFailedConst(line) => (line, "Internal error: cannot make element const"),
 			InternalFailedStatic(line) => (line, "Internal error: cannot make element static"),
 			InternalFailedVolatile(line) => (line, "Internal error: cannot make element volatile"),
 			InternalUnparsed(line) => (
 				line,
 				"Internal error: Last element in statement parsing vector was unparsed",
-			),
-			IllegalStructLiteral(line) => (
-				line,
-				"Only struct variables can be passed into functions with struct arguments (not \
-				 literals)",
 			),
 			MisplacedOperators(line) => (
 				line,
@@ -87,6 +66,45 @@ impl fmt::Display for ParseError {
 				"Couldn't construct tree from statement. Element that should've been parsed first \
 				 has not been parsed",
 			),
+		};
+		write!(f, "Parse Error ({}): {}", line, error)
+	}
+}
+
+impl error::Error for ParseError {}
+
+///Error type for internal transformations
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum IRError {
+	UnknownSymbol(u32),
+	UndefinedType(u32),
+	UndefinedVariable(u32),
+	InternalNotStruct(u32),
+	WrongTypeWasNative(u32),
+	UndefinedStructField(u32),
+	UndefinedFunction(u32),
+	IllegalStructLiteral(u32),
+	BadStructName(u32),
+	ReturnStruct(u32),
+}
+
+impl fmt::Display for IRError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use IRError::*;
+		let (line, error) = match self {
+			UnknownSymbol(line) => (line, "Unknown symbol"),
+			UndefinedType(line) => (line, "Undefined struct type"),
+			UndefinedVariable(line) => (line, "Undefined Variable"),
+			UndefinedStructField(line) => (line, "Undefined field name"),
+			UndefinedFunction(line) => (line, "Undefined function"),
+			BadStructName(line) => (line, "Struct doesn't have the same name as its typedef"),
+			InternalNotStruct(line) => (line, "Internal error: Type was not a struct type"),
+			WrongTypeWasNative(line) => (line, "Variable wasn't of struct or struct pointer type"),
+			IllegalStructLiteral(line) => (
+				line,
+				"Only struct variables can be passed into functions with struct arguments (not \
+				 literals)",
+			),
 			ReturnStruct(line) => (
 				line,
 				"Cannot return struct from function due to ABI limitation. Maybe try having an \
@@ -97,7 +115,7 @@ impl fmt::Display for ParseError {
 	}
 }
 
-impl error::Error for ParseError {}
+impl error::Error for IRError {}
 
 ///Error type for type checking
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

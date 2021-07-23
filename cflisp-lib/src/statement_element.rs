@@ -356,7 +356,7 @@ impl<'a> StatementElement<'a> {
 	pub(crate) fn signedness(
 		&self,
 		symbols: &HashMap<Cow<str>, NativeType>,
-	) -> Result<NumberType, ParseError> {
+	) -> Result<NumberType, IRError> {
 		let res = match self {
 			StatementElement::Add { lhs, rhs }
 			| StatementElement::Sub { lhs, rhs }
@@ -382,7 +382,7 @@ impl<'a> StatementElement<'a> {
 				.get(name)
 				.ok_or_else(|| {
 					dbg!(name, symbols);
-					ParseError::UnknownSymbol(line!())
+					IRError::UnknownSymbol(line!())
 				})?
 				.into(),
 			StatementElement::Num(Number { signedness, .. }) => *signedness,

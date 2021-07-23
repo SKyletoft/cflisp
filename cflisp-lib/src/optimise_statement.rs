@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::*;
 
-pub fn all_optimisations(element: &mut StructlessStatement) -> Result<(), ParseError> {
+pub fn all_optimisations(element: &mut StructlessStatement) -> Result<(), IRError> {
 	const_eval(element);
 	fast_mul(element);
 	fast_div(element);

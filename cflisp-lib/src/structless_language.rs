@@ -62,7 +62,7 @@ impl<'a> StructlessLanguage<'a> {
 	///Destructures structs into normal language elements
 	pub fn from_language_elements(
 		elements: Vec<LanguageElement<'a>>,
-	) -> Result<Vec<StructlessLanguage<'a>>, ParseError> {
+	) -> Result<Vec<StructlessLanguage<'a>>, IRError> {
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
 		let mut functions = HashMap::new();
@@ -95,7 +95,7 @@ impl<'a> StructlessLanguage<'a> {
 		scope: Cow<'a, str>,
 		rename_map: &mut HashMap<String, String>,
 		state: &mut State<'a, '_, '_, '_, '_>,
-	) -> Result<Vec<StructlessLanguage<'a>>, ParseError> {
+	) -> Result<Vec<StructlessLanguage<'a>>, IRError> {
 		let mut new_elements = Vec::new();
 		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
 		for mut element in elements.into_iter() {
@@ -117,7 +117,7 @@ impl<'a> StructlessLanguage<'a> {
 					let fields = state
 						.struct_types
 						.get(n)
-						.ok_or(ParseError::UndefinedType(line!()))?;
+						.ok_or(IRError::UndefinedType(line!()))?;
 					let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 					rename_map.insert(name.to_string(), new_name.to_string());
 					state.symbols.insert(new_name.clone(), NativeType::Void);
@@ -157,7 +157,7 @@ impl<'a> StructlessLanguage<'a> {
 					let fields = state
 						.struct_types
 						.get(n)
-						.ok_or(ParseError::UndefinedType(line!()))?;
+						.ok_or(IRError::UndefinedType(line!()))?;
 					state.structs_and_struct_pointers.insert(name.clone(), n);
 					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
@@ -292,11 +292,11 @@ impl<'a> StructlessLanguage<'a> {
 						let struct_fields = state
 							.struct_types
 							.get(struct_type)
-							.ok_or(ParseError::BadStructName(line!()))?;
+							.ok_or(IRError::BadStructName(line!()))?;
 						let rhs_name = if let StatementElement::Var(name) = value {
 							Ok(name)
 						} else {
-							Err(ParseError::InternalNotStruct(line!()))
+							Err(IRError::InternalNotStruct(line!()))
 						}?;
 						for NativeVariable { name: field, .. } in struct_fields.iter() {
 							let lhs = helper::merge_name_and_field(&name, field);
@@ -318,11 +318,11 @@ impl<'a> StructlessLanguage<'a> {
 					let name: &str = &name;
 					let struct_type = structs
 						.get(name)
-						.ok_or(ParseError::UndefinedVariable(line!()))?;
+						.ok_or(IRError::UndefinedVariable(line!()))?;
 					let fields = state
 						.struct_types
 						.get(struct_type)
-						.ok_or(ParseError::UndefinedType(line!()))?;
+						.ok_or(IRError::UndefinedType(line!()))?;
 					for (val, field) in value.into_iter().zip(fields.iter()) {
 						new_elements.push(StructlessLanguage::VariableAssignment {
 							name: helper::merge_name_and_field(name, &field.name),
@@ -469,7 +469,7 @@ impl<'a> StructlessLanguage<'a> {
 						Ok(struct_type)
 					} else {
 						dbg!(&typ);
-						Err(ParseError::InternalNotStruct(line!()))
+						Err(IRError::InternalNotStruct(line!()))
 					}?;
 					state
 						.structs_and_struct_pointers
@@ -488,7 +488,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_volatile,
 						});
 						dbg!(&state.struct_types, &state.structs_and_struct_pointers);
-						return Err(ParseError::UndefinedType(line!()));
+						return Err(IRError::UndefinedType(line!()));
 					};
 					upper.push(StructlessLanguage::VariableLabelTag {
 						name: new_name.clone(),
@@ -525,7 +525,7 @@ impl<'a> StructlessLanguage<'a> {
 						Ok(struct_type)
 					} else {
 						dbg!(&typ);
-						Err(ParseError::InternalNotStruct(line!()))
+						Err(IRError::InternalNotStruct(line!()))
 					}?;
 					state
 						.structs_and_struct_pointers
@@ -542,7 +542,7 @@ impl<'a> StructlessLanguage<'a> {
 							is_volatile,
 						});
 						dbg!(&state.struct_types, &state.structs_and_struct_pointers);
-						return Err(ParseError::UndefinedType(line!()));
+						return Err(IRError::UndefinedType(line!()));
 					};
 					new_elements.push(StructlessLanguage::VariableLabelTag {
 						name: name.clone(),
@@ -585,11 +585,11 @@ impl<'a> StructlessLanguage<'a> {
 							let fields = state
 								.struct_types
 								.get(struct_type)
-								.ok_or(ParseError::UndefinedType(line!()))?;
+								.ok_or(IRError::UndefinedType(line!()))?;
 							let rhs_name = if let StatementElement::Var(name) = &value {
 								Ok(name)
 							} else {
-								Err(ParseError::WrongTypeWasNative(line!()))
+								Err(IRError::WrongTypeWasNative(line!()))
 							}?;
 							for (idx, NativeVariable { name: field, .. }) in
 								fields.iter().enumerate()
@@ -619,7 +619,7 @@ impl<'a> StructlessLanguage<'a> {
 							let _fields = state
 								.struct_types
 								.get(struct_type)
-								.ok_or(ParseError::UndefinedType(line!()))?;
+								.ok_or(IRError::UndefinedType(line!()))?;
 							todo!("Todo: Assign struct to any non named pointer");
 						} else {
 							default()?;
@@ -637,16 +637,16 @@ impl<'a> StructlessLanguage<'a> {
 						.ok_or_else(|| {
 							eprintln!("{}->{} = {:?}", name, field, value);
 							dbg!(name_borrowed, &state.structs_and_struct_pointers);
-							ParseError::WrongTypeWasNative(line!())
+							IRError::WrongTypeWasNative(line!())
 						})?;
 					let fields = state
 						.struct_types
 						.get(struct_type_name)
-						.ok_or(ParseError::UndefinedType(line!()))?;
+						.ok_or(IRError::UndefinedType(line!()))?;
 					let idx = fields
 						.iter()
 						.position(|NativeVariable { name, .. }| name == &field)
-						.ok_or(ParseError::UndefinedStructField(line!()))?;
+						.ok_or(IRError::UndefinedStructField(line!()))?;
 					let signedness = NumberType::from(&fields[idx].typ);
 					let new_ptr = if idx == 0 {
 						StructlessStatement::Var(name)
@@ -671,7 +671,7 @@ impl<'a> StructlessLanguage<'a> {
 					block,
 				} => {
 					if matches!(typ, Type::Struct(_)) {
-						return Err(ParseError::ReturnStruct(line!()));
+						return Err(IRError::ReturnStruct(line!()));
 					}
 					state.functions.insert(name.clone(), args.clone());
 					let mut new_structs_and_struct_pointers =

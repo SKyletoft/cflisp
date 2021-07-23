@@ -29,7 +29,7 @@ impl<'a> StructlessStatement<'a> {
 	pub(crate) fn from(
 		other: &StatementElement<'a>,
 		state: &State<'a, '_, '_, '_, '_>,
-	) -> Result<Self, ParseError> {
+	) -> Result<Self, IRError> {
 		let bin_op = |op, lhs, rhs| {
 			Ok(StructlessStatement::BinOp {
 				op,
@@ -78,17 +78,17 @@ impl<'a> StructlessStatement<'a> {
 				let arguments = state
 					.functions
 					.get(name)
-					.ok_or(ParseError::UndefinedFunction(line!()))?;
+					.ok_or(IRError::UndefinedFunction(line!()))?;
 				for (arg, param) in arguments.iter().zip(parametres.iter()) {
 					if let Type::Struct(struct_type) = arg.typ {
 						let fields = state
 							.struct_types
 							.get(struct_type)
-							.ok_or(ParseError::UndefinedType(line!()))?;
+							.ok_or(IRError::UndefinedType(line!()))?;
 						let var_name = if let StatementElement::Var(var_name) = param {
 							Ok(var_name)
 						} else {
-							Err(ParseError::IllegalStructLiteral(line!()))
+							Err(IRError::IllegalStructLiteral(line!()))
 						}?;
 						for field in fields.iter() {
 							let param_name = helper::merge_name_and_field(var_name, &field.name);
@@ -118,16 +118,16 @@ impl<'a> StructlessStatement<'a> {
 			StatementElement::FieldPointerAccess(name, field) => {
 				let struct_type = state.structs_and_struct_pointers.get(name).ok_or_else(|| {
 					dbg!(name, &state.structs_and_struct_pointers);
-					ParseError::WrongTypeWasNative(line!())
+					IRError::WrongTypeWasNative(line!())
 				})?;
 				let fields = state
 					.struct_types
 					.get(*struct_type)
-					.ok_or(ParseError::UndefinedType(line!()))?;
+					.ok_or(IRError::UndefinedType(line!()))?;
 				let idx = fields
 					.iter()
 					.position(|field_name| &field_name.name == field)
-					.ok_or(ParseError::UndefinedStructField(line!()))?;
+					.ok_or(IRError::UndefinedStructField(line!()))?;
 				let signedness = NumberType::from(&fields[idx].typ);
 				StructlessStatement::Deref(Box::new(StructlessStatement::BinOp {
 					op: BinOp::Add,
