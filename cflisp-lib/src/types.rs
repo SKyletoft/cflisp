@@ -44,7 +44,7 @@ pub struct NativeVariable<'a> {
 ///Return type, name and argument list
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Function<'a> {
-	pub return_type: NativeType,
+	pub return_type: Type<'a>,
 	pub name: &'a str,
 	pub parametres: Vec<Variable<'a>>,
 }

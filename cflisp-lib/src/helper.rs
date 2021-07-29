@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 pub(crate) fn merge_name_and_field<'a>(name: &str, field: &str) -> Cow<'a, str> {
-	Cow::Owned(name.to_string() + "::" + field)
+	Cow::Owned(format!("{}::{}", name, field))
 }
 
 #[macro_export]
@@ -13,7 +13,7 @@ macro_rules! merge_comments {
 		let lhs: &Option<Cow<str>> = $lhs;
 		let rest = merge_comments!($($rhs), +);
 		if let (Some(l), Some(r)) = (lhs, &rest) {
-			Some(Cow::Owned(l.to_string() + ", " + &r))
+			Some(Cow::Owned(format!("{}, {}", l, &r)))
 		} else {
 			$lhs.clone().or_else(|| rest.clone())
 		}

@@ -96,7 +96,7 @@ pub(crate) fn language_element<'a>(
 				functions.insert(
 					name.clone(),
 					Function {
-						return_type: typ.into(),
+						return_type: typ.clone(),
 						name: name.as_ref(),
 						parametres: args.to_vec(),
 					},
@@ -423,8 +423,7 @@ pub(crate) fn type_of<'a>(
 				TypeError::UndefinedFunction(line!())
 			})?
 			.return_type
-			.clone()
-			.into(),
+			.clone(),
 
 		StatementElement::Var(name) => variables
 			.get(name)
