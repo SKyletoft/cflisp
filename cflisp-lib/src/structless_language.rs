@@ -254,6 +254,7 @@ fn per_element<'a>(
 			is_volatile,
 		} => {
 			let converted_t = NativeType::from(t.as_ref());
+			state.symbols.insert(name.clone(), t.as_ref().into());
 			for idx in (0..len).rev() {
 				let new_element_name = format!("{}[{}]", &name, idx);
 				state
