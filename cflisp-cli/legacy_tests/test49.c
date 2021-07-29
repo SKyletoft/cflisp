@@ -4,7 +4,7 @@ typedef struct Foo {
 } Foo;
 
 Foo create_foo() {
-	Foo f = {1, 2};
+	const Foo f = {1, 2};
 	return f;
 }
 
