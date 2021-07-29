@@ -128,7 +128,35 @@ impl NativeType {
 	}
 }
 
-impl<'a> From<Type<'a>> for NativeType {
+impl fmt::Display for NativeType {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			NativeType::Uint => write!(f, "uint"),
+			NativeType::Int => write!(f, "int"),
+			NativeType::Char => write!(f, "char"),
+			NativeType::Bool => write!(f, "bool"),
+			NativeType::Void => write!(f, "void"),
+			NativeType::Ptr(inner) => write!(f, "{}*", inner),
+		}
+	}
+}
+
+impl fmt::Display for Type<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Type::Uint => write!(f, "uint"),
+			Type::Int => write!(f, "int"),
+			Type::Char => write!(f, "char"),
+			Type::Bool => write!(f, "bool"),
+			Type::Void => write!(f, "void"),
+			Type::Ptr(inner) => write!(f, "{}*", inner),
+			Type::Struct(name) => write!(f, "{}", name),
+			Type::Arr(typ, len) => write!(f, "{}[{}]", typ, len),
+		}
+	}
+}
+
+impl From<Type<'_>> for NativeType {
 	fn from(other: Type) -> Self {
 		(&other).into()
 	}

@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use crate::*;
 
@@ -222,6 +222,146 @@ impl<'a> LanguageElement<'a> {
 				statement.rename(from, to);
 			}
 			LanguageElement::Return(None) => {}
+		}
+	}
+}
+
+impl fmt::Display for LanguageElement<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let static_const_volatile = |s, c, v, f: &mut fmt::Formatter<'_>| {
+			if s {
+				write!(f, "static ")?;
+			}
+			if c {
+				write!(f, "const ")?;
+			}
+			if v {
+				write!(f, "volatile ")?;
+			}
+			Ok(())
+		};
+		match self {
+			LanguageElement::VariableDeclaration {
+				typ,
+				name,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{} {};", typ, name)
+			}
+			LanguageElement::VariableAssignment { name, value } => {
+				write!(f, "{} = {};", name, value)
+			}
+			LanguageElement::StructAssignment { name, value } => {
+				write!(f, "{} = {{", name)?;
+				for field in value.iter() {
+					write!(f, "{}, ", field)?;
+				}
+				write!(f, "}};")
+			}
+			LanguageElement::VariableDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{} {} = {}", typ, name, value)
+			}
+			LanguageElement::StructDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{} {} = {{", typ, name)?;
+				for field in value.iter() {
+					write!(f, "{}, ", field)?;
+				}
+				write!(f, "}};")
+			}
+			LanguageElement::PointerAssignment { ptr, value } => write!(f, "*{} = {};", ptr, value),
+			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
+				write!(f, "{}->{} = {};", name, field, value)
+			}
+			LanguageElement::FunctionDeclaration {
+				typ,
+				name,
+				args,
+				block,
+			} => {
+				write!(f, "{} {}(", typ, name)?;
+				for Variable { name, typ } in args.iter() {
+					write!(f, "{} {},", typ, name)?;
+				}
+				writeln!(f, ") {{")?;
+				for line in block.iter() {
+					writeln!(f, "{}", line)?;
+				}
+				write!(f, "}}")
+			}
+			LanguageElement::StructDefinition { name, members } => {
+				writeln!(f, "struct {} {{", name)?;
+				for NativeVariable { typ, name } in members.iter() {
+					writeln!(f, "{} {};", typ, name)?;
+				}
+				write!(f, "}};")
+			}
+			LanguageElement::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => {
+				writeln!(f, "if ({}) {{", condition)?;
+				for line in then.iter() {
+					writeln!(f, "{}", line)?;
+				}
+				write!(f, "}}")?;
+				if let Some(else_then) = else_then {
+					writeln!(f, " else {{")?;
+					for line in else_then.iter() {
+						writeln!(f, "{}", line)?;
+					}
+					write!(f, "}}")
+				} else {
+					Ok(())
+				}
+			}
+			LanguageElement::For {
+				init,
+				condition,
+				post,
+				body,
+			} => {
+				//todo: investigate if for loops really can contain multiple init and post statements
+				writeln!(f, "for ({} {}; {}) {{", init[0], condition, post[0])?;
+				for line in body.iter() {
+					writeln!(f, "{}", line)?;
+				}
+				write!(f, "}}")
+			}
+			LanguageElement::While { condition, body } => {
+				write!(f, "while ({}) {{", condition)?;
+				for line in body {
+					writeln!(f, "{}", line)?;
+				}
+				write!(f, "}}")
+			}
+			LanguageElement::Return(val) => {
+				write!(f, "return")?;
+				if let Some(val) = val {
+					write!(f, " {}", val)?;
+				}
+				write!(f, ";")
+			}
+			LanguageElement::Statement(statement) => write!(f, "{};", statement),
 		}
 	}
 }
