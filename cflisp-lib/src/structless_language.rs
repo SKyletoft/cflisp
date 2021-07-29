@@ -707,8 +707,6 @@ fn per_element<'a>(
 				Ok(())
 			};
 			if let StatementElement::Var(name) = &ptr {
-				eprintln!("\nLOG: Pointer assignment to struct hit");
-				dbg!(&ptr, &value);
 				let borrowed_name: &str = name;
 				// *out = in; (struct in, out)
 				if let Some(struct_type) = state.structs_and_struct_pointers.get(borrowed_name) {
