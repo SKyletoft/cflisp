@@ -400,7 +400,7 @@ fn merge_allocs(instructions: &mut Vec<CommentedInstruction>) {
 	let mut idx = 0;
 	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
 		if let [(Instruction::LEASP(Addressing::SP(a)), first_comment), (Instruction::LEASP(Addressing::SP(b)), second_comment)] =
-			&instructions[idx..idx + 1]
+			&instructions[idx..idx + 2]
 		{
 			let comment = merge_comments!(first_comment, second_comment);
 			instructions[idx] = (Instruction::LEASP(Addressing::SP(*a + *b)), comment);
