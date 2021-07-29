@@ -508,7 +508,7 @@ fn per_element<'a>(
 				.ok_or(IRError::UndefinedType(line!()))?;
 			new_elements.push(StructlessLanguage::VariableLabelTag {
 				name: name.clone(),
-				is_static: true,
+				is_static: false,
 				is_const,
 				is_volatile,
 			});

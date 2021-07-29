@@ -97,6 +97,7 @@ fn compile_element<'a>(
 				state
 					.global_variables
 					.insert(name.clone(), NativeType::Void);
+				vec![(Instruction::Label(name.clone()), None)]
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
@@ -105,8 +106,8 @@ fn compile_element<'a>(
 				state
 					.variables
 					.insert(name.clone(), (NativeType::Void, *state.stack_size));
+				vec![]
 			}
-			vec![(Instruction::Label(name.clone()), None)]
 		}
 		StructlessLanguage::VariableDeclaration {
 			typ,
