@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp, collections::HashMap, convert::TryFrom, default::Default, fmt, ops};
+use std::{borrow::Cow, cmp, collections::HashMap, default::Default, fmt, ops};
 
 use crate::*;
 
@@ -517,3 +517,5 @@ pub enum BinOp {
 	Cmp,
 	NotCmp,
 }
+
+pub type TokenSlice<'a, 'b> = &'b [Token<'a>];

@@ -22,6 +22,7 @@ use error::{CompileError, IRError, ParseError, TypeError};
 use flags::Flags;
 use flisp::flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use language_element::LanguageElement;
+use parser::Parsable;
 use statement_element::StatementElement;
 use statement_token::StatementToken;
 use structless_language::StructlessLanguage;
@@ -29,5 +30,5 @@ use structless_statement::StructlessStatement;
 use token::Token;
 use types::{
 	BinOp, Block, BlockStructless, Function, NativeType, NativeVariable, Number, NumberType,
-	Statement, Type, Variable,
+	Statement, TokenSlice, Type, Variable,
 };

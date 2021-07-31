@@ -408,6 +408,42 @@ impl<'a> StatementElement<'a> {
 	}
 }
 
+impl<'a, 'b> Parsable<'a, 'b> for StatementElement<'a> {
+	///Runs to semicolon, comma or end of stream
+	fn parse(
+		tokens: TokenSlice<'a, 'b>,
+	) -> Result<(StatementElement<'a>, TokenSlice<'a, 'b>), ParseError> {
+		let to_take = tokens
+			.iter()
+			.position(|t| matches!(t, Token::NewLine | Token::Comma))
+			.unwrap_or(tokens.len());
+		let (statement, tail) = tokens.split_at(to_take);
+		let tail = match tail {
+			[Token::Comma | Token::NewLine, rest @ ..] => rest,
+			[] => &[],
+			_ => return Err(ParseError::ExcessTokens(line!())),
+		};
+		let statement_tokens = StatementToken::from_tokens(statement)?;
+		let element = StatementElement::from_statement_tokens(statement_tokens)?;
+		Ok((element, tail))
+	}
+}
+
+impl<'a, 'b> Parsable<'a, 'b> for Vec<StatementElement<'a>> {
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+		let filter = |slice| match StatementElement::parse(slice) {
+			Ok((element, [])) => Ok(element),
+			Ok(_) => Err(ParseError::ExcessTokens(line!())),
+			Err(e) => Err(e),
+		};
+		let vec = tokens
+			.split(|t| t == &Token::Comma)
+			.map(filter)
+			.collect::<Result<Vec<_>, _>>()?;
+		Ok((vec, &[]))
+	}
+}
+
 impl fmt::Display for StatementElement<'_> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {

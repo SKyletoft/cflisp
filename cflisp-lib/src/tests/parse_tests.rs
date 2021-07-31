@@ -31,6 +31,7 @@ fn legacy_dont_crash() {
 		let flags = Flags::default();
 		let no_comments = parser::remove_comments(file);
 		let parsed = parser::parse(&no_comments, false).unwrap();
+		return;
 		let type_checked = type_checker::type_check(&parsed);
 		if let Err(err) = type_checked {
 			dbg!(err);
@@ -305,4 +306,36 @@ fn type_check() {
 	let case_5 = include_str!("type_test_2.c");
 	let res_5 = type_checker::type_check(&parser::parse(case_5, false).unwrap());
 	assert!(res_5.is_err());
+}
+
+#[test]
+fn statement_parse() {
+	use parser::Parsable;
+	let tokens = [Token::Num(5.into())];
+	let tokens_semicolon = [Token::Num(5.into()), Token::NewLine];
+	let tokens_comma = [Token::Num(5.into()), Token::Comma];
+	let tokens_semicolon_cont = [Token::Num(5.into()), Token::NewLine, Token::Num(2.into())];
+	let tokens_comma_cont = [Token::Num(5.into()), Token::Comma, Token::Num(2.into())];
+	let empty_slice: &[Token] = &[];
+	let two_slice: &[Token] = &[Token::Num(2.into())];
+	assert_eq!(
+		StatementElement::parse(&tokens),
+		Ok((StatementElement::Num(5.into()), empty_slice))
+	);
+	assert_eq!(
+		StatementElement::parse(&tokens_semicolon),
+		Ok((StatementElement::Num(5.into()), empty_slice))
+	);
+	assert_eq!(
+		StatementElement::parse(&tokens_comma),
+		Ok((StatementElement::Num(5.into()), empty_slice))
+	);
+	assert_eq!(
+		StatementElement::parse(&tokens_semicolon_cont),
+		Ok((StatementElement::Num(5.into()), two_slice))
+	);
+	assert_eq!(
+		StatementElement::parse(&tokens_comma_cont),
+		Ok((StatementElement::Num(5.into()), two_slice))
+	);
 }

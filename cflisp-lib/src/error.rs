@@ -35,7 +35,7 @@ impl fmt::Display for ParseError {
 		let (line, error) = match self {
 			TokenFail(line) => (line, "Couldn't parse token"),
 			SwitchStatement(line) => (line, "Switch statements are not supported"),
-			BreakContinue(line) => (line, "Break and continue are not supported"),
+			BreakContinue(line) => (line, "Break, continue and default are not supported"),
 			MatchFail(line) => (line, "Couldn't match language pattern"),
 			NonConstantArrayLen(line) => (line, "Array length wasn't constant"),
 			FieldAccessOnNonNames(line) => (line, "Field access between non-names"),

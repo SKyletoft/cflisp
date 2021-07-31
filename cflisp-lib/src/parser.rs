@@ -1,15 +1,19 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData};
 
 use crate::*;
-
-type TokenSlice<'a, 'b> = &'b [Token<'a>];
 
 pub fn parse<'a>(
 	source: &'a str,
 	move_first: bool,
 ) -> Result<Vec<LanguageElement<'a>>, ParseError> {
 	let tokens: Vec<Token<'a>> = Token::by_byte(source)?;
-	construct_block(&tokens, move_first)
+	let original = construct_block(&tokens, move_first)?;
+	let (res, tail) = Vec::<LanguageElement>::parse(&tokens)?;
+	if !tail.is_empty() {
+		return Err(ParseError::ExcessTokens(line!()));
+	}
+	assert_eq!(&res, &original);
+	Ok(res)
 }
 
 ///Wrapper around `construct_structure_from_tokens` to construct an entire block.
@@ -198,8 +202,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			[Token::Struct, Token::Name(name), Token::Block(fields)] => {
-				let fields_variable = parse_struct_fields_declaration(fields)?
-					.ok_or(ParseError::BadStructFields(line!()))?;
+				let fields_variable = parse_struct_fields_declaration(fields)?;
 				if !fields_variable
 					.iter()
 					.all(|Variable { typ, .. }| typ.is_native())
@@ -222,7 +225,8 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			_ => {
-				dbg!(tokens);
+				let len = 10usize.min(tokens.len());
+				dbg!(&tokens[..len]);
 				return Err(ParseError::MatchFail(line!()));
 			}
 		}
@@ -333,8 +337,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				//Function
 				[Token::Name(n), Token::Parentheses(args_tokens), Token::Block(code)] => {
 					let args = match parse_argument_declaration(args_tokens) {
-						Ok(Some(res)) => res,
-						Ok(None) => return None,
+						Ok(res) => res,
 						Err(e) => return Some(Err(e)),
 					};
 					let block = match construct_block(code, move_first) {
@@ -401,8 +404,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 				//Function
 				[Token::Name(n), Token::Parentheses(args_tokens), Token::Block(code)] => {
 					let args = match parse_argument_declaration(args_tokens) {
-						Ok(Some(res)) => res,
-						Ok(None) => return None,
+						Ok(res) => res,
 						Err(e) => return Some(Err(e)),
 					};
 					let block = match construct_block(code, move_first) {
@@ -446,8 +448,335 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 
 fn parse_variable_and_function_declarations<'a, 'b>(
 	tokens: TokenSlice<'a, 'b>,
-) -> Result<Option<LanguageElement<'a>>, ParseError> {
-	Ok(None)
+) -> Result<(LanguageElement<'a>, TokenSlice<'a, 'b>), ParseError> {
+	let (scv, scv_tail) = StaticConstVolatile::parse(tokens)?;
+	let (var, var_tail) = Variable::parse(scv_tail)?;
+	let res = match var_tail {
+		// type var = {..};
+		[Token::Assign, Token::Block(fields), Token::NewLine, tail @ ..] => {
+			//parse tail is hardcoded to be []
+			let (fields_parsed, _) = Vec::<StatementElement>::parse(fields)?;
+			let elem = match &var.typ {
+				Type::Struct(_) => LanguageElement::StructDeclarationAssignment {
+					typ: var.typ,
+					name: Cow::Borrowed(var.name),
+					value: fields_parsed,
+					is_static: scv.is_static,
+					is_const: scv.is_const,
+					is_volatile: scv.is_volatile,
+				},
+				Type::Ptr(_) | Type::Arr(_, _) => LanguageElement::VariableDeclarationAssignment {
+					typ: var.typ,
+					name: Cow::Borrowed(var.name),
+					value: StatementElement::Array(fields_parsed),
+					is_static: scv.is_static,
+					is_const: scv.is_const,
+					is_volatile: scv.is_volatile,
+				},
+				_ => return Err(ParseError::BadType(line!())),
+			};
+			(elem, tail)
+		}
+
+		// type var = ..
+		[Token::Assign, tail @ ..] => {
+			let (statement, rest) = StatementElement::parse(tail)?;
+			(
+				LanguageElement::VariableDeclarationAssignment {
+					typ: var.typ,
+					name: Cow::Borrowed(var.name),
+					value: statement,
+					is_static: scv.is_static,
+					is_const: scv.is_const,
+					is_volatile: scv.is_volatile,
+				},
+				rest,
+			)
+		}
+
+		// type var;
+		[Token::NewLine, tail @ ..] => (
+			LanguageElement::VariableDeclaration {
+				typ: var.typ,
+				name: Cow::Borrowed(var.name),
+				is_static: scv.is_static,
+				is_const: scv.is_const,
+				is_volatile: scv.is_volatile,
+			},
+			tail,
+		),
+
+		// type fun() {}
+		[Token::Parentheses(args), Token::Block(code), tail @ ..] => {
+			//Check type to refuse arrays
+			if matches!(var.typ, Type::Arr(_, _)) {
+				return Err(ParseError::BadType(line!()));
+			}
+			//No static/const/volatile allowed on functions
+			if tokens != scv_tail {
+				return Err(ParseError::InvalidToken(line!()));
+			}
+			let args = parse_argument_declaration(args)?;
+			let block = construct_block(code, false)?;
+			(
+				LanguageElement::FunctionDeclaration {
+					typ: var.typ,
+					name: Cow::Borrowed(var.name),
+					args,
+					block,
+				},
+				tail,
+			)
+		}
+
+		[] => return Err(ParseError::IncompleteStatement(line!())),
+		[..] => return Err(ParseError::InvalidToken(line!())),
+	};
+	Ok(res)
+}
+
+fn parse_language_pattern<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<(LanguageElement<'a>, TokenSlice<'a, 'b>), ParseError> {
+	let res: (LanguageElement<'a>, TokenSlice<'a, 'b>) = match tokens {
+		//Struct member assignment
+		[Token::Name(n), Token::FieldAccess, Token::Name(field), Token::Assign, tail @ ..] => {
+			let name = helper::merge_name_and_field(n, field);
+			let (rhs, rest) = StatementElement::parse(tail)?;
+			(
+				LanguageElement::VariableAssignment { name, value: rhs },
+				rest,
+			)
+		}
+
+		//Struct member assignment through pointer
+		[Token::Name(n), Token::FieldPointerAccess, Token::Name(field), Token::Assign, tail @ ..] =>
+		{
+			let (rhs, rest) = StatementElement::parse(tail)?;
+			(
+				LanguageElement::StructFieldPointerAssignment {
+					name: Cow::Borrowed(n),
+					field: Cow::Borrowed(field),
+					value: rhs,
+				},
+				rest,
+			)
+		}
+
+		//Variable assignment
+		[Token::Name(n), Token::Assign, tail @ ..] => {
+			let (rhs, rest) = StatementElement::parse(tail)?;
+			(
+				LanguageElement::VariableAssignment {
+					name: Cow::Borrowed(n),
+					value: rhs,
+				},
+				rest,
+			)
+		}
+
+		//Array assignment
+		[Token::Name(n), Token::ArrayAccess(idx), Token::Assign, tail @ ..] => {
+			let (mut idx_arr, _) = Vec::<StatementElement>::parse(idx)?;
+			//yes, C interprets [0,1,2] as just [2]
+			let lhs = idx_arr
+				.pop()
+				.ok_or(ParseError::IncompleteStatement(line!()))?;
+			if !idx_arr.is_empty() {
+				eprintln!("Warning: multiple statements separated by commas evaluate to just the last one");
+			}
+			let (rhs, rest) = StatementElement::parse(tail)?;
+			(
+				LanguageElement::PointerAssignment {
+					ptr: StatementElement::Add {
+						lhs: Box::new(lhs),
+						rhs: Box::new(StatementElement::Var(Cow::Borrowed(n))),
+					},
+					value: rhs,
+				},
+				rest,
+			)
+		}
+
+		//If else if
+		[Token::If, Token::Parentheses(cond_tokens), Token::Block(then_code), Token::Else, Token::If, ..] =>
+		{
+			let (condition, cond_rest) = StatementElement::parse(cond_tokens)?;
+			let (then, then_rest) = Vec::<LanguageElement>::parse(then_code)?;
+			let (else_then, rest) = LanguageElement::parse(&tokens[4..])?; // tail[-1..]
+			if !cond_rest.is_empty() || !then_rest.is_empty() {
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+			(
+				LanguageElement::IfStatement {
+					condition,
+					then,
+					else_then: Some(vec![else_then]),
+				},
+				rest,
+			)
+		}
+
+		//If else
+		[Token::If, Token::Parentheses(cond_tokens), Token::Block(then_code), Token::Else, Token::Block(else_code), tail @ ..] =>
+		{
+			let (condition, cond_rest) = StatementElement::parse(cond_tokens)?;
+			let (then, then_rest) = Vec::<LanguageElement>::parse(then_code)?;
+			let (else_then, else_rest) = Vec::<LanguageElement>::parse(else_code)?;
+			if !cond_rest.is_empty() || !then_rest.is_empty() || !else_rest.is_empty() {
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+			(
+				LanguageElement::IfStatement {
+					condition,
+					then,
+					else_then: Some(else_then),
+				},
+				tail,
+			)
+		}
+
+		//If
+		[Token::If, Token::Parentheses(cond_tokens), Token::Block(code), tail @ ..] => {
+			let (condition, cond_rest) = StatementElement::parse(cond_tokens)?;
+			let (then, then_rest) = Vec::<LanguageElement>::parse(code)?;
+			if !cond_rest.is_empty() || !then_rest.is_empty() {
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+			(
+				LanguageElement::IfStatement {
+					condition,
+					then,
+					else_then: None,
+				},
+				tail,
+			)
+		}
+
+		//For
+		[Token::For, Token::Parentheses(init_cond_post), Token::Block(code), tail @ ..] => {
+			let split = init_cond_post
+				.split(|t| t == &Token::NewLine)
+				.collect::<Vec<_>>();
+			if split.len() != 3 {
+				return Err(ParseError::BrokenForLoop(line!()));
+			}
+
+			let (condition, cond_rest) = StatementElement::parse(split[1])?;
+			let (init, init_rest) = Vec::<LanguageElement>::parse(split[0])?;
+			let (post, post_rest) = Vec::<LanguageElement>::parse(split[2])?;
+			let (body, body_rest) = Vec::<LanguageElement>::parse(code)?;
+
+			if !cond_rest.is_empty()
+				|| !init_rest.is_empty()
+				|| !post_rest.is_empty()
+				|| !body_rest.is_empty()
+			{
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+
+			(
+				LanguageElement::For {
+					init,
+					condition,
+					post,
+					body,
+				},
+				tail,
+			)
+		}
+
+		//While
+		[Token::While, Token::Parentheses(cond_tokens), Token::Block(code), tail @ ..] => {
+			let (condition, cond_rest) = StatementElement::parse(cond_tokens)?;
+			let (body, body_rest) = Vec::<LanguageElement>::parse(code)?;
+			if !cond_rest.is_empty() || !body_rest.is_empty() {
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+			(LanguageElement::While { condition, body }, tail)
+		}
+
+		[Token::Return, Token::NewLine, tail @ ..] => (LanguageElement::Return(None), tail),
+
+		[Token::Return, tail @ ..] => {
+			let (return_statement, rest) = StatementElement::parse(tail)?;
+			(LanguageElement::Return(Some(return_statement)), rest)
+		}
+
+		[Token::TypeDef, Token::Struct, Token::Name(name), Token::Block(members), Token::Name(name2), Token::NewLine, tail @ ..] =>
+		{
+			if name != name2 {
+				return Err(ParseError::BadStructName(line!()));
+			}
+			//Reuse second definition
+			// There will never be a tail, so we can throw it away
+			let (res, _) = LanguageElement::parse(&[
+				Token::Struct,
+				Token::Name(name),
+				Token::Block(members.clone()),
+				Token::NewLine,
+			])?;
+			(res, tail)
+		}
+
+		[Token::Struct, Token::Name(name), Token::Block(fields), Token::NewLine, tail @ ..] => {
+			let fields_variable = parse_struct_fields_declaration(fields)?;
+			if !fields_variable
+				.iter()
+				.all(|Variable { typ, .. }| typ.is_native())
+			{
+				return Err(ParseError::BadStructFields(line!()));
+			}
+			let fields_native_variable = fields_variable
+				.into_iter()
+				.map(Variable::into)
+				.collect::<Vec<NativeVariable>>();
+			(
+				LanguageElement::StructDefinition {
+					name: Cow::Borrowed(name),
+					members: fields_native_variable,
+				},
+				tail,
+			)
+		}
+
+		_ if !tokens.contains(&Token::Assign) => {
+			let (statement, rest) = StatementElement::parse(tokens)?;
+			(LanguageElement::Statement(statement), rest)
+		}
+
+		[Token::Switch, ..] => return Err(ParseError::SwitchStatement(line!())),
+		[Token::Case | Token::Continue | Token::Default, ..] => {
+			return Err(ParseError::BreakContinue(line!()))
+		}
+
+		_ => {
+			let len = 10usize.min(tokens.len());
+			dbg!(&tokens[..len]);
+			return Err(ParseError::MatchFail(line!()));
+		}
+	};
+	Ok(res)
+}
+
+impl<'a, 'b> Parsable<'a, 'b> for LanguageElement<'a> {
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+		parse_variable_and_function_declarations(tokens).or_else(|_| parse_language_pattern(tokens))
+	}
+}
+
+impl<'a, 'b> Parsable<'a, 'b> for Vec<LanguageElement<'a>> {
+	///Runs until stream is exhausted
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+		let mut vec = Vec::new();
+		let mut tail = tokens;
+		while !tail.is_empty() {
+			let (item, rest) = LanguageElement::parse(tail)?;
+			vec.push(item);
+			tail = rest;
+		}
+		Ok((vec, tail))
+	}
 }
 
 ///Splits tokens at NewLines and after `Block`s that are *not* followed by `Else`
@@ -584,9 +913,10 @@ impl StaticConstVolatile {
 			_ => Ok(None),
 		}
 	}
-	fn parse_static_const_volatile<'a, 'b>(
-		mut tokens: TokenSlice<'a, 'b>,
-	) -> Result<(StaticConstVolatile, TokenSlice<'a, 'b>), ParseError> {
+}
+
+impl<'a, 'b> Parsable<'a, 'b> for StaticConstVolatile {
+	fn parse(mut tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
 		let mut scv = StaticConstVolatile::default();
 		while let Some((new_scv, tail)) = scv.parse_single_static_const_volatile(tokens)? {
 			scv = new_scv;
@@ -598,15 +928,10 @@ impl StaticConstVolatile {
 
 ///Gets the base type (primitive or struct) and the tail of the stream
 fn parse_base_type<'a, 'b>(tokens: TokenSlice<'a, 'b>) -> Option<(Type<'a>, TokenSlice<'a, 'b>)> {
-	match tokens.split_first() {
-		Some((Token::Decl(t), rest)) => Some((t.into(), rest)),
-		Some((Token::Name(n), rest)) => Some((Type::Struct(n), rest)),
-		Some((Token::Struct, rest)) => {
-			if let Some((Token::Name(n), rest)) = rest.split_first() {
-				Some((Type::Struct(n), rest))
-			} else {
-				None
-			}
+	match tokens {
+		[Token::Decl(t), rest @ ..] => Some((t.into(), rest)),
+		[Token::Name(n), rest @ ..] | [Token::Struct, Token::Name(n), rest @ ..] => {
+			Some((Type::Struct(n), rest))
 		}
 		_ => None,
 	}
@@ -623,73 +948,76 @@ fn parse_pointers<'a, 'b>(
 	}
 }
 
-///Reads a type from the token stream, returns the parsed type and the stream tail
-fn parse_type<'a, 'b>(tokens: TokenSlice<'a, 'b>) -> Option<(Type<'a>, TokenSlice<'a, 'b>)> {
-	let (mut base, mut rest) = parse_base_type(tokens)?;
-	while let Some((typ, tail)) = parse_pointers(rest, base.clone()) {
-		base = typ;
-		rest = tail;
-	}
-	Some((base, rest))
-}
-
-fn parse_variable<'a, 'b>(
-	tokens: TokenSlice<'a, 'b>,
-) -> Result<Option<(Variable<'a>, TokenSlice<'a, 'b>)>, ParseError> {
-	let (typ, tail) = match parse_type(tokens) {
-		Some(ok) => ok,
-		_ => return Ok(None),
-	};
-	let (name, tail) = match tail.split_first() {
-		Some((Token::Name(n), rest)) => (n, rest),
-		_ => return Ok(None),
-	};
-	let (typ, tail) = match tail.split_first() {
-		Some((Token::ArrayAccess(len), rest)) => {
-			let len = match len.as_slice() {
-				[Token::Num(Number { val, .. })] => Ok(*val),
-				_ => Err(ParseError::NonConstantArrayLen(line!())),
-			}?;
-			(Type::Arr(Box::new(typ), len), rest)
+impl<'a, 'b> Parsable<'a, 'b> for Type<'a> {
+	///Reads a type from the token stream, returns the parsed type and the stream tail
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+		let (mut base, mut rest) = parse_base_type(tokens).ok_or(ParseError::BadType(line!()))?;
+		while let Some((typ, tail)) = parse_pointers(rest, base.clone()) {
+			base = typ;
+			rest = tail;
 		}
-		_ => (typ, tail),
-	};
-	Ok(Some((Variable { name, typ }, tail)))
+		Ok((base, rest))
+	}
 }
 
-//Remove the Option? TODO
+impl<'a, 'b> Parsable<'a, 'b> for Variable<'a> {
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+		let (typ, tail) = Type::parse(tokens)?;
+		let (name, tail) = match tail.split_first() {
+			Some((Token::Name(n), rest)) => (n, rest),
+			_ => return Err(ParseError::MissingName(line!())),
+		};
+		let (typ, tail) = match tail.split_first() {
+			Some((Token::ArrayAccess(len), rest)) => {
+				let len = match len.as_slice() {
+					[Token::Num(Number { val, .. })] => Ok(*val),
+					_ => Err(ParseError::NonConstantArrayLen(line!())),
+				}?;
+				(Type::Arr(Box::new(typ), len), rest)
+			}
+			_ => (typ, tail),
+		};
+		Ok((Variable { name, typ }, tail))
+	}
+}
+
 fn parse_split_variables<'a, 'b>(
 	tokens: TokenSlice<'a, 'b>,
 	split: &Token<'a>,
-) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+) -> Result<Vec<Variable<'a>>, ParseError> {
 	let mut vec = Vec::new();
+
 	if tokens.is_empty() {
-		return Ok(Some(vec));
+		return Ok(vec);
 	}
 
-	for variable_stream in tokens.split(|t| t == split) {
-		if let Some((var, tail)) = parse_variable(variable_stream)? {
-			if !tail.is_empty() {
-				return Err(ParseError::ExcessTokens(line!()));
-			}
+	let mut tail = tokens;
+	while !tail.is_empty() {
+		if let Ok((var, rest)) = Variable::parse(tail) {
 			vec.push(var);
+			tail = match rest {
+				[token, rest @ ..] if token == split => rest,
+				[] => break,
+				_ => return Err(ParseError::ExcessTokens(line!())),
+			};
 		} else {
+			dbg!(tail, split);
 			return Err(ParseError::InvalidArguments(line!()));
 		}
 	}
 
-	Ok(Some(vec))
+	Ok(vec)
 }
 
-pub(crate) fn parse_argument_declaration<'a, 'b>(
+fn parse_argument_declaration<'a, 'b>(
 	tokens: TokenSlice<'a, 'b>,
-) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+) -> Result<Vec<Variable<'a>>, ParseError> {
 	parse_split_variables(tokens, &Token::Comma)
 }
 
 fn parse_struct_fields_declaration<'a, 'b>(
 	tokens: TokenSlice<'a, 'b>,
-) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+) -> Result<Vec<Variable<'a>>, ParseError> {
 	parse_split_variables(tokens, &Token::NewLine)
 }
 
@@ -705,4 +1033,39 @@ pub(crate) fn parse_tokens_to_statements<'a, 'b>(
 		.split(|t| t == &Token::Comma)
 		.map(|slice| StatementToken::from_tokens(slice))
 		.collect::<Result<Vec<_>, _>>()
+}
+
+//This trait exists as a trait and not just a bunch of standalone functions so it can be used once for `ParserIterator`
+pub trait Parsable<'a, 'b>
+where
+	Self: Sized,
+{
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError>;
+}
+
+pub struct ParserIterator<'a, 'b, T: Parsable<'a, 'b>> {
+	token_stream: TokenSlice<'a, 'b>,
+	_marker: PhantomData<T>,
+}
+
+impl<'a, 'b, T: Parsable<'a, 'b>> ParserIterator<'a, 'b, T> {
+	pub fn new(token_stream: TokenSlice<'a, 'b>) -> Self {
+		ParserIterator {
+			token_stream,
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl<'a, 'b, T: Parsable<'a, 'b>> Iterator for ParserIterator<'a, 'b, T> {
+	type Item = Result<T, ParseError>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		let (out, tail) = match T::parse(self.token_stream) {
+			Ok(ok) => ok,
+			Err(e) => return Some(Err(e)),
+		};
+		self.token_stream = tail;
+		Some(Ok(out))
+	}
 }
