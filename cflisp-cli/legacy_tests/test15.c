@@ -1,4 +1,6 @@
+// test15.c
 int main() {
+	int *fc = 0xFC;
 	// if (true) {
 	// int a   = 1;
 	// int b   = a;
@@ -17,12 +19,12 @@ int main() {
 	int g = f + 6;
 	int h = g + 7;
 
-	//int foo = ((a + b) + (c + d)) + ((e + f) + (g + h));
-	int foo = ((a+b)+(c+d))+((e+f)+(g+h));
-	*0xFC   = foo;
+	// int foo = ((a + b) + (c + d)) + ((e + f) + (g + h));
+	int foo = ((a + b) + (c + d)) + ((e + f) + (g + h));
+	*fc     = foo;
 
-	//int bar = a + b + c + d + e + f + g + h;
-	//int bar = a+b+c+d+e+f+g+h;
+	// int bar = a + b + c + d + e + f + g + h;
+	// int bar = a+b+c+d+e+f+g+h;
 	//*0xFB   = bar;
 	// printf("0x%X\n", foo);
 }

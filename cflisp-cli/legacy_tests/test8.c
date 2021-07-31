@@ -1,3 +1,4 @@
+// test8.c
 int factorial(int n) {
 	if (n <= 1) {
 		return 1;
@@ -8,5 +9,6 @@ int factorial(int n) {
 
 int main() {
 	int res = factorial(5);
-	*0xFC   = res;
+	int *fc = 0xFC;
+	*fc     = res;
 }

@@ -1,3 +1,4 @@
+// test2.c
 int main() {
 	int *nullptr = 0;
 	int x        = 5;

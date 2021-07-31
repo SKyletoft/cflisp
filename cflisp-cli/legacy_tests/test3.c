@@ -1,3 +1,4 @@
+// test3.c
 // Expected error
 int main() {
 	void y() { int b = 43; }

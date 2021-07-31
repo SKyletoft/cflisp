@@ -1,4 +1,7 @@
+// test13.c
 int main() {
-	//*0xFC = 5 * 4 * 3 * 2 * 1;
-	*0xFB = 0x5 - 0x2;
+	int *fc = 0xFC;
+	int *fb = 0xFB;
+	*fb     = 5 * 4 * 3 * 2 * 1;
+	*fc     = 0x5 - 0x2;
 }
