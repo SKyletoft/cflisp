@@ -55,18 +55,19 @@ fn main() {
 	if files.is_empty() {
 		exit_error("Error: No input files");
 	}
-	let mut source = String::new();
-	for file in files {
-		source.push_str(
-			&fs::read_to_string(file).unwrap_or_else(|e| {
+	let source = {
+		let mut s = String::new();
+		for file in files {
+			s.push_str(&fs::read_to_string(file).unwrap_or_else(|e| {
 				exit_error(&format!("IO Error: File could not be read ({})", e))
-			}),
-		);
-		source.push('\n');
-	}
-	source = parser::remove_comments(&source);
+			}));
+			s.push('\n');
+		}
+		s
+	};
+	let no_comments = parser::remove_comments(&source);
 
-	let parsed = parser::parse(&source, !flags.debug)
+	let parsed = parser::parse(&no_comments, !flags.debug)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 	if flags.tree {
 		dbg!(&parsed);

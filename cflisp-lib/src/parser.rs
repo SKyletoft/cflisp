@@ -444,6 +444,12 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 	}
 }
 
+fn parse_variable_and_function_declarations<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<Option<LanguageElement<'a>>, ParseError> {
+	Ok(None)
+}
+
 ///Splits tokens at NewLines and after `Block`s that are *not* followed by `Else`
 fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	let mut vec = Vec::new();
@@ -479,14 +485,10 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 
 ///Removes all comments from the source code.
 /// Recursive multiline comments are treated properly.
-pub fn remove_comments(s: &str) -> String {
+pub fn remove_comments(s: &str) -> Cow<str> {
 	let cow_str = Cow::Borrowed(s);
 	let no_multilines = remove_multiline_comments(cow_str);
-	let no_single_lines = remove_single_line_comments(no_multilines);
-	match no_single_lines {
-		Cow::Owned(s) => s,
-		Cow::Borrowed(s) => s.to_owned(),
-	}
+	remove_single_line_comments(no_multilines)
 }
 
 ///Takes the entire source code and removes the rest of the line for each line with a `//`.
