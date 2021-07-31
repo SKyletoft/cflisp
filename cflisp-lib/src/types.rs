@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp, collections::HashMap, default::Default, fmt, ops};
+use std::{borrow::Cow, cmp, collections::HashMap, convert::TryFrom, default::Default, fmt, ops};
 
 use crate::*;
 
@@ -31,6 +31,15 @@ impl<'a> Variable<'a> {
 			}]
 		};
 		Ok(res)
+	}
+}
+
+impl<'a> From<Variable<'a>> for NativeVariable<'a> {
+	fn from(var: Variable<'a>) -> Self {
+		NativeVariable {
+			typ: var.typ.into(),
+			name: Cow::Borrowed(var.name),
+		}
 	}
 }
 
@@ -106,6 +115,14 @@ impl<'a> Type<'a> {
 			Some(*inner)
 		} else {
 			None
+		}
+	}
+
+	pub(crate) fn is_native(&self) -> bool {
+		match self {
+			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => true,
+			Type::Struct(_) => false,
+			Type::Ptr(t) | Type::Arr(t, _) => t.is_native(),
 		}
 	}
 }

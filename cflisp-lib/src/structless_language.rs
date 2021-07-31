@@ -916,7 +916,6 @@ fn per_element<'a>(
 			let mut inner_rename_map = rename_map.clone();
 			let mut inner_structs_and_struct_pointers = state.structs_and_struct_pointers.clone();
 
-			let condition = StructlessStatement::from(&condition, state)?;
 			let mut new_state = State {
 				struct_types: state.struct_types,
 				structs_and_struct_pointers: &mut inner_structs_and_struct_pointers,
@@ -930,6 +929,8 @@ fn per_element<'a>(
 				&mut inner_rename_map,
 				&mut new_state,
 			)?;
+			//Can't be moved to be first so that `new_state` takes variables from `init_block` into consideration
+			let condition = StructlessStatement::from(&condition, &new_state)?;
 			let mut body = StructlessLanguage::from_language_elements_internal(
 				body,
 				upper,

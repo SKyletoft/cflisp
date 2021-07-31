@@ -24,6 +24,9 @@ pub enum ParseError {
 	InternalFailedStatic(u32),
 	InternalFailedVolatile(u32),
 	TreeConstructionFail(u32),
+	MissingName(u32),
+	BadType(u32),
+	ExcessTokens(u32),
 }
 
 impl fmt::Display for ParseError {
@@ -47,6 +50,9 @@ impl fmt::Display for ParseError {
 			InternalFailedConst(line) => (line, "Internal error: cannot make element const"),
 			InternalFailedStatic(line) => (line, "Internal error: cannot make element static"),
 			InternalFailedVolatile(line) => (line, "Internal error: cannot make element volatile"),
+			MissingName(line) => (line, "No name when expected"),
+			BadType(line) => (line, "Failed to parse type"),
+			ExcessTokens(line) => (line, "Extra tokens in statement"),
 			InternalUnparsed(line) => (
 				line,
 				"Internal error: Last element in statement parsing vector was unparsed",

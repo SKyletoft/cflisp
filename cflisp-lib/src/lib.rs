@@ -15,6 +15,7 @@ pub mod structless_statement;
 pub mod tests;
 pub mod token;
 pub mod type_checker;
+
 pub mod types;
 
 use error::{CompileError, IRError, ParseError, TypeError};

@@ -706,7 +706,7 @@ fn compile_statement_inner<'a>(
 				instructions.append(&mut compile_statement(statement, state)?);
 				instructions.push((
 					Instruction::PSHA,
-					Some(helper::merge_name_and_field(name, v_name)),
+					Some(helper::merge_name_and_field(name, &v_name)),
 				));
 			}
 			instructions.push((Instruction::JSR(Addressing::Label(name.clone())), None));

@@ -74,38 +74,33 @@ impl<'a> StatementToken<'a> {
 				Token::IntCast => StatementToken::Cast(NativeType::Int),
 				Token::UintCast => StatementToken::Cast(NativeType::Uint),
 				Token::Ternary(b) => {
-					let tokenised = Token::by_byte(b)?;
-					let as_statement = StatementToken::from_tokens(&tokenised)?;
+					let as_statement = StatementToken::from_tokens(b)?;
 					StatementToken::Ternary(as_statement)
 				}
-				Token::UnparsedParentheses(b) => {
+				Token::Parentheses(tokenised) => {
 					if let Some(StatementToken::Var(n)) = res.get(last) {
-						res[last] =
-							StatementToken::FunctionCall(n, Token::parse_arguments_tokens(b)?);
+						let arguments = parser::parse_tokens_to_statements(tokenised)?;
+						res[last] = StatementToken::FunctionCall(n, arguments);
 						continue;
 					} else {
-						let tokenised = Token::by_byte(b)?;
 						let as_statement = StatementToken::from_tokens(&tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
 				}
-				Token::UnparsedArrayAccess(b) => {
-					let idx = Token::by_byte(b)?;
+				Token::ArrayAccess(idx) => {
 					let as_statement = StatementToken::from_tokens(&idx)?;
 					StatementToken::ArrayAccess(as_statement)
 				}
-				Token::UnparsedBlock(b) => {
-					let items = b.split(',').map(|s| s.trim()).collect::<Vec<_>>();
+				Token::Block(b) => {
+					let items = b.split(|t| t == &Token::Comma).collect::<Vec<_>>();
 					let mut v = Vec::new();
 					for item in items {
-						let tokens = Token::by_byte(item)?;
-						v.push(StatementToken::from_tokens(&tokens)?);
+						v.push(StatementToken::from_tokens(item)?);
 					}
 					StatementToken::Array(v)
 				}
-				Token::UnparsedSource(b) => {
-					let (token, _) = lexer::get_token(b)?;
-					StatementToken::Parentheses(StatementToken::from_tokens(&[token])?)
+				Token::Source(tokens) => {
+					StatementToken::Parentheses(StatementToken::from_tokens(tokens)?)
 				}
 				Token::StringLiteral(s) => StatementToken::Array(
 					s.chars()

@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use crate::*;
 
+type TokenSlice<'a, 'b> = &'b [Token<'a>];
+
 pub fn parse<'a>(
 	source: &'a str,
 	move_first: bool,
@@ -71,8 +73,8 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Array assignment
-			[Token::Name(n), Token::UnparsedArrayAccess(idx), Token::Assign, ..] => {
-				let lhs = StatementElement::from_source_str(idx)?;
+			[Token::Name(n), Token::ArrayAccess(idx), Token::Assign, ..] => {
+				let lhs = StatementElement::from_tokens(idx)?;
 				let rhs = StatementElement::from_tokens(&tokens[3..])?;
 				LanguageElement::PointerAssignment {
 					ptr: StatementElement::Add {
@@ -84,9 +86,9 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//Switch statement
-			[Token::Switch, Token::UnparsedParentheses(expr), Token::UnparsedBlock(cases)] => {
-				let _expr = StatementElement::from_source_str(expr)?;
-				let _cases_parsed = parse(cases, move_first)?;
+			[Token::Switch, Token::Parentheses(expr), Token::Block(cases)] => {
+				let _expr = StatementElement::from_tokens(expr)?;
+				let _cases_parsed = construct_structure_from_tokens(cases, move_first)?;
 				return Err(ParseError::SwitchStatement(line!()));
 			}
 
@@ -102,10 +104,10 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//If else if
-			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(then_code), Token::Else, Token::If, ..] =>
+			[Token::If, Token::Parentheses(cond), Token::Block(then_code), Token::Else, Token::If, ..] =>
 			{
-				let condition_parsed = StatementElement::from_source_str(cond)?;
-				let then_parsed = parse(then_code, move_first)?;
+				let condition_parsed = StatementElement::from_tokens(cond)?;
+				let then_parsed = construct_block(then_code, move_first)?;
 				let else_if_tokens = &tokens[4..];
 				let else_if_parsed = construct_structure_from_tokens(else_if_tokens, move_first)?;
 				LanguageElement::IfStatement {
@@ -116,11 +118,11 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//If else
-			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(then_code), Token::Else, Token::UnparsedBlock(else_code)] =>
+			[Token::If, Token::Parentheses(cond), Token::Block(then_code), Token::Else, Token::Block(else_code)] =>
 			{
-				let condition_parsed = StatementElement::from_source_str(cond)?;
-				let then_parsed = parse(then_code, move_first)?;
-				let else_parsed = parse(else_code, move_first)?;
+				let condition_parsed = StatementElement::from_tokens(cond)?;
+				let then_parsed = construct_block(then_code, move_first)?;
+				let else_parsed = construct_block(else_code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -129,9 +131,9 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//If
-			[Token::If, Token::UnparsedParentheses(cond), Token::UnparsedBlock(code)] => {
-				let condition_parsed = StatementElement::from_source_str(cond)?;
-				let then_parsed = parse(code, move_first)?;
+			[Token::If, Token::Parentheses(cond), Token::Block(code)] => {
+				let condition_parsed = StatementElement::from_tokens(cond)?;
+				let then_parsed = construct_block(code, move_first)?;
 				LanguageElement::IfStatement {
 					condition: condition_parsed,
 					then: then_parsed,
@@ -140,17 +142,19 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//For
-			[Token::For, Token::UnparsedParentheses(init_cond_post), Token::UnparsedBlock(code)] => {
-				let split = init_cond_post.split(';').map(str::trim).collect::<Vec<_>>();
+			[Token::For, Token::Parentheses(init_cond_post), Token::Block(code)] => {
+				let split = init_cond_post
+					.split(|t| t == &Token::NewLine)
+					.collect::<Vec<_>>();
 				if split.len() != 3 {
 					return Err(ParseError::BrokenForLoop(line!()));
 				}
 
-				let condition = StatementElement::from_source_str(split[1])?;
+				let condition = StatementElement::from_tokens(split[1])?;
 
-				let init = parse(split[0], move_first)?;
-				let post = parse(split[2], move_first)?;
-				let body = parse(code, move_first)?;
+				let init = construct_block(split[0], move_first)?;
+				let post = construct_block(split[2], move_first)?;
+				let body = construct_block(code, move_first)?;
 
 				LanguageElement::For {
 					init,
@@ -161,9 +165,9 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 			}
 
 			//While
-			[Token::While, Token::UnparsedParentheses(cond), Token::UnparsedBlock(code)] => {
-				let condition_parsed = StatementElement::from_source_str(cond)?;
-				let body_parsed = parse(code, move_first)?;
+			[Token::While, Token::Parentheses(cond), Token::Block(code)] => {
+				let condition_parsed = StatementElement::from_tokens(cond)?;
+				let body_parsed = construct_block(code, move_first)?;
 				LanguageElement::While {
 					condition: condition_parsed,
 					body: body_parsed,
@@ -177,7 +181,7 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 				LanguageElement::Return(Some(return_statement))
 			}
 
-			[Token::TypeDef, Token::Struct, Token::Name(name), Token::UnparsedBlock(members), Token::Name(name2)] =>
+			[Token::TypeDef, Token::Struct, Token::Name(name), Token::Block(members), Token::Name(name2)] =>
 			{
 				if name != name2 {
 					return Err(ParseError::BadStructName(line!()));
@@ -187,17 +191,28 @@ fn construct_structure_from_tokens_via_pattern<'a>(
 					&[
 						Token::Struct,
 						Token::Name(name),
-						Token::UnparsedBlock(members),
+						Token::Block(members.clone()),
 					],
 					move_first,
 				)?
 			}
 
-			[Token::Struct, Token::Name(name), Token::UnparsedBlock(members)] => {
-				let members_parsed = Token::parse_struct_member_tokens(members)?;
+			[Token::Struct, Token::Name(name), Token::Block(fields)] => {
+				let fields_variable = parse_struct_fields_declaration(fields)?
+					.ok_or(ParseError::BadStructFields(line!()))?;
+				if !fields_variable
+					.iter()
+					.all(|Variable { typ, .. }| typ.is_native())
+				{
+					return Err(ParseError::BadStructFields(line!()));
+				}
+				let fields_native_variable = fields_variable
+					.into_iter()
+					.map(Variable::into)
+					.collect::<Vec<NativeVariable>>();
 				LanguageElement::StructDefinition {
 					name: Cow::Borrowed(name),
-					members: members_parsed,
+					members: fields_native_variable,
 				}
 			}
 
@@ -265,20 +280,21 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_const: false,
 					is_volatile: false,
 				})),
-				[Token::Name(n), Token::UnparsedArrayAccess(len)] => {
-					let res = len
-						.parse::<isize>()
-						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
-						.map(|len| {
-							t = Type::Arr(Box::new(t), len);
-							LanguageElement::VariableDeclaration {
-								typ: t,
-								name: Cow::Borrowed(n),
-								is_static: false,
-								is_const: false,
-								is_volatile: false,
-							}
-						});
+				[Token::Name(n), Token::ArrayAccess(len)] => {
+					let res = match len.as_slice() {
+						[Token::Num(Number { val, .. })] => Ok(*val),
+						_ => Err(ParseError::NonConstantArrayLen(line!())),
+					}
+					.map(|len| {
+						t = Type::Arr(Box::new(t), len);
+						LanguageElement::VariableDeclaration {
+							typ: t,
+							name: Cow::Borrowed(n),
+							is_static: false,
+							is_const: false,
+							is_volatile: false,
+						}
+					});
 					Some(res)
 				}
 				[Token::Name(n), Token::Assign, ..] => {
@@ -294,40 +310,44 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					});
 					Some(res)
 				}
-				[Token::Name(n), Token::UnparsedArrayAccess(len), Token::Assign, ..] => {
-					let res = len
-						.parse::<isize>()
-						.map_err(|_| ParseError::NonConstantArrayLen(line!()))
-						.and_then(|len| {
-							t = Type::Arr(Box::new(t), len);
-							StatementElement::from_tokens(&tokens_slice[3..]).map(|statement| {
-								LanguageElement::VariableDeclarationAssignment {
-									typ: t,
-									name: Cow::Borrowed(n),
-									value: statement,
-									is_static: false,
-									is_const: false,
-									is_volatile: false,
-								}
-							})
-						});
-					Some(res)
-				}
-				//Function
-				[Token::Name(n), Token::UnparsedParentheses(args), Token::UnparsedBlock(code)] => {
-					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
-						Token::parse_block_tokens(code).and_then(|code_tokenised| {
-							construct_block(&code_tokenised, move_first).map(|code_parsed| {
-								LanguageElement::FunctionDeclaration {
-									typ: t,
-									name: Cow::Borrowed(n),
-									args: args_parsed,
-									block: code_parsed,
-								}
-							})
+				[Token::Name(n), Token::ArrayAccess(len), Token::Assign, ..] => {
+					let res = match len.as_slice() {
+						[Token::Num(Number { val, .. })] => Ok(*val),
+						_ => Err(ParseError::NonConstantArrayLen(line!())),
+					}
+					.and_then(|len| {
+						t = Type::Arr(Box::new(t), len);
+						StatementElement::from_tokens(&tokens_slice[3..]).map(|statement| {
+							LanguageElement::VariableDeclarationAssignment {
+								typ: t,
+								name: Cow::Borrowed(n),
+								value: statement,
+								is_static: false,
+								is_const: false,
+								is_volatile: false,
+							}
 						})
 					});
 					Some(res)
+				}
+				//Function
+				[Token::Name(n), Token::Parentheses(args_tokens), Token::Block(code)] => {
+					let args = match parse_argument_declaration(args_tokens) {
+						Ok(Some(res)) => res,
+						Ok(None) => return None,
+						Err(e) => return Some(Err(e)),
+					};
+					let block = match construct_block(code, move_first) {
+						Ok(res) => res,
+						Err(e) => return Some(Err(e)),
+					};
+					let res = LanguageElement::FunctionDeclaration {
+						typ: t,
+						name: Cow::Borrowed(n),
+						args,
+						block,
+					};
+					Some(Ok(res))
 				}
 				_ => None,
 			}
@@ -348,8 +368,8 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					is_const: false,
 					is_volatile: false,
 				})),
-				[Token::Name(n), Token::Assign, Token::UnparsedBlock(s)] => {
-					let res = Token::parse_arguments_tokens(s).and_then(|tokens| {
+				[Token::Name(n), Token::Assign, Token::Block(fields)] => {
+					let res = parse_tokens_to_statements(fields).and_then(|tokens| {
 						tokens
 							.into_iter()
 							.map(StatementElement::from_statement_tokens)
@@ -379,20 +399,23 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 					Some(res)
 				}
 				//Function
-				[Token::Name(n), Token::UnparsedParentheses(args), Token::UnparsedBlock(code)] => {
-					let res = Token::parse_argument_list_tokens(args).and_then(|args_parsed| {
-						Token::parse_block_tokens(code).and_then(|code_tokenised| {
-							construct_block(&code_tokenised, move_first).map(|code_parsed| {
-								LanguageElement::FunctionDeclaration {
-									typ: t,
-									name: Cow::Borrowed(n),
-									args: args_parsed,
-									block: code_parsed,
-								}
-							})
-						})
-					});
-					Some(res)
+				[Token::Name(n), Token::Parentheses(args_tokens), Token::Block(code)] => {
+					let args = match parse_argument_declaration(args_tokens) {
+						Ok(Some(res)) => res,
+						Ok(None) => return None,
+						Err(e) => return Some(Err(e)),
+					};
+					let block = match construct_block(code, move_first) {
+						Ok(res) => res,
+						Err(e) => return Some(Err(e)),
+					};
+					let res = LanguageElement::FunctionDeclaration {
+						typ: t,
+						name: Cow::Borrowed(n),
+						args,
+						block,
+					};
+					Some(Ok(res))
 				}
 				_ => None,
 			}
@@ -421,7 +444,7 @@ fn construct_structure_with_pointers_from_tokens<'a>(
 	}
 }
 
-///Splits tokens at NewLines and after `UnparsedBlock`s that are *not* followed by `Else`
+///Splits tokens at NewLines and after `Block`s that are *not* followed by `Else`
 fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 	let mut vec = Vec::new();
 	let mut last = 0;
@@ -433,7 +456,7 @@ fn split_token_lines<'a, 'b>(tokens: &'a [Token<'b>]) -> Vec<&'a [Token<'b>]> {
 			}
 			last = idx + 1;
 		}
-		if matches!(tokens[idx], Token::UnparsedBlock(_))
+		if matches!(tokens[idx], Token::Block(_))
 			&& !matches!(tokens.get(idx + 1), Some(Token::Else))
 			&& !matches!(
 				(tokens.get(idx + 1), tokens.get(idx + 2)),
@@ -520,4 +543,164 @@ fn remove_multiline_comments(mut s: Cow<str>) -> Cow<str> {
 			s = Cow::Owned(s[..latest_start - 2].to_string() + &s[first_end + 2..]);
 		}
 	}
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+struct StaticConstVolatile {
+	pub is_static: bool,
+	pub is_const: bool,
+	pub is_volatile: bool,
+}
+
+impl StaticConstVolatile {
+	fn parse_single_static_const_volatile<'a, 'b>(
+		mut self,
+		tokens: TokenSlice<'a, 'b>,
+	) -> Result<Option<(StaticConstVolatile, TokenSlice<'a, 'b>)>, ParseError> {
+		match tokens.split_first() {
+			Some((Token::Static, rest)) => {
+				if self.is_static {
+					return Err(ParseError::InternalFailedStatic(line!()));
+				}
+				self.is_static = true;
+				Ok(Some((self, rest)))
+			}
+			Some((Token::Const, rest)) => {
+				if self.is_const {
+					return Err(ParseError::InternalFailedConst(line!()));
+				}
+				self.is_const = true;
+				Ok(Some((self, rest)))
+			}
+			Some((Token::Volatile, rest)) => {
+				if self.is_volatile {
+					return Err(ParseError::InternalFailedVolatile(line!()));
+				}
+				self.is_volatile = true;
+				Ok(Some((self, rest)))
+			}
+			_ => Ok(None),
+		}
+	}
+	fn parse_static_const_volatile<'a, 'b>(
+		mut tokens: TokenSlice<'a, 'b>,
+	) -> Result<(StaticConstVolatile, TokenSlice<'a, 'b>), ParseError> {
+		let mut scv = StaticConstVolatile::default();
+		while let Some((new_scv, tail)) = scv.parse_single_static_const_volatile(tokens)? {
+			scv = new_scv;
+			tokens = tail;
+		}
+		Ok((scv, tokens))
+	}
+}
+
+///Gets the base type (primitive or struct) and the tail of the stream
+fn parse_base_type<'a, 'b>(tokens: TokenSlice<'a, 'b>) -> Option<(Type<'a>, TokenSlice<'a, 'b>)> {
+	match tokens.split_first() {
+		Some((Token::Decl(t), rest)) => Some((t.into(), rest)),
+		Some((Token::Name(n), rest)) => Some((Type::Struct(n), rest)),
+		Some((Token::Struct, rest)) => {
+			if let Some((Token::Name(n), rest)) = rest.split_first() {
+				Some((Type::Struct(n), rest))
+			} else {
+				None
+			}
+		}
+		_ => None,
+	}
+}
+
+///Adds a single pointer to `base_type` if there is one available
+fn parse_pointers<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+	base_type: Type<'a>,
+) -> Option<(Type<'a>, TokenSlice<'a, 'b>)> {
+	match tokens.split_first() {
+		Some((Token::Mul, rest)) => Some((Type::ptr(base_type), rest)),
+		_ => None,
+	}
+}
+
+///Reads a type from the token stream, returns the parsed type and the stream tail
+fn parse_type<'a, 'b>(tokens: TokenSlice<'a, 'b>) -> Option<(Type<'a>, TokenSlice<'a, 'b>)> {
+	let (mut base, mut rest) = parse_base_type(tokens)?;
+	while let Some((typ, tail)) = parse_pointers(rest, base.clone()) {
+		base = typ;
+		rest = tail;
+	}
+	Some((base, rest))
+}
+
+fn parse_variable<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<Option<(Variable<'a>, TokenSlice<'a, 'b>)>, ParseError> {
+	let (typ, tail) = match parse_type(tokens) {
+		Some(ok) => ok,
+		_ => return Ok(None),
+	};
+	let (name, tail) = match tail.split_first() {
+		Some((Token::Name(n), rest)) => (n, rest),
+		_ => return Ok(None),
+	};
+	let (typ, tail) = match tail.split_first() {
+		Some((Token::ArrayAccess(len), rest)) => {
+			let len = match len.as_slice() {
+				[Token::Num(Number { val, .. })] => Ok(*val),
+				_ => Err(ParseError::NonConstantArrayLen(line!())),
+			}?;
+			(Type::Arr(Box::new(typ), len), rest)
+		}
+		_ => (typ, tail),
+	};
+	Ok(Some((Variable { name, typ }, tail)))
+}
+
+//Remove the Option? TODO
+fn parse_split_variables<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+	split: &Token<'a>,
+) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+	let mut vec = Vec::new();
+	if tokens.is_empty() {
+		return Ok(Some(vec));
+	}
+
+	for variable_stream in tokens.split(|t| t == split) {
+		if let Some((var, tail)) = parse_variable(variable_stream)? {
+			if !tail.is_empty() {
+				return Err(ParseError::ExcessTokens(line!()));
+			}
+			vec.push(var);
+		} else {
+			return Err(ParseError::InvalidArguments(line!()));
+		}
+	}
+
+	Ok(Some(vec))
+}
+
+pub(crate) fn parse_argument_declaration<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+	parse_split_variables(tokens, &Token::Comma)
+}
+
+fn parse_struct_fields_declaration<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<Option<Vec<Variable<'a>>>, ParseError> {
+	parse_split_variables(tokens, &Token::NewLine)
+}
+
+pub(crate) fn parse_tokens_to_statements<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<Vec<Statement<'a>>, ParseError> {
+	//Without this we return Ok([[]]) instead of Ok([])
+	// Adding a filter in the iterator would mean accepting double commas
+	if tokens.is_empty() {
+		return Ok(Vec::new());
+	}
+	tokens
+		.split(|t| t == &Token::Comma)
+		.map(|slice| StatementToken::from_tokens(slice))
+		.collect::<Result<Vec<_>, _>>()
 }

@@ -14,7 +14,10 @@ fn hex_digit_value(digit: u8) -> isize {
 ///Gets a hex number from the source and returns the remaining source and a number token. Unsigned only
 fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 	if (s.starts_with("0x") || s.starts_with("0X"))
-		&& s.as_bytes().get(2).map(|d| d.is_ascii_hexdigit()) == Some(true)
+		&& s.as_bytes()
+			.get(2)
+			.map(|d| d.is_ascii_hexdigit())
+			.unwrap_or(false)
 	{
 		let (len, num) = s
 			.bytes()
@@ -36,7 +39,12 @@ fn get_hex_number(s: &str) -> Option<(Token, &str)> {
 //Get rid of and rely on optimisation and negate operation?
 ///Gets a hex number from the source and returns the remaining source and a number token. Negative only
 fn get_negative_number(s: &str) -> Option<(Token, &str)> {
-	if s.starts_with('-') && s.as_bytes().get(1).map(|d| d.is_ascii_digit()) == Some(true) {
+	if s.starts_with('-')
+		&& s.as_bytes()
+			.get(1)
+			.map(|d| d.is_ascii_digit())
+			.unwrap_or(false)
+	{
 		let mut len = 1;
 		let num = s
 			.bytes()
@@ -54,7 +62,11 @@ fn get_negative_number(s: &str) -> Option<(Token, &str)> {
 
 ///Gets a hex number from the source and returns the remaining source and a number token. Unsigned only
 fn get_positive_number(s: &str) -> Option<(Token, &str)> {
-	if s.as_bytes().get(0).map(|d| d.is_ascii_digit()) == Some(true) {
+	if s.as_bytes()
+		.get(0)
+		.map(|d| d.is_ascii_digit())
+		.unwrap_or(false)
+	{
 		let mut len = 0;
 		let num = s
 			.bytes()
@@ -106,28 +118,35 @@ fn get_string_literal(s: &str) -> Option<(Token, &str)> {
 }
 
 ///Gets a complete statement in parenthesis. Returns None on unmatched parentheses.
-/// The parentheses are not in the string in the UnparsedParentheses token
 fn get_parenthesis(s: &str) -> Option<(Token, &str)> {
-	get_prio_section('(', ')', s).map(|(a, b)| (Token::UnparsedParentheses(a), b))
+	let (paren, tail) = get_prio_section('(', ')', s)?;
+	let tokenised = Token::by_byte(paren).ok()?;
+	Some((Token::Parentheses(tokenised), tail))
 }
 
 ///Gets a complete statement in curly brackets. Returns None on unmatched brackets.
 /// The brackets are not in the string in the UnparsedBlock token
 fn get_block(s: &str) -> Option<(Token, &str)> {
-	get_prio_section('{', '}', s).map(|(a, b)| (Token::UnparsedBlock(a), b))
+	let (paren, tail) = get_prio_section('{', '}', s)?;
+	let tokenised = Token::by_byte(paren).ok()?;
+	Some((Token::Block(tokenised), tail))
 }
 
 ///Gets the middle part of a ternary statement to later be used as a binary operator
 /// if the expression lack a colon None will be returned.
 /// `?` and `:` are not included in the string
 fn get_ternary_op(s: &str) -> Option<(Token, &str)> {
-	get_prio_section('?', ':', s).map(|(a, b)| (Token::Ternary(a), b))
+	let (paren, tail) = get_prio_section('?', ':', s)?;
+	let tokenised = Token::by_byte(paren).ok()?;
+	Some((Token::Ternary(tokenised), tail))
 }
 
 ///Gets a complete statement in square brackets. Returns None on unmatched brackets.
 /// The brackets are not in the string in the UnparsedArrayAccess token
 fn get_array_access(s: &str) -> Option<(Token, &str)> {
-	get_prio_section('[', ']', s).map(|(a, b)| (Token::UnparsedArrayAccess(a), b))
+	let (paren, tail) = get_prio_section('[', ']', s)?;
+	let tokenised = Token::by_byte(paren).ok()?;
+	Some((Token::ArrayAccess(tokenised), tail))
 }
 
 ///Gets char in apostrophes. returns None on unmatched apostrophes
@@ -219,7 +238,6 @@ const FORBIDDEN_CHARACTERS: &[char] = &[
 	']', '{', '}', '`', '´', '?', '=', '@', '£', '#', '$', '¤', '%', '¨', '§', ';', ':',
 ];
 
-//Literal, needs following whitespace, closure to return token
 //Closure needed instead of values because pointer types are boxed
 type TokenFunction = fn() -> Token<'static>;
 const KEYWORDS: [(&str, TokenFunction); 59] = [
