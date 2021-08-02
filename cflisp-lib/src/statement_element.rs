@@ -223,17 +223,6 @@ impl<'a> StatementElement<'a> {
 		Ok(res)
 	}
 
-	//Cannot be implemented as the FromStr trait as that trait doesn't allow a lifetime on the string
-	pub(crate) fn from_source_str(s: &'a str) -> Result<StatementElement<'a>, ParseError> {
-		let tokens = Token::parse_statement_tokens(s)?;
-		StatementElement::from_statement_tokens(tokens)
-	}
-
-	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<StatementElement<'a>, ParseError> {
-		let statement_tokens = StatementToken::from_tokens(tokens)?;
-		StatementElement::from_statement_tokens(statement_tokens)
-	}
-
 	pub(crate) fn from_statement_tokens(
 		tokens: Vec<StatementToken<'a>>,
 	) -> Result<StatementElement<'a>, ParseError> {
@@ -629,38 +618,4 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 		idx = idx.wrapping_sub(1);
 	}
 	Ok(())
-}
-
-pub(crate) fn move_declarations_first(block: &mut Block) {
-	let give_value = |element: &LanguageElement| -> usize {
-		match element {
-			LanguageElement::StructDefinition { .. } => 0,
-			LanguageElement::StructDeclarationAssignment {
-				is_static: true, ..
-			} => 1,
-			LanguageElement::VariableDeclaration {
-				is_static: true, ..
-			} => 1,
-
-			LanguageElement::VariableDeclarationAssignment {
-				is_static: true, ..
-			} => 1,
-
-			LanguageElement::StructDeclarationAssignment {
-				is_static: false, ..
-			} => 1,
-
-			LanguageElement::VariableDeclaration {
-				is_static: false, ..
-			} => 2,
-
-			LanguageElement::VariableDeclarationAssignment {
-				is_static: false, ..
-			} => 2,
-
-			LanguageElement::FunctionDeclaration { .. } => 3,
-			_ => 4,
-		}
-	};
-	block.sort_by_key(give_value);
 }

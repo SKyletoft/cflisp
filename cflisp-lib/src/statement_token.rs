@@ -83,12 +83,12 @@ impl<'a> StatementToken<'a> {
 						res[last] = StatementToken::FunctionCall(n, arguments);
 						continue;
 					} else {
-						let as_statement = StatementToken::from_tokens(&tokenised)?;
+						let as_statement = StatementToken::from_tokens(tokenised)?;
 						StatementToken::Parentheses(as_statement)
 					}
 				}
 				Token::ArrayAccess(idx) => {
-					let as_statement = StatementToken::from_tokens(&idx)?;
+					let as_statement = StatementToken::from_tokens(idx)?;
 					StatementToken::ArrayAccess(as_statement)
 				}
 				Token::Block(b) => {

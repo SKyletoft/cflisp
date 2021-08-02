@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::*;
 
 ///All possible tokens in the source (after comments have been removed)
@@ -109,89 +107,5 @@ impl<'a> Token<'a> {
 			src = rest.trim_start();
 		}
 		Ok(vec)
-	}
-
-	///Parses string from `Token::UnparsedBlock`. Allows multiple lines
-	pub(crate) fn parse_block_tokens(s: &'a str) -> Result<Vec<Token<'a>>, ParseError> {
-		if s.is_empty() {
-			return Ok(Vec::new());
-		}
-		Token::by_byte(s)
-	}
-
-	///Converts string from `Token::UnparsedBlock` into `StatementToken`s
-	pub(crate) fn parse_statement_tokens(
-		s: &'a str,
-	) -> Result<Vec<StatementToken<'a>>, ParseError> {
-		let res = Token::by_byte(s)?;
-		if res.contains(&Token::NewLine) {
-			return Err(ParseError::IncompleteStatement(line!()));
-		}
-		StatementToken::from_tokens(&res)
-	}
-
-	///Parses `Token::UnparsedParentheses` as a list of statements. (Function *call*, not declaration)
-	pub(crate) fn parse_arguments_tokens(s: &'a str) -> Result<Vec<Statement<'a>>, ParseError> {
-		if s.is_empty() {
-			Ok(vec![])
-		} else {
-			s.split(',')
-				.map(|slice| Token::by_byte(slice).map(|t| StatementToken::from_tokens(&t)))
-				.collect::<Result<Result<Vec<Statement<'a>>, _>, _>>()?
-		}
-	}
-
-	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Function *declaration*, not call)
-	pub(crate) fn parse_argument_list_tokens(s: &'a str) -> Result<Vec<Variable<'a>>, ParseError> {
-		let get_pattern = |slice: &[Token<'a>]| -> Result<Variable<'a>, ParseError> {
-			let mut typ = match slice.get(0) {
-				Some(Token::Decl(t)) => t.into(),
-				Some(Token::Name(t)) => Type::Struct(t),
-				_ => {
-					dbg!(slice);
-					return Err(ParseError::InvalidArguments(line!()));
-				}
-			};
-			let mut reduced = &slice[1..];
-			while reduced.get(0) == Some(&Token::Mul) {
-				typ = Type::ptr(typ);
-				reduced = &reduced[1..];
-			}
-			if let [Token::Name(n)] = reduced {
-				Ok(Variable { typ, name: *n })
-			} else {
-				Err(ParseError::InvalidArguments(line!()))
-			}
-		};
-		if s.is_empty() {
-			return Ok(Vec::new());
-		}
-		Token::by_byte(s)?
-			.split(|t| t == &Token::Comma)
-			.map(get_pattern)
-			.collect()
-	}
-
-	///Parses string from `Token::UnparsedParentheses` as a list of types and names. (Struct *declaration*, not construction)
-	pub(crate) fn parse_struct_member_tokens(
-		s: &'a str,
-	) -> Result<Vec<NativeVariable<'a>>, ParseError> {
-		if s.is_empty() {
-			return Ok(Vec::new());
-		}
-		let tokens = Token::by_byte(s)?;
-		let mut arguments = Vec::new();
-		for slice in tokens.windows(3).step_by(3) {
-			if let [Token::Decl(t), Token::Name(n), Token::NewLine] = slice {
-				arguments.push(NativeVariable {
-					typ: t.clone(),
-					name: Cow::Borrowed(n),
-				})
-			} else {
-				dbg!(s, tokens);
-				return Err(ParseError::BadStructFields(line!()));
-			}
-		}
-		Ok(arguments)
 	}
 }

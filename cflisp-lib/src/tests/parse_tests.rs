@@ -31,12 +31,8 @@ fn legacy_dont_crash() {
 		let flags = Flags::default();
 		let no_comments = parser::remove_comments(file);
 		let parsed = parser::parse(&no_comments, false).unwrap();
-		return;
 		let type_checked = type_checker::type_check(&parsed);
-		if let Err(err) = type_checked {
-			dbg!(err);
-			panic!("Type check failed");
-		}
+		assert!(type_checked.is_ok(), "Type check failed");
 		let no_structs = StructlessLanguage::from_language_elements(parsed).unwrap();
 		let asm = flisp::compile_flisp::compile(&no_structs, &flags).unwrap();
 		let text = flisp::text::instructions_to_text(&asm, &flags).unwrap();
@@ -217,7 +213,7 @@ fn ternary_op() {
 		lhs: Box::new(StatementElement::Num(1.into())),
 		rhs: Box::new(StatementElement::Num(0.into())),
 	};
-	let res_1 = StatementElement::from_source_str(case_1).unwrap();
+	let res_1 = StatementElement::parse_with_no_tail(&Token::by_byte(case_1).unwrap()).unwrap();
 	assert_eq!(res_1, expected_1);
 
 	let case_2 = "a < b ? c : d ? f : g";
@@ -233,7 +229,7 @@ fn ternary_op() {
 			rhs: Box::new(StatementElement::Var(Cow::Borrowed("g"))),
 		}),
 	};
-	let res_2 = StatementElement::from_source_str(case_2).unwrap();
+	let res_2 = StatementElement::parse_with_no_tail(&Token::by_byte(case_2).unwrap()).unwrap();
 	assert_eq!(res_2, expected_2);
 }
 
@@ -244,7 +240,7 @@ fn negate() {
 		lhs: Box::new(StatementElement::Num(0.into())),
 		rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
 	};
-	let res_1 = StatementElement::from_source_str(case_1).unwrap();
+	let res_1 = StatementElement::parse_with_no_tail(&Token::by_byte(case_1).unwrap()).unwrap();
 	assert_eq!(res_1, expected_1);
 
 	let case_2 = "-(-x)";
@@ -255,7 +251,7 @@ fn negate() {
 			rhs: Box::new(StatementElement::Var(Cow::Borrowed("x"))),
 		}),
 	};
-	let res_2 = StatementElement::from_source_str(case_2).unwrap();
+	let res_2 = StatementElement::parse_with_no_tail(&Token::by_byte(case_2).unwrap()).unwrap();
 	assert_eq!(res_2, expected_2);
 }
 

@@ -78,54 +78,6 @@ pub enum LanguageElement<'a> {
 }
 
 impl<'a> LanguageElement<'a> {
-	pub(crate) fn make_static(mut self) -> Result<Self, ParseError> {
-		match &mut self {
-			LanguageElement::VariableDeclaration { is_static, .. } if !*is_static => {
-				*is_static = true;
-			}
-			LanguageElement::VariableDeclarationAssignment { is_static, .. } if !*is_static => {
-				*is_static = true;
-			}
-			LanguageElement::StructDeclarationAssignment { is_static, .. } if !*is_static => {
-				*is_static = true;
-			}
-			_ => return Err(ParseError::InternalFailedStatic(line!())),
-		}
-		Ok(self)
-	}
-
-	pub(crate) fn make_const(mut self) -> Result<Self, ParseError> {
-		match &mut self {
-			LanguageElement::VariableDeclaration { is_const, .. } if !*is_const => {
-				*is_const = true;
-			}
-			LanguageElement::VariableDeclarationAssignment { is_const, .. } if !*is_const => {
-				*is_const = true;
-			}
-			LanguageElement::StructDeclarationAssignment { is_const, .. } if !*is_const => {
-				*is_const = true;
-			}
-			_ => return Err(ParseError::InternalFailedConst(line!())),
-		}
-		Ok(self)
-	}
-
-	pub(crate) fn make_volatile(mut self) -> Result<Self, ParseError> {
-		match &mut self {
-			LanguageElement::VariableDeclaration { is_volatile, .. } if !*is_volatile => {
-				*is_volatile = true;
-			}
-			LanguageElement::VariableDeclarationAssignment { is_volatile, .. } if !*is_volatile => {
-				*is_volatile = true;
-			}
-			LanguageElement::StructDeclarationAssignment { is_volatile, .. } if !*is_volatile => {
-				*is_volatile = true;
-			}
-			_ => return Err(ParseError::InternalFailedVolatile(line!())),
-		}
-		Ok(self)
-	}
-
 	//If we are renaming, it's guaranteed that the new name is an Owned variant.
 	// We therefore don't need to care about keeping the &'a str reference alive
 	// and have to allocate new Strings everywhere
@@ -369,5 +321,64 @@ impl fmt::Display for LanguageElement<'_> {
 fn rename_many(elements: &mut [LanguageElement], from: &str, to: &str) {
 	for element in elements {
 		element.rename(from, to);
+	}
+}
+
+pub(crate) fn move_declarations_first(block: &mut Block) {
+	let give_value = |element: &LanguageElement| -> usize {
+		match element {
+			LanguageElement::StructDefinition { .. } => 0,
+			LanguageElement::StructDeclarationAssignment {
+				is_static: true, ..
+			} => 1,
+			LanguageElement::VariableDeclaration {
+				is_static: true, ..
+			} => 1,
+
+			LanguageElement::VariableDeclarationAssignment {
+				is_static: true, ..
+			} => 1,
+
+			LanguageElement::StructDeclarationAssignment {
+				is_static: false, ..
+			} => 1,
+
+			LanguageElement::VariableDeclaration {
+				is_static: false, ..
+			} => 2,
+
+			LanguageElement::VariableDeclarationAssignment {
+				is_static: false, ..
+			} => 2,
+
+			LanguageElement::FunctionDeclaration { .. } => 3,
+			_ => 4,
+		}
+	};
+	block.sort_by_key(give_value);
+
+	for element in block.iter_mut() {
+		match element {
+			LanguageElement::FunctionDeclaration { block, .. }
+			| LanguageElement::While { body: block, .. } => {
+				move_declarations_first(block);
+			}
+			LanguageElement::IfStatement {
+				then, else_then, ..
+			} => {
+				move_declarations_first(then);
+				if let Some(else_then) = else_then {
+					move_declarations_first(else_then);
+				}
+			}
+			LanguageElement::For {
+				init, post, body, ..
+			} => {
+				move_declarations_first(init);
+				move_declarations_first(post);
+				move_declarations_first(body);
+			}
+			_ => {}
+		}
 	}
 }
