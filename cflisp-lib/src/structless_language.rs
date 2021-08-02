@@ -837,7 +837,7 @@ fn per_element<'a>(
 				struct_types: state.struct_types,
 				structs_and_struct_pointers: &mut new_structs_and_struct_pointers,
 				functions: state.functions,
-				symbols: state.symbols,
+				symbols: &mut new_symbols,
 			};
 			let block = StructlessLanguage::from_language_elements_internal(
 				block,
