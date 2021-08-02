@@ -3,6 +3,7 @@ use std::{error, fmt};
 ///Error type for parsing
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ParseError {
+	None,
 	TokenFail(u32),
 	SwitchStatement(u32),
 	BreakContinue(u32),
@@ -33,6 +34,7 @@ impl fmt::Display for ParseError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use ParseError::*;
 		let (line, error) = match self {
+			None => (&0, "Internal error: ParseError::None exposed"),
 			TokenFail(line) => (line, "Couldn't parse token"),
 			SwitchStatement(line) => (line, "Switch statements are not supported"),
 			BreakContinue(line) => (line, "Break, continue and default are not supported"),

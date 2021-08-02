@@ -450,7 +450,10 @@ fn parse_variable_and_function_declarations<'a, 'b>(
 	tokens: TokenSlice<'a, 'b>,
 ) -> Result<(LanguageElement<'a>, TokenSlice<'a, 'b>), ParseError> {
 	let (scv, scv_tail) = StaticConstVolatile::parse(tokens)?;
-	let (var, var_tail) = Variable::parse(scv_tail)?;
+	let (var, var_tail) = match Variable::parse(scv_tail) {
+		Ok(ok) => ok,
+		Err(_) => return Err(ParseError::None),
+	};
 	let res = match var_tail {
 		// type var = {..};
 		[Token::Assign, Token::Block(fields), Token::NewLine, tail @ ..] => {
@@ -529,8 +532,7 @@ fn parse_variable_and_function_declarations<'a, 'b>(
 			)
 		}
 
-		[] => return Err(ParseError::IncompleteStatement(line!())),
-		[..] => return Err(ParseError::InvalidToken(line!())),
+		_ => return Err(ParseError::None),
 	};
 	Ok(res)
 }
@@ -759,9 +761,44 @@ fn parse_language_pattern<'a, 'b>(
 	Ok(res)
 }
 
+fn parse_pointer_assignment<'a, 'b>(
+	tokens: TokenSlice<'a, 'b>,
+) -> Result<(LanguageElement<'a>, TokenSlice<'a, 'b>), ParseError> {
+	if !matches!(tokens.first(), Some(Token::Mul)) {
+		return Err(ParseError::None);
+	}
+	let tokens = &tokens[1..];
+	let assign_position = tokens
+		.iter()
+		.position(|t| t == &Token::Assign)
+		.ok_or(ParseError::None)?;
+	let (lhs, lhs_rest) = StatementElement::parse(&tokens[..assign_position])?;
+	let (rhs, rhs_rest) = StatementElement::parse(&tokens[assign_position + 1..])?;
+	if !lhs_rest.is_empty() {
+		return Err(ParseError::ExcessTokens(line!()));
+	}
+	let elem = LanguageElement::PointerAssignment {
+		ptr: lhs,
+		value: rhs,
+	};
+	Ok((elem, rhs_rest))
+}
+
 impl<'a, 'b> Parsable<'a, 'b> for LanguageElement<'a> {
 	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
-		parse_variable_and_function_declarations(tokens).or_else(|_| parse_language_pattern(tokens))
+		match parse_pointer_assignment(tokens) {
+			Ok(ok) => Ok(ok),
+			Err(ParseError::None) => match parse_variable_and_function_declarations(tokens) {
+				Ok(ok) => Ok(ok),
+				Err(ParseError::None) => match parse_language_pattern(tokens) {
+					Ok(ok) => Ok(ok),
+					Err(ParseError::None) => Err(ParseError::MatchFail(line!())),
+					otherwise => otherwise,
+				},
+				otherwise => otherwise,
+			},
+			otherwise => otherwise,
+		}
 	}
 }
 
