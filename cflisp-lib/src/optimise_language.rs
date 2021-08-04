@@ -244,7 +244,10 @@ fn const_prop_inner<'a>(
 				}
 			}
 			StructlessLanguage::Return(Some(statement))
-			| StructlessLanguage::Statement(statement) => {
+			| StructlessLanguage::Statement(statement)
+			| StructlessLanguage::VariableAssignment {
+				value: statement, ..
+			} => {
 				optimise_statement::const_prop(statement, constants);
 			}
 			StructlessLanguage::Loop { condition, body } => {
@@ -255,6 +258,10 @@ fn const_prop_inner<'a>(
 			StructlessLanguage::Block { block, .. } => {
 				let mut inner_scope = constants.clone();
 				const_prop_inner(block, &mut inner_scope);
+			}
+			StructlessLanguage::PointerAssignment { ptr, value } => {
+				optimise_statement::const_prop(ptr, constants);
+				optimise_statement::const_prop(value, constants);
 			}
 			_ => {}
 		}
