@@ -378,6 +378,14 @@ pub(crate) fn verify_function_return_type<'a>(
 	Ok(())
 }
 
+fn ptr_type_promotion<'a>(lhs: Type<'a>, rhs: Type<'a>) -> Option<Type<'a>> {
+	match (&lhs, &rhs) {
+		(Type::Ptr(_) | Type::Arr(_, _), Type::Int | Type::Uint) => Some(lhs),
+		(Type::Int | Type::Uint, Type::Ptr(_) | Type::Arr(_, _)) => Some(rhs),
+		_ => None,
+	}
+}
+
 pub(crate) fn type_of<'a>(
 	elem: &StatementElement<'a>,
 	variables: &'a HashMap<Cow<'a, str>, Type>,
@@ -394,17 +402,21 @@ pub(crate) fn type_of<'a>(
 			lhs
 		}
 		StatementElement::Char(_) => Type::Char,
-		StatementElement::Num(_)
-		| StatementElement::Add { .. }
-		| StatementElement::Sub { .. }
-		| StatementElement::Mul { .. }
-		| StatementElement::Div { .. }
-		| StatementElement::Mod { .. }
-		| StatementElement::LShift { .. }
-		| StatementElement::RShift { .. }
-		| StatementElement::BitAnd { .. }
-		| StatementElement::BitOr { .. }
-		| StatementElement::BitNot(_) => Type::Int,
+		StatementElement::Num(_) => Type::Int,
+		StatementElement::Add { lhs, rhs }
+		| StatementElement::Sub { lhs, rhs }
+		| StatementElement::Mul { lhs, rhs }
+		| StatementElement::Div { lhs, rhs }
+		| StatementElement::Mod { lhs, rhs }
+		| StatementElement::LShift { lhs, rhs }
+		| StatementElement::RShift { lhs, rhs }
+		| StatementElement::BitAnd { lhs, rhs }
+		| StatementElement::BitOr { lhs, rhs } => ptr_type_promotion(
+			type_of(lhs, variables, functions, structs)?,
+			type_of(rhs, variables, functions, structs)?,
+		)
+		.unwrap_or(Type::Int),
+		StatementElement::BitNot(val) => type_of(val, variables, functions, structs)?,
 		StatementElement::Bool(_)
 		| StatementElement::BoolAnd { .. }
 		| StatementElement::BoolOr { .. }
@@ -439,7 +451,10 @@ pub(crate) fn type_of<'a>(
 				.unwrap_or(Ok(Type::Void))?,
 		),
 
-		StatementElement::Deref(t) => type_of(t.as_ref(), variables, functions, structs)?,
+		StatementElement::Deref(t) => match type_of(t.as_ref(), variables, functions, structs)? {
+			Type::Ptr(t) | Type::Arr(t, _) => *t,
+			_ => return Err(TypeError::DerefNonPointer(line!()))
+		},
 
 		StatementElement::AdrOf(name) => Type::ptr(
 			variables

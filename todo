@@ -10,7 +10,3 @@ Separate out the repeated operator function call code in codegen
 Assign struct to any non named pointer
 
 Optimise statement: Remove add/sub/mul 0 and mul/div 1
-
-Don't allow names beginning with "__"
-
-All structs are treated as static

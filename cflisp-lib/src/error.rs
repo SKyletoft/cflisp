@@ -140,6 +140,7 @@ pub enum TypeError {
 	UndefinedField(u32),
 	UndefinedFunction(u32),
 	MissingArguments(u32),
+	DerefNonPointer(u32),
 }
 
 impl fmt::Display for TypeError {
@@ -155,6 +156,7 @@ impl fmt::Display for TypeError {
 			UndefinedField(line) => (line, "Undefined struct field"),
 			UndefinedFunction(line) => (line, "Undefined function"),
 			MissingArguments(line) => (line, "Wrong amount of arguments in function call"),
+			DerefNonPointer(line) => (line, "Dereference of non-pointer"),
 			InternalPointerAssignmentToNonPointer(line) => {
 				(line, "Internal: Pointer assignment to non pointer")
 			}
