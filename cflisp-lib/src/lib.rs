@@ -18,12 +18,12 @@ pub mod type_checker;
 
 pub mod types;
 
-use error::{CompileError, IRError, ParseError, TypeError};
+use error::{CflispError, ErrorInfo, ErrorTypes, Result};
 use flags::Flags;
 use flisp::flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use language_element::LanguageElement;
 use parser::Parsable;
-use statement_element::StatementElement;
+use statement_element::{MaybeParsed, StatementElement};
 use statement_token::StatementToken;
 use structless_language::StructlessLanguage;
 use structless_statement::StructlessStatement;

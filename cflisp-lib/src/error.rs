@@ -1,220 +1,335 @@
-use std::{error, fmt};
+use crate::*;
+
+use std::{error, fmt, result};
+
+pub type Result<T> = result::Result<T, CflispError>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum ErrorInfo<'a> {
+	None,
+	Source(String),
+	Token(Vec<Token<'a>>),
+	StatementToken(Vec<StatementToken<'a>>),
+	Statement(StatementElement<'a>),
+	MaybeParsed(Vec<MaybeParsed<'a>>),
+	Language(LanguageElement<'a>),
+	StructlessStatement(StructlessStatement<'a>),
+	StructlessLanguage(StructlessLanguage<'a>),
+	UnTree(StatementElement<'a>, StatementToken<'a>),
+	BinTree(
+		StatementElement<'a>,
+		StatementElement<'a>,
+		StatementToken<'a>,
+	),
+	Variable(Variable<'a>),
+}
+
+impl<'a> From<&'a str> for ErrorInfo<'a> {
+	fn from(s: &'a str) -> Self {
+		ErrorInfo::Source(s.to_string())
+	}
+}
+
+impl<'a> From<String> for ErrorInfo<'a> {
+	fn from(s: String) -> Self {
+		ErrorInfo::Source(s)
+	}
+}
+
+impl<'a> From<&[Token<'a>]> for ErrorInfo<'a> {
+	fn from(slice: &[Token<'a>]) -> Self {
+		ErrorInfo::Token(slice.to_owned())
+	}
+}
+
+impl<'a> From<Vec<Token<'a>>> for ErrorInfo<'a> {
+	fn from(slice: Vec<Token<'a>>) -> Self {
+		ErrorInfo::Token(slice)
+	}
+}
+
+impl<'a> From<&[StatementToken<'a>]> for ErrorInfo<'a> {
+	fn from(slice: &[StatementToken<'a>]) -> Self {
+		ErrorInfo::StatementToken(slice.to_owned())
+	}
+}
+
+impl<'a> From<Vec<StatementToken<'a>>> for ErrorInfo<'a> {
+	fn from(slice: Vec<StatementToken<'a>>) -> Self {
+		ErrorInfo::StatementToken(slice)
+	}
+}
+
+impl<'a> From<&[MaybeParsed<'a>]> for ErrorInfo<'a> {
+	fn from(slice: &[MaybeParsed<'a>]) -> Self {
+		ErrorInfo::MaybeParsed(slice.to_owned())
+	}
+}
+
+impl<'a> From<Vec<MaybeParsed<'a>>> for ErrorInfo<'a> {
+	fn from(slice: Vec<MaybeParsed<'a>>) -> Self {
+		ErrorInfo::MaybeParsed(slice)
+	}
+}
+
+impl<'a> From<&StatementElement<'a>> for ErrorInfo<'a> {
+	fn from(elem: &StatementElement<'a>) -> Self {
+		ErrorInfo::Statement(elem.to_owned())
+	}
+}
+
+impl<'a> From<&LanguageElement<'a>> for ErrorInfo<'a> {
+	fn from(elem: &LanguageElement<'a>) -> Self {
+		ErrorInfo::Language(elem.to_owned())
+	}
+}
+
+impl<'a> From<&StructlessLanguage<'a>> for ErrorInfo<'a> {
+	fn from(elem: &StructlessLanguage<'a>) -> Self {
+		ErrorInfo::StructlessLanguage(elem.to_owned())
+	}
+}
+
+impl<'a> From<&StructlessStatement<'a>> for ErrorInfo<'a> {
+	fn from(elem: &StructlessStatement<'a>) -> Self {
+		ErrorInfo::StructlessStatement(elem.to_owned())
+	}
+}
+
+impl<'a> From<(&StatementElement<'a>, &StatementToken<'a>)> for ErrorInfo<'a> {
+	fn from((a, b): (&StatementElement<'a>, &StatementToken<'a>)) -> Self {
+		ErrorInfo::UnTree(a.to_owned(), b.to_owned())
+	}
+}
+
+impl<'a>
+	From<(
+		&StatementElement<'a>,
+		&StatementElement<'a>,
+		&StatementToken<'a>,
+	)> for ErrorInfo<'a>
+{
+	fn from(
+		(a, b, c): (
+			&StatementElement<'a>,
+			&StatementElement<'a>,
+			&StatementToken<'a>,
+		),
+	) -> Self {
+		ErrorInfo::BinTree(a.to_owned(), b.to_owned(), c.to_owned())
+	}
+}
+
+impl<'a> From<&Variable<'a>> for ErrorInfo<'a> {
+	fn from(v: &Variable<'a>) -> Self {
+		ErrorInfo::Variable(v.to_owned())
+	}
+}
+
+impl fmt::Display for ErrorInfo<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			ErrorInfo::None => write!(f, ""),
+			ErrorInfo::Source(a) => write!(f, "{}", a),
+			ErrorInfo::Token(a) => write!(f, "{:?}", a),
+			ErrorInfo::Statement(a) => write!(f, "{}", a),
+			ErrorInfo::Language(a) => write!(f, "{}", a),
+			ErrorInfo::StructlessStatement(a) => write!(f, "{:?}", a),
+			ErrorInfo::StructlessLanguage(a) => write!(f, "{:?}", a),
+			ErrorInfo::UnTree(a, b) => write!(f, "{:?}{}", b, a),
+			ErrorInfo::BinTree(a, b, c) => write!(f, "{}{:?}{}", a, c, b),
+			_ => todo!(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CflispError {
+	//info: ErrorInfo<'a>,
+	pub info: String,
+	pub line: u32,
+	pub file: &'static str,
+	pub error: ErrorTypes,
+}
+
+impl CflispError {
+	pub fn new(info: String, line: u32, file: &'static str, error: ErrorTypes) -> Self {
+		CflispError {
+			info,
+			line,
+			file,
+			error,
+		}
+	}
+}
+
+//This is a macro so that line and file can be passed in instead of referring to error.rs
+#[macro_export]
+macro_rules! error {
+	($type: ident) => {{
+		CflispError::new(
+			String::new(), //ErrorInfo::None,
+			line!(),
+			file!(),
+			ErrorTypes::$type,
+		)
+	}};
+
+	($type: ident, $context: expr) => {{
+		CflispError::new(
+			format!("{}", ErrorInfo::from($context)),
+			line!(),
+			file!(),
+			ErrorTypes::$type,
+		)
+	}};
+}
 
 ///Error type for parsing
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ParseError {
+pub enum ErrorTypes {
 	None,
-	TokenFail(u32),
-	SwitchStatement(u32),
-	BreakContinue(u32),
-	MatchFail(u32),
-	NonConstantArrayLen(u32),
-	FieldAccessOnNonNames(u32),
-	InternalTreeFail(u32),
-	InternalUnparsed(u32),
-	InvalidToken(u32),
-	IncompleteStatement(u32),
-	InvalidArguments(u32),
-	BadStructFields(u32),
-	BrokenForLoop(u32),
-	BadStructName(u32),
-	AddressOfTemporary(u32),
-	MisplacedOperators(u32),
-	MalformedTernary(u32),
-	InternalFailedConst(u32),
-	InternalFailedStatic(u32),
-	InternalFailedVolatile(u32),
-	TreeConstructionFail(u32),
-	MissingName(u32),
-	BadType(u32),
-	ExcessTokens(u32),
+	TokenFail,
+	SwitchStatement,
+	BreakContinue,
+	MatchFail,
+	NonConstantArrayLen,
+	FieldAccessOnNonNames,
+	InternalTreeFail,
+	InternalUnparsed,
+	InvalidToken,
+	IncompleteStatement,
+	InvalidArguments,
+	BadStructFields,
+	BrokenForLoop,
+	BadStructName,
+	AddressOfTemporary,
+	MisplacedOperators,
+	MalformedTernary,
+	InternalFailedConst,
+	InternalFailedStatic,
+	InternalFailedVolatile,
+	TreeConstructionFail,
+	MissingName,
+	BadType,
+	ExcessTokens,
+	UnknownSymbol,
+	UndefinedType,
+	UndefinedVariable,
+	InternalNotStruct,
+	WrongTypeWasNative,
+	UndefinedStructField,
+	UndefinedFunction,
+	IllegalStructLiteral,
+	ReturnStruct,
+	TypeMismatch,
+	AssignmentToConstant,
+	InternalPointerAssignmentToNonPointer,
+	IllegalVoidArgument,
+	MalformedInterruptHandlerReturn,
+	MalformedInterruptHandlerArguments,
+	MissingStructFields,
+	UndefinedField,
+	MissingArguments,
+	DerefNonPointer,
+	ProgramTooLarge,
+	DuplicateName,
+	LoneGlobalStatement,
+	NonConstInConstInit,
+	NegativeShift,
+	IllegalArrayLiteral,
+	InvalidAddressOf,
+	InternalOpOfFunction,
+	InternalOpOfLiteral,
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for ErrorTypes {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use ParseError::*;
-		let (line, error) = match self {
-			None => (&0, "Internal error: ParseError::None exposed"),
-			TokenFail(line) => (line, "Couldn't parse token"),
-			SwitchStatement(line) => (line, "Switch statements are not supported"),
-			BreakContinue(line) => (line, "Break, continue and default are not supported"),
-			MatchFail(line) => (line, "Couldn't match language pattern"),
-			NonConstantArrayLen(line) => (line, "Array length wasn't constant"),
-			FieldAccessOnNonNames(line) => (line, "Field access between non-names"),
-			InternalTreeFail(line) => (line, "Internal tree construction error"),
-			IncompleteStatement(line) => (line, "Statement ended early?"),
-			InvalidArguments(line) => (line, "Couldn't parse argument list"),
-			BadStructFields(line) => (line, "Couldn't parse struct fields"),
-			InvalidToken(line) => (line, "Token is not valid in this context"),
-			BrokenForLoop(line) => (line, "For loop was malformed"),
-			AddressOfTemporary(line) => (line, "Tried to take address of on a non variable"),
-			BadStructName(line) => (line, "Struct doesn't have the same name as its typedef"),
-			InternalFailedConst(line) => (line, "Internal error: cannot make element const"),
-			InternalFailedStatic(line) => (line, "Internal error: cannot make element static"),
-			InternalFailedVolatile(line) => (line, "Internal error: cannot make element volatile"),
-			MissingName(line) => (line, "No name when expected"),
-			BadType(line) => (line, "Failed to parse type"),
-			ExcessTokens(line) => (line, "Extra tokens in statement"),
-			InternalUnparsed(line) => (
-				line,
-				"Internal error: Last element in statement parsing vector was unparsed",
-			),
-			MisplacedOperators(line) => (
-				line,
+		use ErrorTypes::*;
+		let msg = match self {
+			None => "Internal error: ParseError::None exposed",
+			TokenFail => "Couldn't parse token",
+			SwitchStatement => "Switch statements are not supported",
+			BreakContinue => "Break, continue and default are not supported",
+			MatchFail => "Couldn't match language pattern",
+			NonConstantArrayLen => "Array length wasn't constant",
+			FieldAccessOnNonNames => "Field access between non-names",
+			InternalTreeFail => "Internal tree construction error",
+			IncompleteStatement => "Statement ended early?",
+			InvalidArguments => "Couldn't parse argument list",
+			BadStructFields => "Couldn't parse struct fields",
+			InvalidToken => "Token is not valid in this context",
+			BrokenForLoop => "For loop was malformed",
+			AddressOfTemporary => "Tried to take address of on a non variable",
+			BadStructName => "Struct doesn't have the same name as its typedef",
+			InternalFailedConst => "Internal error: cannot make element const",
+			InternalFailedStatic => "Internal error: cannot make element static",
+			InternalFailedVolatile => "Internal error: cannot make element volatile",
+			MissingName => "No name when expected",
+			BadType => "Failed to parse type",
+			ExcessTokens => "Extra tokens in statement",
+			InternalUnparsed => {
+				"Internal error: Last element in statement parsing vector was unparsed"
+			}
+			MisplacedOperators => {
 				"Couldn't construct tree from statement. Are you sure the operators are correctly \
-				 placed?",
-			),
-			MalformedTernary(line) => (
-				line,
+				 placed?"
+			}
+			MalformedTernary => {
 				"Couldn't construct tree from statement. Element that should've been parsed first \
-				 has not been parsed",
-			),
-			TreeConstructionFail(line) => (
-				line,
+				 has not been parsed"
+			}
+			TreeConstructionFail => {
 				"Couldn't construct tree from statement. Element that should've been parsed first \
-				 has not been parsed",
-			),
-		};
-		write!(f, "Parse Error ({}): {}", line, error)
-	}
-}
-
-impl error::Error for ParseError {}
-
-///Error type for internal transformations
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum IRError {
-	UnknownSymbol(u32),
-	UndefinedType(u32),
-	UndefinedVariable(u32),
-	InternalNotStruct(u32),
-	WrongTypeWasNative(u32),
-	UndefinedStructField(u32),
-	UndefinedFunction(u32),
-	IllegalStructLiteral(u32),
-	BadStructName(u32),
-	ReturnStruct(u32),
-}
-
-impl fmt::Display for IRError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use IRError::*;
-		let (line, error) = match self {
-			UnknownSymbol(line) => (line, "Unknown symbol"),
-			UndefinedType(line) => (line, "Undefined struct type"),
-			UndefinedVariable(line) => (line, "Undefined Variable"),
-			UndefinedStructField(line) => (line, "Undefined field name"),
-			UndefinedFunction(line) => (line, "Undefined function"),
-			BadStructName(line) => (line, "Struct doesn't have the same name as its typedef"),
-			InternalNotStruct(line) => (line, "Internal error: Type was not a struct type"),
-			WrongTypeWasNative(line) => (line, "Variable wasn't of struct or struct pointer type"),
-			IllegalStructLiteral(line) => (
-				line,
+				 has not been parsed"
+			}
+			UnknownSymbol => "Unknown symbol",
+			UndefinedType => "Undefined struct type",
+			UndefinedVariable => "Undefined Variable",
+			UndefinedStructField => "Undefined field name",
+			UndefinedFunction => "Undefined function",
+			InternalNotStruct => "Internal error: Type was not a struct type",
+			WrongTypeWasNative => "Variable wasn't of struct or struct pointer type",
+			IllegalStructLiteral => {
 				"Only struct variables can be passed into functions with struct arguments (not \
-				 literals)",
-			),
-			ReturnStruct(line) => (
-				line,
+				 literals)"
+			}
+			ReturnStruct => {
 				"Cannot return struct from function due to ABI limitation. Maybe try having an \
-				 out pointer parametre instead? (Sorry)",
-			),
-		};
-		write!(f, "Parse Error ({}): {}", line, error)
-	}
-}
-
-impl error::Error for IRError {}
-
-///Error type for type checking
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TypeError {
-	UndefinedVariable(u32),
-	TypeMismatch(u32),
-	AssignmentToConstant(u32),
-	InternalPointerAssignmentToNonPointer(u32),
-	IllegalVoidArgument(u32),
-	MalformedInterruptHandlerReturn(u32),
-	MalformedInterruptHandlerArguments(u32),
-	UndefinedType(u32),
-	MissingStructFields(u32),
-	UndefinedField(u32),
-	UndefinedFunction(u32),
-	MissingArguments(u32),
-	DerefNonPointer(u32),
-}
-
-impl fmt::Display for TypeError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use TypeError::*;
-		let (line, error) = match self {
-			UndefinedVariable(line) => (line, "Undefined variable"),
-			TypeMismatch(line) => (line, "Type mismatch"),
-			AssignmentToConstant(line) => (line, "Assignment to constant"),
-			IllegalVoidArgument(line) => (line, "Function has void argument"),
-			MalformedInterruptHandlerArguments(line) => (line, "Interrupt handler takes arugments"),
-			UndefinedType(line) => (line, "Undefined struct type"),
-			UndefinedField(line) => (line, "Undefined struct field"),
-			UndefinedFunction(line) => (line, "Undefined function"),
-			MissingArguments(line) => (line, "Wrong amount of arguments in function call"),
-			DerefNonPointer(line) => (line, "Dereference of non-pointer"),
-			InternalPointerAssignmentToNonPointer(line) => {
-				(line, "Internal: Pointer assignment to non pointer")
+				 out pointer parametre instead? (Sorry)"
 			}
-			MalformedInterruptHandlerReturn(line) => {
-				(line, "Interrupt handler does not return void")
-			}
-			MissingStructFields(line) => (
-				line,
-				"Not the correct amount of fields in struct initalisation",
-			),
+			TypeMismatch => "Type mismatch",
+			AssignmentToConstant => "Assignment to constant",
+			IllegalVoidArgument => "Function has void argument",
+			MalformedInterruptHandlerArguments => "Interrupt handler takes arugments",
+			UndefinedField => "Undefined struct field",
+			MissingArguments => "Wrong amount of arguments in function call",
+			DerefNonPointer => "Dereference of non-pointer",
+			InternalPointerAssignmentToNonPointer => "Internal: Pointer assignment to non pointer",
+			MalformedInterruptHandlerReturn => "Interrupt handler does not return void",
+			MissingStructFields => "Not the correct amount of fields in struct initalisation",
+			ProgramTooLarge => "Program is too large for digiflisp!",
+			DuplicateName => "Name already exists in scope!",
+			LoneGlobalStatement => "Lone statement in global scope",
+			NonConstInConstInit => "Non constant in constant initialisation",
+			NegativeShift => "Cannot shift by negative amount",
+			IllegalArrayLiteral => "Illegal array literal",
+			InternalOpOfFunction => "Internal error: function call, not instruction?",
+			InvalidAddressOf => "Invalid address of operation (should've failed in parse)",
+			InternalOpOfLiteral => "Internal error: special cases and literals, not instructions?",
 		};
-		write!(f, "Type Error ({}): {}", line, error)
+		write!(f, "{}", msg)
 	}
 }
 
-impl error::Error for TypeError {}
-
-///Error type for compiling and optimisation
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum CompileError {
-	ProgramTooLarge(u32),
-	DuplicateName(u32),
-	LoneGlobalStatement(u32),
-	NonConstInConstInit(u32),
-	NegativeShift(u32),
-	UndefinedVariable(u32),
-	IllegalArrayLiteral(u32),
-	InvalidAddressOf(u32),
-	InternalOpOfFunction(u32),
-	InternalOpOfLiteral(u32),
-}
-
-impl fmt::Display for CompileError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use CompileError::*;
-		let (line, error) = match self {
-			ProgramTooLarge(line) => (line, "Program is too large for digiflisp!"),
-			DuplicateName(line) => (line, "Name already exists in scope!"),
-			LoneGlobalStatement(line) => (line, "Lone statement in global scope"),
-			NonConstInConstInit(line) => (line, "Non constant in constant initialisation"),
-			NegativeShift(line) => (line, "Cannot shift by negative amount"),
-			IllegalArrayLiteral(line) => (line, "Illegal array literal"),
-			InternalOpOfFunction(line) => (line, "Internal error: function call, not instruction?"),
-			UndefinedVariable(line) => (
-				line,
-				"Internal: Name resolution failed? This should've failed in typecheck",
-			),
-			InvalidAddressOf(line) => (
-				line,
-				"Invalid address of operation (should've failed in parse)",
-			),
-			InternalOpOfLiteral(line) => (
-				line,
-				"Internal error: special cases and literals, not instructions?",
-			),
-		};
-		write!(f, "Compile Error ({}): {}", line, error)
+impl fmt::Display for CflispError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"Error: {} on {:?} ({}:{})",
+			self.error, self.info, self.file, self.line
+		)
 	}
 }
 
-impl error::Error for CompileError {}
+impl error::Error for CflispError {}

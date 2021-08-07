@@ -26,9 +26,9 @@ struct State<'a, 'b, 'c, 'd, 'e> {
 }
 
 pub fn compile<'a>(
-	program: &'a [StructlessLanguage],
+	program: &'a [StructlessLanguage<'a>],
 	flags: &Flags,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+) -> Result<Vec<CommentedInstruction<'a>>> {
 	let mut functions: HashMap<Cow<'a, str>, &[NativeVariable]> = HashMap::new();
 	functions.insert(
 		Cow::Borrowed("__tb__"),
@@ -52,12 +52,12 @@ pub fn compile<'a>(
 	)
 }
 
-fn compile_elements<'a>(
-	block: &'a [StructlessLanguage],
+fn compile_elements<'a, 'b>(
+	block: &'a [StructlessLanguage<'a>],
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+) -> Result<Vec<CommentedInstruction<'a>>> {
 	let mut instructions = vec![(Instruction::Label(state.scope_name.clone()), None)];
 	for (i, e) in block.iter().enumerate() {
 		let mut new_state = State {
@@ -80,11 +80,11 @@ fn compile_elements<'a>(
 //Any error returned from here is an internal error or a naming issue that should've already been caught
 // by the (potentially disabled) type checker
 fn compile_element<'a>(
-	element: &'a StructlessLanguage,
+	element: &'a StructlessLanguage<'a>,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+) -> Result<Vec<CommentedInstruction<'a>>> {
 	let res = match element {
 		StructlessLanguage::VariableLabelTag {
 			name, is_static, ..
@@ -92,7 +92,7 @@ fn compile_element<'a>(
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				state
 					.global_variables
@@ -101,7 +101,7 @@ fn compile_element<'a>(
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				state
 					.variables
@@ -118,7 +118,7 @@ fn compile_element<'a>(
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				state
 					.global_variables
@@ -130,7 +130,7 @@ fn compile_element<'a>(
 			} else {
 				if state.variables.contains_key(name) {
 					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				state
 					.variables
@@ -145,7 +145,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::VariableAssignment { name, value } => {
 			if state.scope_name == "global" {
-				return Err(CompileError::LoneGlobalStatement(line!()));
+				return Err(error!(LoneGlobalStatement, element));
 			}
 			let adr = adr_for_name(
 				name,
@@ -170,14 +170,12 @@ fn compile_element<'a>(
 				StructlessStatement::Char(c) => Ok(*c as isize),
 				StructlessStatement::Bool(b) => Ok(*b as isize),
 				_ => {
-					dbg!(val);
-					Err(CompileError::NonConstInConstInit(line!()))
+					return Err(error!(NonConstInConstInit, element));
 				}
 			};
 			if state.scope_name == "global" || *is_static {
 				if state.global_variables.contains_key(name) {
-					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				if let StructlessStatement::Array(elements) = value {
 					state
@@ -186,7 +184,7 @@ fn compile_element<'a>(
 					let values = elements
 						.iter()
 						.map(global_def)
-						.collect::<Result<Vec<isize>, CompileError>>()?;
+						.collect::<Result<Vec<isize>>>()?;
 					vec![
 						(Instruction::Label(name.clone()), None),
 						(Instruction::FCB(values), None),
@@ -202,8 +200,7 @@ fn compile_element<'a>(
 				}
 			} else {
 				if state.variables.contains_key(name) || state.global_variables.contains_key(name) {
-					dbg!(element);
-					return Err(CompileError::DuplicateName(line!()));
+					return Err(error!(DuplicateName, element));
 				}
 				if let StructlessStatement::Array(elements) = value {
 					let mut statement = Vec::new();
@@ -239,7 +236,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::PointerAssignment { ptr, value } => {
 			if state.scope_name == "global" {
-				return Err(CompileError::LoneGlobalStatement(line!()));
+				return Err(error!(LoneGlobalStatement, element));
 			}
 
 			match (ptr, ptr.internal_ref()) {
@@ -283,7 +280,7 @@ fn compile_element<'a>(
 			name, args, block, ..
 		} => {
 			if state.functions.contains_key(name) {
-				return Err(CompileError::DuplicateName(line!()));
+				return Err(error!(DuplicateName, element));
 			}
 			state
 				.functions
@@ -392,7 +389,7 @@ fn compile_element<'a>(
 
 		StructlessLanguage::Statement(statement) => {
 			if state.scope_name == "global" {
-				return Err(CompileError::LoneGlobalStatement(line!()));
+				return Err(error!(LoneGlobalStatement, element));
 			}
 			compile_statement(statement, state)?
 		}
@@ -421,9 +418,9 @@ fn compile_element<'a>(
 }
 
 fn compile_statement<'a>(
-	statement: &'a StructlessStatement,
+	statement: &'a StructlessStatement<'a>,
 	state: &mut State<'a, '_, '_, '_, '_>,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+) -> Result<Vec<CommentedInstruction<'a>>> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
 		statement,
@@ -458,7 +455,7 @@ fn compile_statement_inner<'a>(
 	statement: &'a StructlessStatement,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
-) -> Result<Vec<CommentedInstruction<'a>>, CompileError> {
+) -> Result<Vec<CommentedInstruction<'a>>> {
 	let instructions = match statement {
 		//Commutative operations
 		StructlessStatement::BinOp {
@@ -626,7 +623,7 @@ fn compile_statement_inner<'a>(
 					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
 					if let StructlessStatement::Num(n) = rhs.as_ref() {
 						if *n < Number::ZERO {
-							return Err(CompileError::NegativeShift(line!()));
+							return Err(error!(NegativeShift, statement));
 						}
 						let inst = if matches!(op, BinOp::RShift) {
 							Instruction::LSRA
@@ -694,10 +691,10 @@ fn compile_statement_inner<'a>(
 
 		StructlessStatement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
-			let arg_names = state.functions.get(name).ok_or_else(|| {
-				dbg!(name);
-				CompileError::UndefinedVariable(line!())
-			})?;
+			let arg_names = state
+				.functions
+				.get(name)
+				.ok_or_else(|| error!(UndefinedVariable, statement))?;
 			for (statement, NativeVariable { name: v_name, .. }) in parametres.iter().zip(
 				arg_names
 					.iter()
@@ -741,7 +738,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::Array(_) => {
-			return Err(CompileError::IllegalArrayLiteral(line!()));
+			return Err(error!(IllegalArrayLiteral, statement));
 		}
 
 		StructlessStatement::Deref(adr) => {
@@ -832,7 +829,7 @@ fn compile_statement_inner<'a>(
 				Addressing::Label(lbl) => {
 					vec![(Instruction::LDA(Addressing::DataLabel(lbl)), None)]
 				}
-				_ => return Err(CompileError::InvalidAddressOf(line!())),
+				_ => return Err(error!(InvalidAddressOf, statement)),
 			}
 		}
 
@@ -851,7 +848,7 @@ fn adr_for_name<'a>(
 	variables: &HashMap<Cow<'a, str>, (NativeType, isize)>,
 	global_variables: &HashMap<Cow<'a, str>, NativeType>,
 	stack_size: isize,
-) -> Result<Addressing<'a>, CompileError> {
+) -> Result<Addressing<'a>> {
 	if let Some((_, adr)) = variables.get(name) {
 		Ok(Addressing::SP(stack_size - *adr - 1))
 	} else if let Some(typ) = global_variables.get(name) {
@@ -861,7 +858,6 @@ fn adr_for_name<'a>(
 			Ok(Addressing::Label(Cow::Borrowed(name)))
 		}
 	} else {
-		dbg!(name, variables, global_variables);
-		Err(CompileError::UndefinedVariable(line!()))
+		return Err(error!(UndefinedVariable, name));
 	}
 }

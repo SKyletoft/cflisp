@@ -163,7 +163,7 @@ impl<'a> Instruction<'a> {
 	pub(crate) fn from_statement_element_structless(
 		elem: &StructlessStatement<'a>,
 		adr: Addressing<'a>,
-	) -> Result<Instruction<'a>, CompileError> {
+	) -> Result<Instruction<'a>> {
 		let res = match elem {
 			StructlessStatement::BinOp { op, .. } => match op {
 				BinOp::Add => Instruction::ADDA(adr),
@@ -179,7 +179,7 @@ impl<'a> Instruction<'a> {
 				| BinOp::LessThanEqual
 				| BinOp::Cmp
 				| BinOp::NotCmp => {
-					return Err(CompileError::InternalOpOfFunction(line!()));
+					return Err(error!(InternalOpOfFunction, elem));
 				}
 				BinOp::And => Instruction::ANDA(adr),
 				BinOp::Or => Instruction::ORA(adr),
@@ -194,7 +194,7 @@ impl<'a> Instruction<'a> {
 			| StructlessStatement::Deref(_)
 			| StructlessStatement::AdrOf(_)
 			| StructlessStatement::FunctionCall { .. } => {
-				return Err(CompileError::InternalOpOfLiteral(line!()))
+				return Err(error!(InternalOpOfLiteral, elem));
 			}
 		};
 

@@ -14,11 +14,11 @@ impl<'a> Variable<'a> {
 	pub(crate) fn split_into_native(
 		self,
 		struct_defs: &HashMap<Cow<'a, str>, Vec<NativeVariable<'a>>>,
-	) -> Result<Vec<NativeVariable<'a>>, IRError> {
+	) -> Result<Vec<NativeVariable<'a>>> {
 		let res = if let Type::Struct(struct_type) = self.typ {
 			let mut vec = struct_defs
 				.get(struct_type)
-				.ok_or(IRError::UndefinedType(line!()))?
+				.ok_or_else(|| error!(UndefinedType, &self))?
 				.clone();
 			for NativeVariable { name, .. } in vec.iter_mut() {
 				*name = helper::merge_name_and_field(self.name, name);

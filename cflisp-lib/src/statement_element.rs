@@ -103,18 +103,16 @@ pub enum StatementElement<'a> {
 }
 
 ///Takes two `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same
-type OpFnPtr<'a> = fn(
-	lhs: StatementElement<'a>,
-	rhs: StatementElement<'a>,
-) -> Result<StatementElement<'a>, ParseError>;
+type OpFnPtr<'a> =
+	fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> Result<StatementElement<'a>>;
 
 ///Takes one `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same
-type UnOpFnPtr<'a> = fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>, ParseError>;
+type UnOpFnPtr<'a> = fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>>;
 
 ///Enum type for Work-In-Progress parsing. Either a parsed StatementElement or a unparsed *single* token.
 /// Both types are exported.
 #[derive(Debug, Clone, PartialEq)]
-enum MaybeParsed<'a> {
+pub(crate) enum MaybeParsed<'a> {
 	Parsed(StatementElement<'a>),
 	Unparsed(StatementToken<'a>),
 }
@@ -192,7 +190,7 @@ impl<'a> StatementElement<'a> {
 		}
 	}
 
-	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>, ParseError> {
+	fn from_token(token: StatementToken<'a>) -> Result<MaybeParsed<'a>> {
 		let res = match token {
 			StatementToken::Bool(b) => Parsed(StatementElement::Bool(b)),
 			StatementToken::Char(c) => Parsed(StatementElement::Char(c)),
@@ -203,7 +201,7 @@ impl<'a> StatementElement<'a> {
 				let parametres = ts
 					.into_iter()
 					.map(StatementElement::from_statement_tokens)
-					.collect::<Result<Vec<_>, _>>()?;
+					.collect::<Result<Vec<_>>>()?;
 				Parsed(StatementElement::FunctionCall {
 					name: Cow::Borrowed(name),
 					parametres,
@@ -214,7 +212,7 @@ impl<'a> StatementElement<'a> {
 				let elements = arr
 					.into_iter()
 					.map(StatementElement::from_statement_tokens)
-					.collect::<Result<Vec<_>, _>>()?;
+					.collect::<Result<Vec<_>>>()?;
 				Parsed(StatementElement::Array(elements))
 			}
 
@@ -225,11 +223,11 @@ impl<'a> StatementElement<'a> {
 
 	pub(crate) fn from_statement_tokens(
 		tokens: Vec<StatementToken<'a>>,
-	) -> Result<StatementElement<'a>, ParseError> {
-		let mut working_tokens: Vec<MaybeParsed<'a>> = tokens
+	) -> Result<StatementElement<'a>> {
+		let mut working_tokens = tokens
 			.into_iter()
 			.map(StatementElement::from_token)
-			.collect::<Result<_, _>>()?;
+			.collect::<Result<Vec<_>>>()?;
 
 		for token in working_tokens.iter_mut() {
 			if let Unparsed(StatementToken::Parentheses(p)) = token {
@@ -240,19 +238,29 @@ impl<'a> StatementElement<'a> {
 
 		let ptr_ops: [(MaybeParsed, OpFnPtr); 2] = [
 			(Unparsed(StatementToken::FieldAccess), |l, r| {
-				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (l, r) {
+				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (&l, &r) {
 					Ok(StatementElement::Var(helper::merge_name_and_field(
-						&lhs, &rhs,
+						lhs, rhs,
 					)))
 				} else {
-					Err(ParseError::FieldAccessOnNonNames(line!()))
+					Err(error!(
+						FieldAccessOnNonNames,
+						(&l, &r, &StatementToken::FieldAccess)
+					))
 				}
 			}),
 			(Unparsed(StatementToken::FieldPointerAccess), |l, r| {
-				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (l, r) {
-					Ok(StatementElement::FieldPointerAccess(lhs, rhs))
+				if let (StatementElement::Var(lhs), StatementElement::Var(rhs)) = (&l, &r) {
+					//Because of the l -> r pattern, these are guaranteed to be Cow::Borrowed, so cloning isn't too dumb
+					Ok(StatementElement::FieldPointerAccess(
+						lhs.clone(),
+						rhs.clone(),
+					))
 				} else {
-					Err(ParseError::FieldAccessOnNonNames(line!()))
+					Err(error!(
+						FieldAccessOnNonNames,
+						(&l, &r, &StatementToken::FieldPointerAccess)
+					))
 				}
 			}),
 		];
@@ -291,7 +299,7 @@ impl<'a> StatementElement<'a> {
 				if let StatementElement::Var(n) = r {
 					Ok(StatementElement::AdrOf(n))
 				} else {
-					Err(ParseError::AddressOfTemporary(line!()))
+					Err(error!(AddressOfTemporary, (&r, &StatementToken::BitAnd)))
 				}
 			}),
 		];
@@ -331,21 +339,20 @@ impl<'a> StatementElement<'a> {
 		do_ternary_op(&mut working_tokens)?;
 
 		if working_tokens.len() != 1 {
-			dbg!(working_tokens);
-			return Err(ParseError::InternalTreeFail(line!()));
+			return Err(error!(InternalTreeFail, working_tokens.as_slice()));
 		}
+
 		if let Parsed(elem) = working_tokens.remove(0) {
 			Ok(elem)
 		} else {
-			dbg!(working_tokens);
-			Err(ParseError::InternalUnparsed(line!()))
+			Err(error!(InternalUnparsed, working_tokens.as_slice()))
 		}
 	}
 
 	pub(crate) fn signedness(
 		&self,
-		symbols: &HashMap<Cow<str>, NativeType>,
-	) -> Result<NumberType, IRError> {
+		symbols: &HashMap<Cow<'a, str>, NativeType>,
+	) -> Result<NumberType> {
 		let res = match self {
 			StatementElement::Add { lhs, rhs }
 			| StatementElement::Sub { lhs, rhs }
@@ -369,10 +376,7 @@ impl<'a> StatementElement<'a> {
 			| StatementElement::Bool(_) => NumberType::BOOL_SIGNEDNESS,
 			StatementElement::FunctionCall { name, .. } | StatementElement::Var(name) => symbols
 				.get(name)
-				.ok_or_else(|| {
-					dbg!(name, symbols);
-					IRError::UnknownSymbol(line!())
-				})?
+				.ok_or_else(|| error!(UnknownSymbol, name.to_string()))? //Maybe add `symbols`
 				.into(),
 			StatementElement::Num(Number { signedness, .. }) => *signedness,
 			StatementElement::Char(_) => NumberType::CHAR_SIGNEDNESS,
@@ -399,9 +403,7 @@ impl<'a> StatementElement<'a> {
 
 impl<'a, 'b> Parsable<'a, 'b> for StatementElement<'a> {
 	///Runs to semicolon, comma or end of stream
-	fn parse(
-		tokens: TokenSlice<'a, 'b>,
-	) -> Result<(StatementElement<'a>, TokenSlice<'a, 'b>), ParseError> {
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(StatementElement<'a>, TokenSlice<'a, 'b>)> {
 		let to_take = tokens
 			.iter()
 			.position(|t| matches!(t, Token::NewLine | Token::Comma))
@@ -410,7 +412,7 @@ impl<'a, 'b> Parsable<'a, 'b> for StatementElement<'a> {
 		let tail = match tail {
 			[Token::Comma | Token::NewLine, rest @ ..] => rest,
 			[] => &[],
-			_ => return Err(ParseError::ExcessTokens(line!())),
+			_ => return Err(error!(ExcessTokens, tail)),
 		};
 		let statement_tokens = StatementToken::from_tokens(statement)?;
 		let element = StatementElement::from_statement_tokens(statement_tokens)?;
@@ -419,16 +421,16 @@ impl<'a, 'b> Parsable<'a, 'b> for StatementElement<'a> {
 }
 
 impl<'a, 'b> Parsable<'a, 'b> for Vec<StatementElement<'a>> {
-	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>), ParseError> {
+	fn parse(tokens: TokenSlice<'a, 'b>) -> Result<(Self, TokenSlice<'a, 'b>)> {
 		let filter = |slice| match StatementElement::parse(slice) {
 			Ok((element, [])) => Ok(element),
-			Ok(_) => Err(ParseError::ExcessTokens(line!())),
+			Ok(_) => Err(error!(ExcessTokens, slice)),
 			Err(e) => Err(e),
 		};
 		let vec = tokens
 			.split(|t| t == &Token::Comma)
 			.map(filter)
-			.collect::<Result<Vec<_>, _>>()?;
+			.collect::<Result<Vec<_>>>()?;
 		Ok((vec, &[]))
 	}
 }
@@ -488,15 +490,11 @@ impl fmt::Display for StatementElement<'_> {
 fn do_binary_operation<'a>(
 	tokens: &mut Vec<MaybeParsed<'a>>,
 	op_from: &MaybeParsed,
-	op_to: fn(
-		lhs: StatementElement<'a>,
-		rhs: StatementElement<'a>,
-	) -> Result<StatementElement<'a>, ParseError>,
-) -> Result<(), ParseError> {
+	op_to: fn(lhs: StatementElement<'a>, rhs: StatementElement<'a>) -> Result<StatementElement<'a>>,
+) -> Result<()> {
 	while let Some(idx) = tokens.iter().position(|t| t == op_from) {
 		if idx == 0 || idx + 1 == tokens.len() {
-			dbg!(tokens);
-			return Err(ParseError::MisplacedOperators(line!()));
+			return Err(error!(MisplacedOperators, tokens.as_slice()));
 		}
 		let right = tokens.remove(idx + 1);
 		let left = tokens.remove(idx - 1);
@@ -504,14 +502,13 @@ fn do_binary_operation<'a>(
 			//The removal of the left item offset the index by one
 			tokens[idx - 1] = Parsed(op_to(lhs, rhs)?);
 		} else {
-			dbg!(tokens);
-			return Err(ParseError::TreeConstructionFail(line!()));
+			return Err(error!(TreeConstructionFail, tokens.as_slice()));
 		}
 	}
 	Ok(())
 }
 
-fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
+fn do_ternary_op<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		if let Some(Unparsed(StatementToken::Ternary(lhs))) = tokens.get(idx) {
@@ -526,7 +523,7 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 					rhs: Box::new(rhs),
 				});
 			} else {
-				return Err(ParseError::MalformedTernary(line!()));
+				return Err(error!(MalformedTernary, tokens.as_slice()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -538,8 +535,8 @@ fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 fn do_unary_operation_left<'a>(
 	tokens: &mut Vec<MaybeParsed<'a>>,
 	op_from: &MaybeParsed,
-	op_to: fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>, ParseError>,
-) -> Result<(), ParseError> {
+	op_to: fn(lhs: StatementElement<'a>) -> Result<StatementElement<'a>>,
+) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		if !matches!(tokens.get(idx), Some(token) if token == op_from) {
@@ -557,7 +554,7 @@ fn do_unary_operation_left<'a>(
 			if let Parsed(right) = next {
 				tokens[idx] = Parsed(op_to(right)?);
 			} else {
-				return Err(ParseError::TreeConstructionFail(line!()));
+				return Err(error!(TreeConstructionFail, tokens.as_slice()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -566,7 +563,7 @@ fn do_unary_operation_left<'a>(
 }
 
 /// Left as in [OP] [TARGET]
-fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
+fn do_cast<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		let typ = match tokens.get(idx) {
@@ -590,7 +587,7 @@ fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 					value: Box::new(value),
 				});
 			} else {
-				return Err(ParseError::TreeConstructionFail(line!()));
+				return Err(error!(TreeConstructionFail, tokens.as_slice()));
 			}
 		}
 		idx = idx.wrapping_sub(1);
@@ -598,7 +595,7 @@ fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 	Ok(())
 }
 
-fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
+fn do_array_access<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	//yes, stop once too early
 	while idx < tokens.len() {
@@ -612,7 +609,7 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<(), ParseError> {
 						rhs: Box::new(i),
 					})));
 			} else {
-				return Err(ParseError::TreeConstructionFail(line!()));
+				return Err(error!(TreeConstructionFail, tokens.as_slice()));
 			}
 		}
 		idx = idx.wrapping_sub(1);

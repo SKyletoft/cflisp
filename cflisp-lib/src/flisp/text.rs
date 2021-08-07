@@ -2,17 +2,17 @@ use crate::*;
 
 const DIGIFLISP_PROGRAM_LIMIT: usize = 172;
 
-pub fn instructions_to_text(
-	instructions: &[CommentedInstruction],
+pub fn instructions_to_text<'a>(
+	instructions: &[CommentedInstruction<'a>],
 	flags: &Flags,
-) -> Result<String, CompileError> {
+) -> Result<String> {
 	if instructions
 		.iter()
 		.map(|(instruction, _)| instruction.size())
 		.sum::<usize>()
 		> DIGIFLISP_PROGRAM_LIMIT
 	{
-		return Err(CompileError::ProgramTooLarge(line!()));
+		return Err(error!(ProgramTooLarge));
 	}
 	let mut output = String::new();
 	for ((i, c), (next, _)) in instructions.iter().zip(

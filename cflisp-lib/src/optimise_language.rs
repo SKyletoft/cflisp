@@ -5,7 +5,7 @@ use std::{
 
 use crate::*;
 
-pub fn all_optimisations(elements: &mut Vec<StructlessLanguage>) -> Result<(), IRError> {
+pub fn all_optimisations<'a>(elements: &mut Vec<StructlessLanguage<'a>>) -> Result<()> {
 	const_prop(elements);
 	statement_optimisation(elements)?;
 	dead_code_elimination(elements);
@@ -13,14 +13,14 @@ pub fn all_optimisations(elements: &mut Vec<StructlessLanguage>) -> Result<(), I
 	Ok(())
 }
 
-fn single_statement_optimisation(element: &mut StructlessLanguage) -> Result<(), IRError> {
+fn single_statement_optimisation<'a>(element: &mut StructlessLanguage<'a>) -> Result<()> {
 	if let StructlessLanguage::Block { block, .. } = element {
 		all_optimisations(block)?;
 	}
 	Ok(())
 }
 
-fn statement_optimisation(elements: &mut Vec<StructlessLanguage>) -> Result<(), IRError> {
+fn statement_optimisation<'a>(elements: &mut Vec<StructlessLanguage<'a>>) -> Result<()> {
 	for element in elements {
 		match element {
 			StructlessLanguage::VariableDeclaration { .. } => {}

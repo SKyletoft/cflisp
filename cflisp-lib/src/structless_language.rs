@@ -62,7 +62,7 @@ impl<'a> StructlessLanguage<'a> {
 	///Destructures structs into normal language elements
 	pub fn from_language_elements(
 		elements: Vec<LanguageElement<'a>>,
-	) -> Result<Vec<StructlessLanguage<'a>>, IRError> {
+	) -> Result<Vec<StructlessLanguage<'a>>> {
 		let mut struct_types = HashMap::new();
 		let mut structs_and_struct_pointers = HashMap::new();
 		let mut functions = HashMap::new();
@@ -95,7 +95,7 @@ impl<'a> StructlessLanguage<'a> {
 		scope: Cow<'a, str>,
 		rename_map: &mut HashMap<String, String>,
 		state: &mut State<'a, '_, '_, '_, '_>,
-	) -> Result<Vec<StructlessLanguage<'a>>, IRError> {
+	) -> Result<Vec<StructlessLanguage<'a>>> {
 		let mut new_elements = Vec::new();
 		let mut structs: HashMap<Cow<str>, Cow<str>> = HashMap::new();
 		for mut element in elements.into_iter() {
@@ -132,7 +132,7 @@ fn per_element<'a>(
 	state: &mut State<'a, '_, '_, '_, '_>,
 	new_elements: &mut Vec<StructlessLanguage<'a>>,
 	structs: &mut HashMap<Cow<'a, str>, Cow<'a, str>>,
-) -> Result<(), IRError> {
+) -> Result<()> {
 	match element {
 		LanguageElement::StructDefinition { name, members } => {
 			state.struct_types.insert(name, members);
@@ -145,10 +145,18 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let fields = state
-				.struct_types
-				.get(n)
-				.ok_or(IRError::UndefinedType(line!()))?;
+			let fields = state.struct_types.get(n).ok_or_else(|| {
+				error!(
+					UndefinedType,
+					&LanguageElement::VariableDeclaration {
+						typ: Type::Struct(n),
+						name: name.clone(),
+						is_static: true,
+						is_const,
+						is_volatile,
+					}
+				)
+			})?;
 			let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 			rename_map.insert(name.to_string(), new_name.to_string());
 			state.symbols.insert(new_name.clone(), NativeType::Void);
@@ -184,10 +192,20 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let fields = state
-				.struct_types
-				.get(n)
-				.ok_or(IRError::UndefinedType(line!()))?;
+			let fields = if let Some(fields) = state.struct_types.get(n) {
+				fields
+			} else {
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::VariableDeclaration {
+						typ: Type::Struct(n),
+						name,
+						is_static: false,
+						is_const,
+						is_volatile,
+					}
+				));
+			};
 			state.structs_and_struct_pointers.insert(name.clone(), n);
 			new_elements.push(StructlessLanguage::VariableLabelTag {
 				name: name.clone(),
@@ -320,15 +338,23 @@ fn per_element<'a>(
 		LanguageElement::VariableAssignment { name, value } => {
 			if let Some(struct_type) = state.structs_and_struct_pointers.get(&name) {
 				let struct_type: &str = struct_type;
-				let struct_fields = state
-					.struct_types
-					.get(struct_type)
-					.ok_or(IRError::BadStructName(line!()))?;
-				let rhs_name = if let StatementElement::Var(name) = value {
-					Ok(name)
+				let struct_fields = if let Some(struct_fields) = state.struct_types.get(struct_type)
+				{
+					struct_fields
 				} else {
-					Err(IRError::InternalNotStruct(line!()))
-				}?;
+					return Err(error!(
+						BadStructName,
+						&LanguageElement::VariableAssignment { name, value }
+					));
+				};
+				let rhs_name = if let StatementElement::Var(name) = value {
+					name
+				} else {
+					return Err(error!(
+						InternalNotStruct,
+						&LanguageElement::VariableAssignment { name, value }
+					));
+				};
 				for NativeVariable { name: field, .. } in struct_fields.iter() {
 					let lhs = helper::merge_name_and_field(&name, field);
 					let rhs = helper::merge_name_and_field(&rhs_name, field);
@@ -347,13 +373,28 @@ fn per_element<'a>(
 
 		LanguageElement::StructAssignment { name, value } => {
 			let name: &str = &name;
-			let struct_type = structs
-				.get(name)
-				.ok_or(IRError::UndefinedVariable(line!()))?;
-			let fields = state
-				.struct_types
-				.get(struct_type)
-				.ok_or(IRError::UndefinedType(line!()))?;
+			let struct_type = if let Some(struct_type) = structs.get(name) {
+				struct_type
+			} else {
+				return Err(error!(
+					UndefinedVariable,
+					&LanguageElement::StructAssignment {
+						name: Cow::Borrowed(name),
+						value
+					}
+				));
+			};
+			let fields = if let Some(fields) = state.struct_types.get(struct_type) {
+				fields
+			} else {
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::StructAssignment {
+						name: Cow::Borrowed(name),
+						value
+					}
+				));
+			};
 			for (val, field) in value.into_iter().zip(fields.iter()) {
 				new_elements.push(StructlessLanguage::VariableAssignment {
 					name: helper::merge_name_and_field(name, &field.name),
@@ -448,10 +489,21 @@ fn per_element<'a>(
 		} => {
 			let scoped_name = format!("{}::{}", scope, name);
 			rename_map.insert(name.to_string(), scoped_name.clone());
-			let fields = state
-				.struct_types
-				.get(struct_type)
-				.ok_or(IRError::UndefinedType(line!()))?;
+			let fields = if let Some(fields) = state.struct_types.get(struct_type) {
+				fields
+			} else {
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::VariableDeclarationAssignment {
+						typ: Type::Struct(struct_type),
+						name,
+						value,
+						is_static: true,
+						is_const,
+						is_volatile,
+					}
+				));
+			};
 			upper.push(StructlessLanguage::VariableLabelTag {
 				name: Cow::Owned(scoped_name),
 				is_static: true,
@@ -503,10 +555,21 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let fields = state
-				.struct_types
-				.get(struct_type)
-				.ok_or(IRError::UndefinedType(line!()))?;
+			let fields = if let Some(fields) = state.struct_types.get(struct_type) {
+				fields
+			} else {
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::VariableDeclarationAssignment {
+						typ: Type::Struct(struct_type),
+						name,
+						value,
+						is_static: false,
+						is_const,
+						is_volatile,
+					}
+				));
+			};
 			new_elements.push(StructlessLanguage::VariableLabelTag {
 				name: name.clone(),
 				is_static: false,
@@ -598,11 +661,20 @@ fn per_element<'a>(
 		} => {
 			let new_name: Cow<'a, str> = Cow::Owned(format!("{}::{}", scope, name));
 			let struct_type = if let Type::Struct(struct_type) = typ {
-				Ok(struct_type)
+				struct_type
 			} else {
-				dbg!(&typ);
-				Err(IRError::InternalNotStruct(line!()))
-			}?;
+				return Err(error!(
+					InternalNotStruct,
+					&LanguageElement::StructDeclarationAssignment {
+						typ,
+						name,
+						value,
+						is_static: true,
+						is_const,
+						is_volatile,
+					}
+				));
+			};
 			state
 				.structs_and_struct_pointers
 				.insert(new_name.clone(), struct_type);
@@ -611,16 +683,17 @@ fn per_element<'a>(
 			let fields = if let Some(fields) = state.struct_types.get(struct_type) {
 				fields
 			} else {
-				dbg!(LanguageElement::StructDeclarationAssignment {
-					typ,
-					name: new_name,
-					value,
-					is_static: true,
-					is_const,
-					is_volatile,
-				});
-				dbg!(&state.struct_types, &state.structs_and_struct_pointers);
-				return Err(IRError::UndefinedType(line!()));
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::StructDeclarationAssignment {
+						typ,
+						name,
+						value,
+						is_static: true,
+						is_const,
+						is_volatile,
+					}
+				));
 			};
 			upper.push(StructlessLanguage::VariableLabelTag {
 				name: new_name.clone(),
@@ -654,27 +727,37 @@ fn per_element<'a>(
 			is_volatile,
 		} => {
 			let struct_type = if let Type::Struct(struct_type) = typ {
-				Ok(struct_type)
+				struct_type
 			} else {
-				dbg!(&typ);
-				Err(IRError::InternalNotStruct(line!()))
-			}?;
+				return Err(error!(
+					InternalNotStruct,
+					&LanguageElement::StructDeclarationAssignment {
+						typ,
+						name,
+						value,
+						is_static: false,
+						is_const,
+						is_volatile,
+					}
+				));
+			};
 			state
 				.structs_and_struct_pointers
 				.insert(name.clone(), struct_type);
 			let fields = if let Some(fields) = state.struct_types.get(struct_type) {
 				fields
 			} else {
-				dbg!(LanguageElement::StructDeclarationAssignment {
-					typ,
-					name,
-					value,
-					is_static: false,
-					is_const,
-					is_volatile,
-				});
-				dbg!(&state.struct_types, &state.structs_and_struct_pointers);
-				return Err(IRError::UndefinedType(line!()));
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::StructDeclarationAssignment {
+						typ,
+						name,
+						value,
+						is_static: false,
+						is_const,
+						is_volatile,
+					}
+				));
 			};
 			new_elements.push(StructlessLanguage::VariableLabelTag {
 				name: name.clone(),
@@ -712,15 +795,22 @@ fn per_element<'a>(
 				// *out = in; (struct in, out)
 				if let Some(struct_type) = state.structs_and_struct_pointers.get(borrowed_name) {
 					let struct_type: &str = struct_type;
-					let fields = state
-						.struct_types
-						.get(struct_type)
-						.ok_or(IRError::UndefinedType(line!()))?;
-					let rhs_name = if let StatementElement::Var(name) = &value {
-						Ok(name)
+					let fields = if let Some(fields) = state.struct_types.get(struct_type) {
+						fields
 					} else {
-						Err(IRError::WrongTypeWasNative(line!()))
-					}?;
+						return Err(error!(
+							UndefinedType,
+							&LanguageElement::PointerAssignment { ptr, value }
+						));
+					};
+					let rhs_name = if let StatementElement::Var(name) = &value {
+						name
+					} else {
+						return Err(error!(
+							WrongTypeWasNative,
+							&LanguageElement::PointerAssignment { ptr, value }
+						));
+					};
 					for (idx, NativeVariable { name: field, .. }) in fields.iter().enumerate() {
 						new_elements.push(StructlessLanguage::PointerAssignment {
 							ptr: StructlessStatement::BinOp {
@@ -742,10 +832,10 @@ fn per_element<'a>(
 				// *(anything) = in; (struct in, out)
 				if let Some(struct_type) = state.structs_and_struct_pointers.get(name) {
 					let struct_type: &str = struct_type;
-					let _fields = state
-						.struct_types
-						.get(struct_type)
-						.ok_or(IRError::UndefinedType(line!()))?;
+					/*let _fields = state
+					.struct_types
+					.get(struct_type)
+					.ok_or_else(|| error!(UndefinedType, &element))?;*/
 					todo!("Todo: Assign struct to any non named pointer");
 				} else {
 					default()?;
@@ -757,23 +847,40 @@ fn per_element<'a>(
 
 		LanguageElement::StructFieldPointerAssignment { name, field, value } => {
 			let name_borrowed: &str = &name;
-			let struct_type_name = *state
-				.structs_and_struct_pointers
-				.get(name_borrowed)
-				.ok_or_else(|| {
-					eprintln!("{}->{} = {:?}", name, field, value);
-					dbg!(name_borrowed, &state.structs_and_struct_pointers);
-					IRError::WrongTypeWasNative(line!())
-				})?;
-			let fields = state
-				.struct_types
-				.get(struct_type_name)
-				.ok_or(IRError::UndefinedType(line!()))?;
-			let idx = fields
+			let struct_type_name = if let Some(struct_type_name) =
+				state.structs_and_struct_pointers.get(name_borrowed)
+			{
+				*struct_type_name
+			} else {
+				return Err(error!(
+					WrongTypeWasNative,
+					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+				));
+			};
+			let fields = if let Some(fields) = state.struct_types.get(struct_type_name) {
+				fields
+			} else {
+				return Err(error!(
+					UndefinedType,
+					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+				));
+			};
+			let idx = if let Some(idx) = fields
 				.iter()
 				.position(|NativeVariable { name, .. }| name == &field)
-				.ok_or(IRError::UndefinedStructField(line!()))?;
+			{
+				idx
+			} else {
+				return Err(error!(
+					UndefinedStructField,
+					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+				));
+			};
 			let signedness = NumberType::from(&fields[idx].typ);
+			//Todo: Maybe remove this and tell users to just enable opt?
+			// Does it even make a difference? Or will it just generate
+			// LDA X, idx
+			// regardless?
 			let new_ptr = if idx == 0 {
 				StructlessStatement::Var(name)
 			} else {
@@ -823,7 +930,7 @@ fn per_element<'a>(
 			let new_args = args
 				.into_iter()
 				.map(|v| v.split_into_native(state.struct_types))
-				.collect::<Result<Vec<_>, _>>()? //There must be a better way
+				.collect::<Result<Vec<_>>>()? //There must be a better way
 				.into_iter()
 				.flat_map(|vec| vec.into_iter())
 				.collect::<Vec<_>>();

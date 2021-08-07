@@ -217,7 +217,7 @@ fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 	get_keyword().or_else(get_operator)
 }
 
-pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
+pub(crate) fn get_token<'a>(s: &'a str) -> Result<(Token<'a>, &'a str)> {
 	None.or_else(|| get_number(s))
 		.or_else(|| get_single_token_match(s))
 		.or_else(|| get_parenthesis(s))
@@ -227,10 +227,7 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str), ParseError> {
 		.or_else(|| get_string_literal(s))
 		.or_else(|| get_char(s))
 		.or_else(|| get_name(s))
-		.ok_or_else(|| {
-			dbg!(s);
-			ParseError::TokenFail(line!())
-		})
+		.ok_or_else(|| error!(TokenFail, s))
 }
 
 const FORBIDDEN_CHARACTERS: &[char] = &[

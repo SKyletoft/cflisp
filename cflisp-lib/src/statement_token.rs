@@ -38,7 +38,7 @@ pub enum StatementToken<'a> {
 }
 
 impl<'a> StatementToken<'a> {
-	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>, ParseError> {
+	pub(crate) fn from_tokens(tokens: &[Token<'a>]) -> Result<Statement<'a>> {
 		let mut res = Vec::new();
 		for token in tokens {
 			let last = res.len().wrapping_sub(1);
@@ -108,8 +108,7 @@ impl<'a> StatementToken<'a> {
 						.collect::<Vec<_>>(),
 				),
 				_ => {
-					dbg!(tokens, token);
-					return Err(ParseError::InvalidToken(line!()));
+					return Err(error!(InvalidToken, tokens));
 				}
 			};
 			res.push(new);

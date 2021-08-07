@@ -10,3 +10,6 @@ Separate out the repeated operator function call code in codegen
 Assign struct to any non named pointer
 
 Optimise statement: Remove add/sub/mul 0 and mul/div 1
+
+Refactor: if let Type::Struct(s) = s { s } else { return Err(_); } -> s.get_struct()?
+          if let Type::Ptr(ref_inner) = ptr ... -> ptr.get_inner_ref()?
