@@ -21,6 +21,7 @@ async function run() {
 		const imports    = document.getElementById("imports").checked;
 		const interrupts = document.getElementById("interrupts").checked;
 
+		localStorage.setItem("source_code", source);
 		const state = {
 			source : source,
 			opt : opt,
@@ -56,7 +57,12 @@ const default_c = "//Try changing the compiler settings!\n" +
                   "\t\treturn -1;\n" +
                   "\t}\n" +
                   "}\n";
-editor.setValue(default_c);
+let loaded_source = localStorage.getItem("source_code");
+if (loaded_source != null) {
+	editor.setValue(loaded_source);
+} else {
+	editor.setValue(default_c);
+}
 editor.clearSelection();
 
 console.log(
