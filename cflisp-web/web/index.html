@@ -18,6 +18,12 @@
 			<a href="https://github.com/SKyletoft/cflisp" class="links">Github</a>
 			<div class="settings">
 				<label>Optimisation: </label><input type="number" min="0" max="2" id="opt" value="1" />
+				<label>Output type: </label>
+				<select id="type">
+					<option>Flisp Assembly</option>
+					<option>Raw AST</option>
+					<option>Intermediate Representation</option>
+				</select>
 				<br />
 				<label>Type checking: </label><input type="checkbox" id="type_check" checked>
 				<label>Debug info: </label><input type="checkbox" id="debug" checked>

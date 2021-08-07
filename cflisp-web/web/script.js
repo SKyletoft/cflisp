@@ -12,14 +12,15 @@ async function run() {
 	if (add(1, 2) !== 3) { throw new Error("wasm doesn't work!"); }
 
 	function compile_and_write() {
-		const source     = editor.getValue();
-		const opt        = document.getElementById("opt").value;
-		const type_check = document.getElementById("type_check").checked;
-		const debug      = document.getElementById("debug").checked;
-		const hex        = document.getElementById("hex").checked;
-		const comments   = document.getElementById("comments").checked;
-		const imports    = document.getElementById("imports").checked;
-		const interrupts = document.getElementById("interrupts").checked;
+		const source      = editor.getValue();
+		const opt         = document.getElementById("opt").value;
+		const type_check  = document.getElementById("type_check").checked;
+		const debug       = document.getElementById("debug").checked;
+		const hex         = document.getElementById("hex").checked;
+		const comments    = document.getElementById("comments").checked;
+		const imports     = document.getElementById("imports").checked;
+		const interrupts  = document.getElementById("interrupts").checked;
+		const output_type = document.getElementById("type").selectedIndex;
 
 		localStorage.setItem("source_code", source);
 		const state = {
@@ -30,12 +31,13 @@ async function run() {
 			hex : hex,
 			comments : comments,
 			imports : imports,
-			interrupts : interrupts
+			interrupts : interrupts,
+			output_type : output_type,
 		};
 
 		if (state != last_state) {
-			resultWindow.value =
-			    run_cc(source, opt, type_check, debug, hex, comments, imports, interrupts);
+			resultWindow.value = run_cc(source, opt, type_check, debug, hex, comments, imports,
+			                            interrupts, output_type);
 		}
 		last_state = state;
 	}
@@ -57,8 +59,8 @@ const default_c = "//Try changing the compiler settings!\n" +
                   "\t\treturn -1;\n" +
                   "\t}\n" +
                   "}\n";
-let loaded_source = localStorage.getItem("source_code");
-if (loaded_source != null) {
+const loaded_source = localStorage.getItem("source_code");
+if (!!loaded_source) {
 	editor.setValue(loaded_source);
 } else {
 	editor.setValue(default_c);
