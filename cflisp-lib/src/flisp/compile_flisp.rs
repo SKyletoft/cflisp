@@ -52,7 +52,7 @@ pub fn compile<'a>(
 	)
 }
 
-fn compile_elements<'a, 'b>(
+fn compile_elements<'a>(
 	block: &'a [StructlessLanguage<'a>],
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,

@@ -118,6 +118,15 @@ pub(crate) enum MaybeParsed<'a> {
 }
 use MaybeParsed::*;
 
+impl fmt::Display for MaybeParsed<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Parsed(a) => write!(f, "{}", a),
+			Unparsed(a) => write!(f, "{}", a),
+		}
+	}
+}
+
 impl<'a> MaybeParsed<'a> {
 	fn map_unparsed<T>(&self, f: fn(&StatementToken<'a>) -> T) -> Option<T> {
 		if let Unparsed(internal) = self {
@@ -508,7 +517,7 @@ fn do_binary_operation<'a>(
 	Ok(())
 }
 
-fn do_ternary_op<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
+fn do_ternary_op(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		if let Some(Unparsed(StatementToken::Ternary(lhs))) = tokens.get(idx) {
@@ -563,7 +572,7 @@ fn do_unary_operation_left<'a>(
 }
 
 /// Left as in [OP] [TARGET]
-fn do_cast<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
+fn do_cast(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	while idx != usize::MAX {
 		let typ = match tokens.get(idx) {
@@ -595,7 +604,7 @@ fn do_cast<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
 	Ok(())
 }
 
-fn do_array_access<'a>(tokens: &mut Vec<MaybeParsed<'a>>) -> Result<()> {
+fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
 	let mut idx = tokens.len().wrapping_sub(1);
 	//yes, stop once too early
 	while idx < tokens.len() {

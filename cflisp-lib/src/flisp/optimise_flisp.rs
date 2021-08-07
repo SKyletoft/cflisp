@@ -8,7 +8,7 @@ use crate::*;
 ///Doesn't actually call all optimisations. It only calls those optimisations that
 /// can be called on an independent code block. This excludes `remove_unused_labels`
 /// and `repeat_rts`
-pub fn all_optimisations<'a>(instructions: &mut Vec<CommentedInstruction<'a>>) -> Result<()> {
+pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result<()> {
 	load_xy(instructions);
 	repeat_xy(instructions);
 	repeat_load(instructions);
@@ -438,7 +438,7 @@ fn remove_post_early_return_code(instructions: &mut Vec<CommentedInstruction>) {
 
 ///Split instruction list into sections with no branching or jumping so
 /// `reduce_reserves_section` doesn't need to take that into account.
-fn reduce_reserves_redux<'a>(instructions: &mut [CommentedInstruction<'a>]) -> Result<()> {
+fn reduce_reserves_redux(instructions: &mut [CommentedInstruction]) -> Result<()> {
 	let mut last_instruction_split = 0;
 	while let Some((idx, _)) =
 		instructions
@@ -465,7 +465,7 @@ fn reduce_reserves_redux<'a>(instructions: &mut [CommentedInstruction<'a>]) -> R
 }
 
 ///Reduce memory allocation in a scope so that the smallest memory access should be SP(0)
-fn reduce_reserves_section<'a>(instructions: &mut [CommentedInstruction<'a>]) -> Result<()> {
+fn reduce_reserves_section(instructions: &mut [CommentedInstruction]) -> Result<()> {
 	let mut sp_stack = Vec::new();
 	for idx in 0..instructions.len() {
 		match instructions[idx].0 {

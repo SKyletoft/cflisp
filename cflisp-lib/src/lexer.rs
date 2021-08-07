@@ -217,7 +217,7 @@ fn get_single_token_match(s: &str) -> Option<(Token, &str)> {
 	get_keyword().or_else(get_operator)
 }
 
-pub(crate) fn get_token<'a>(s: &'a str) -> Result<(Token<'a>, &'a str)> {
+pub(crate) fn get_token(s: &str) -> Result<(Token, &str)> {
 	None.or_else(|| get_number(s))
 		.or_else(|| get_single_token_match(s))
 		.or_else(|| get_parenthesis(s))

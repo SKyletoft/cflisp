@@ -9,6 +9,12 @@ pub struct Variable<'a> {
 	pub name: &'a str,
 }
 
+impl fmt::Display for Variable<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{} {}", self.typ, self.name)
+	}
+}
+
 impl<'a> Variable<'a> {
 	///Get the inner field list with each member prepended with the struct type name, e.g. `[Foo::A, Foo::B, Foo::C]`
 	pub(crate) fn split_into_native(
@@ -40,6 +46,12 @@ impl<'a> From<Variable<'a>> for NativeVariable<'a> {
 			typ: var.typ.into(),
 			name: Cow::Borrowed(var.name),
 		}
+	}
+}
+
+impl fmt::Display for NativeVariable<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{} {}", self.typ, self.name)
 	}
 }
 
@@ -516,6 +528,31 @@ pub enum BinOp {
 	LessThanEqual,
 	Cmp,
 	NotCmp,
+}
+
+impl fmt::Display for BinOp {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		use BinOp::*;
+		let token = match self {
+			Add => "+",
+			Sub => "-",
+			Mul => "*",
+			Div => "/",
+			Mod => "%",
+			LShift => "<<",
+			RShift => ">>",
+			And => "&&",
+			Or => "||",
+			Xor => "^",
+			GreaterThan => ">",
+			LessThan => "<",
+			GreaterThanEqual => ">=",
+			LessThanEqual => "<=",
+			Cmp => "==",
+			NotCmp => "!=",
+		};
+		write!(f, "{}", token)
+	}
 }
 
 pub type TokenSlice<'a, 'b> = &'b [Token<'a>];

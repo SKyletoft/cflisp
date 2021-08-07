@@ -6,7 +6,6 @@ pub type Result<T> = result::Result<T, CflispError>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ErrorInfo<'a> {
-	None,
 	Source(String),
 	Token(Vec<Token<'a>>),
 	StatementToken(Vec<StatementToken<'a>>),
@@ -129,23 +128,23 @@ impl<'a> From<&Variable<'a>> for ErrorInfo<'a> {
 impl fmt::Display for ErrorInfo<'_> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			ErrorInfo::None => write!(f, ""),
 			ErrorInfo::Source(a) => write!(f, "{}", a),
-			ErrorInfo::Token(a) => write!(f, "{:?}", a),
+			ErrorInfo::Token(a) => helper::write_token_slice(a, f, ", "),
 			ErrorInfo::Statement(a) => write!(f, "{}", a),
 			ErrorInfo::Language(a) => write!(f, "{}", a),
-			ErrorInfo::StructlessStatement(a) => write!(f, "{:?}", a),
-			ErrorInfo::StructlessLanguage(a) => write!(f, "{:?}", a),
-			ErrorInfo::UnTree(a, b) => write!(f, "{:?}{}", b, a),
+			ErrorInfo::StructlessStatement(a) => write!(f, "{}", a),
+			ErrorInfo::StructlessLanguage(a) => write!(f, "{}", a),
+			ErrorInfo::UnTree(a, b) => write!(f, "{}{}", b, a),
 			ErrorInfo::BinTree(a, b, c) => write!(f, "{}{:?}{}", a, c, b),
-			_ => todo!(),
+			ErrorInfo::StatementToken(a) => helper::write_token_slice(a, f, " "),
+			ErrorInfo::MaybeParsed(a) => helper::write_token_slice(a, f, " "),
+			ErrorInfo::Variable(a) => write!(f, "{}", a),
 		}
 	}
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CflispError {
-	//info: ErrorInfo<'a>,
 	pub info: String,
 	pub line: u32,
 	pub file: &'static str,

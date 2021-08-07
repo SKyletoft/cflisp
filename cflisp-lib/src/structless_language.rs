@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt};
 
 use crate::*;
 
@@ -830,9 +830,9 @@ fn per_element<'a>(
 			} else if let StatementElement::Var(name) = &value {
 				let name: &str = name;
 				// *(anything) = in; (struct in, out)
-				if let Some(struct_type) = state.structs_and_struct_pointers.get(name) {
-					let struct_type: &str = struct_type;
-					/*let _fields = state
+				if let Some(_struct_type) = state.structs_and_struct_pointers.get(name) {
+					/*let struct_type: &str = struct_type;
+					let _fields = state
 					.struct_types
 					.get(struct_type)
 					.ok_or_else(|| error!(UndefinedType, &element))?;*/
@@ -1148,6 +1148,100 @@ fn replace_returns(elements: &mut Vec<LanguageElement>) {
 				elements.insert(idx + 1, LanguageElement::Return(None));
 			}
 			_ => {}
+		}
+	}
+}
+
+impl fmt::Display for StructlessLanguage<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let static_const_volatile = |s, c, v, f: &mut fmt::Formatter<'_>| {
+			if s {
+				write!(f, "static ")?;
+			}
+			if c {
+				write!(f, "const ")?;
+			}
+			if v {
+				write!(f, "volatile ")?;
+			}
+			Ok(())
+		};
+		match self {
+			StructlessLanguage::VariableDeclaration {
+				typ,
+				name,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{} {};", typ, name)
+			}
+			StructlessLanguage::VariableAssignment { name, value } => {
+				write!(f, "{} = {};", name, value)
+			}
+			StructlessLanguage::VariableDeclarationAssignment {
+				typ,
+				name,
+				value,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{} {} = {}", typ, name, value)
+			}
+			StructlessLanguage::PointerAssignment { ptr, value } => {
+				write!(f, "*{} = {};", ptr, value)
+			}
+			StructlessLanguage::FunctionDeclaration {
+				typ,
+				name,
+				args,
+				block,
+			} => {
+				write!(f, "{} {}(", typ, name)?;
+				helper::write_token_slice(args, f, ", ")?;
+				writeln!(f, "){{")?;
+				helper::write_token_slice(block, f, "\n")?;
+				write!(f, "\n}}")
+			}
+			StructlessLanguage::IfStatement {
+				condition,
+				then,
+				else_then,
+			} => {
+				write!(f, "if ({}) {{\n{}\n}}", condition, then)?;
+				if let Some(else_then) = else_then {
+					write!(f, " else {{\n{}\n}}", else_then)?;
+				}
+				Ok(())
+			}
+			StructlessLanguage::Loop { condition, body } => {
+				write!(f, "while ({}) {{\n{}\n}}", condition, body)
+			}
+			StructlessLanguage::Return(statement) => {
+				write!(f, "return")?;
+				if let Some(statement) = statement {
+					write!(f, " {}", statement)?;
+				}
+				write!(f, ";")
+			}
+			StructlessLanguage::Statement(s) => write!(f, "{};", s),
+			StructlessLanguage::VariableLabelTag {
+				name,
+				is_static,
+				is_const,
+				is_volatile,
+			} => {
+				write!(f, "VARIBABLE_TAG_FOR_STRUCT_NAMES (")?;
+				static_const_volatile(*is_static, *is_const, *is_volatile, f)?;
+				write!(f, "{})", name)
+			}
+			StructlessLanguage::Block { block, scope_name } => {
+				write!(f, "'{}: {{", scope_name)?;
+				helper::write_token_slice(block, f, "")
+			}
 		}
 	}
 }
