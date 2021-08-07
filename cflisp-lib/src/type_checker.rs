@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::*;
 
-pub fn type_check<'a>(block: &[LanguageElement<'a>]) -> Result<()> {
+pub fn type_check(block: &[LanguageElement]) -> Result<()> {
 	language_element(
 		block,
 		&mut HashMap::new(),
@@ -20,7 +20,7 @@ pub(crate) fn language_element<'a>(
 	structs: &mut HashMap<&'a str, Vec<NativeVariable<'a>>>,
 	constants: &mut HashSet<&'a str>,
 ) -> Result<()> {
-	for line in block {
+	for line in block.iter() {
 		match line {
 			LanguageElement::VariableDeclaration {
 				typ,
@@ -119,19 +119,19 @@ pub(crate) fn language_element<'a>(
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
 				let mut inner_constants = constants.clone();
-				verify_function_return_type(
-					block,
-					&inner_variables,
-					&inner_functions,
-					&inner_structs,
-					typ,
-				)?;
 				language_element(
 					block,
 					&mut inner_variables,
 					&mut inner_functions,
 					&mut inner_structs,
 					&mut inner_constants,
+				)?;
+				verify_function_return_type(
+					block,
+					&inner_variables,
+					&inner_functions,
+					&inner_structs,
+					typ,
 				)?;
 			}
 
