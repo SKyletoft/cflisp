@@ -74,7 +74,7 @@ pub(crate) fn language_element<'a>(
 				statement_element(ptr, variables, functions, structs)?;
 				statement_element(value, variables, functions, structs)?;
 				let correct_type = type_of(ptr, variables, functions, structs)?
-					.get_inner()
+					.get_ptr_inner()
 					.ok_or_else(|| error!(InternalPointerAssignmentToNonPointer, line))?;
 				let actual_type = type_of(value, variables, functions, structs)?;
 				if correct_type != actual_type {
@@ -249,11 +249,7 @@ pub(crate) fn language_element<'a>(
 			} => {
 				let name: &str = name;
 				variables.insert(name, typ.clone());
-				let struct_type = if let Type::Struct(name) = typ {
-					Ok(*name)
-				} else {
-					Err(error!(TypeMismatch, line))
-				}?;
+				let struct_type = typ.get_struct().ok_or_else(|| error!(TypeMismatch, line))?;
 				let fields = structs
 					.get(struct_type)
 					.ok_or_else(|| error!(UndefinedField, line))?;
@@ -463,18 +459,13 @@ pub(crate) fn type_of<'a>(
 		StatementElement::FieldPointerAccess(name, field) => {
 			let name: &str = name;
 
-			let typ = variables
+			let struct_type = variables
 				.get(name)
-				.ok_or_else(|| error!(UndefinedVariable, elem))?;
-			let struct_type = if let Type::Ptr(pointing_at) = typ {
-				if let Type::Struct(struct_type) = pointing_at.as_ref() {
-					Ok(struct_type)
-				} else {
-					Err(error!(TypeMismatch, elem))
-				}
-			} else {
-				Err(error!(TypeMismatch, elem))
-			}?;
+				.ok_or_else(|| error!(UndefinedVariable, elem))?
+				.get_ptr_inner_ref()
+				.ok_or_else(|| error!(TypeMismatch, elem))?
+				.get_struct()
+				.ok_or_else(|| error!(TypeMismatch, elem))?;
 
 			(&structs
 				.get(struct_type)

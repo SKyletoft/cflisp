@@ -423,7 +423,7 @@ fn per_element<'a>(
 				}
 				arr.truncate(len as usize);
 			}
-			if let Some(n) = t.as_ref().get_struct_type() {
+			if let Some(n) = t.as_ref().get_struct_recursive() {
 				state.structs_and_struct_pointers.insert(name.clone(), n);
 			}
 			let typ = NativeType::ptr(t.as_ref().into());
@@ -452,7 +452,7 @@ fn per_element<'a>(
 				}
 				arr.truncate(len as usize);
 			}
-			if let Some(n) = t.as_ref().get_struct_type() {
+			if let Some(n) = t.as_ref().get_struct_recursive() {
 				state.structs_and_struct_pointers.insert(name.clone(), n);
 			}
 			let typ = NativeType::ptr(t.as_ref().into());
@@ -923,7 +923,7 @@ fn per_element<'a>(
 			let mut new_structs_and_struct_pointers = state.structs_and_struct_pointers.clone();
 			for (name, typ) in args
 				.iter()
-				.filter_map(|v| v.typ.get_struct_type().map(|t| (v.name, t)))
+				.filter_map(|v| v.typ.get_struct_recursive().map(|t| (v.name, t)))
 			{
 				new_structs_and_struct_pointers.insert(Cow::Borrowed(name), typ);
 			}

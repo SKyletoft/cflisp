@@ -122,7 +122,8 @@ impl<'a> Type<'a> {
 		Type::Ptr(Box::new(target))
 	}
 
-	pub(crate) fn get_inner(self) -> Option<Self> {
+	///Gets inner type name from `Type::Ptr`
+	pub(crate) fn get_ptr_inner(self) -> Option<Self> {
 		if let Type::Ptr(inner) = self {
 			Some(*inner)
 		} else {
@@ -130,11 +131,39 @@ impl<'a> Type<'a> {
 		}
 	}
 
+	///Checks if self is losslessly convertible to `NativeType`
 	pub(crate) fn is_native(&self) -> bool {
 		match self {
 			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => true,
 			Type::Struct(_) => false,
 			Type::Ptr(t) | Type::Arr(t, _) => t.is_native(),
+		}
+	}
+
+	///Gets inner type name from `Type::Ptr`
+	pub(crate) fn get_ptr_inner_ref(&self) -> Option<&Self> {
+		if let Type::Ptr(inner) = self {
+			Some(inner)
+		} else {
+			None
+		}
+	}
+
+	///Gets struct name from `Type::Struct`
+	pub(crate) fn get_struct(&self) -> Option<&str> {
+		if let Type::Struct(s) = self {
+			Some(s)
+		} else {
+			None
+		}
+	}
+
+	///Gets struct type name from `Type::Struct`, even when nested in a pointer or array
+	pub(crate) fn get_struct_recursive(&self) -> Option<&'a str> {
+		match self {
+			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
+			Type::Struct(n) => Some(n),
+			Type::Ptr(inner) | Type::Arr(inner, _) => inner.get_struct_recursive(),
 		}
 	}
 }
@@ -221,17 +250,6 @@ impl<'a> From<&NativeType> for Type<'a> {
 			NativeType::Bool => Type::Bool,
 			NativeType::Void => Type::Void,
 			NativeType::Ptr(target) => Type::ptr((target.as_ref()).into()),
-		}
-	}
-}
-
-impl<'a> Type<'a> {
-	///Get struct type name, even when nested in a pointer or array
-	pub(crate) fn get_struct_type(&self) -> Option<&'a str> {
-		match self {
-			Type::Uint | Type::Int | Type::Char | Type::Bool | Type::Void => None,
-			Type::Struct(n) => Some(n),
-			Type::Ptr(inner) | Type::Arr(inner, _) => inner.get_struct_type(),
 		}
 	}
 }
