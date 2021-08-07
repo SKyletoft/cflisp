@@ -75,13 +75,28 @@ fn compile_to_text(
 	if output_type == 1 {
 		return Ok(format!("{:#?}", tree));
 	}
+	if output_type == 2 {
+		return Ok(format!(
+			"{}",
+			cflisp_lib::language_element::LanguageBlock(&tree)
+		));
+	}
 	let mut structless =
 		StructlessLanguage::from_language_elements(tree).map_err(|err| format!("{}", err))?;
 	if optimise >= 2 {
 		optimise_language::all_optimisations(&mut structless).map_err(|err| format!("{}", err))?;
 	}
-	if output_type == 2 {
+	if output_type == 3 {
 		return Ok(format!("{:#?}", structless));
+	}
+	if output_type == 4 {
+		return Ok(format!(
+			"{}",
+			cflisp_lib::structless_language::StructlessLanguage::Block {
+				block: structless,
+				scope_name: "global".into(),
+			}
+		));
 	}
 	let mut inst = compile_flisp::compile(&structless, &flags).map_err(|err| format!("{}", err))?;
 	if optimise >= 1 {

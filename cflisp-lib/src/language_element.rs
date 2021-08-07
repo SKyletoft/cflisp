@@ -382,3 +382,11 @@ pub(crate) fn move_declarations_first(block: &mut Block) {
 		}
 	}
 }
+
+pub struct LanguageBlock<'a>(pub &'a [LanguageElement<'a>]);
+
+impl fmt::Display for LanguageBlock<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		helper::write_token_slice(self.0, f, "\n")
+	}
+}
