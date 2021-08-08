@@ -1,0 +1,9 @@
+__swap_	LDA	0,Y	; Swaps the values in the locations specified in X and Y
+	EORA	0,X
+	STA	0,X
+	EORA	0,Y
+	STA	0,Y
+	EORA	0,X
+	STA	0,X
+	RTS
+
