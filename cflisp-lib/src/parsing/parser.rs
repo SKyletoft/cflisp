@@ -1,5 +1,6 @@
 use std::{borrow::Cow, marker::PhantomData};
 
+use super::*;
 use crate::*;
 
 pub fn parse<'a>(source: &'a str, move_first: bool) -> Result<Vec<LanguageElement<'a>>> {
@@ -32,7 +33,7 @@ fn parse_variable_and_function_declarations<'a, 'b>(
 					is_const: scv.is_const,
 					is_volatile: scv.is_volatile,
 				},
-				Type::Ptr(_) | Type::Arr(_, _) => LanguageElement::VariableDeclarationAssignment {
+				Type::Ptr(_) | Type::Arr(..) => LanguageElement::VariableDeclarationAssignment {
 					typ: var.typ,
 					name: Cow::Borrowed(var.name),
 					value: StatementElement::Array(fields_parsed),
@@ -154,7 +155,10 @@ fn parse_language_pattern<'a, 'b>(
 				.pop()
 				.ok_or_else(|| error!(IncompleteStatement, tokens))?;
 			if !idx_arr.is_empty() {
-				eprintln!("Warning: multiple statements separated by commas evaluate to just the last one");
+				eprintln!(
+					"Warning: multiple statements separated by commas evaluate to just the last \
+					 one"
+				);
 			}
 			let (rhs, rest) = StatementElement::parse(tail)?;
 			(

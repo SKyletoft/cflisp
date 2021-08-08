@@ -1,6 +1,6 @@
-use crate::*;
-
 use std::{error, fmt, result};
+
+use crate::*;
 
 pub type Result<T> = result::Result<T, CflispError>;
 
@@ -276,8 +276,8 @@ impl fmt::Display for ErrorTypes {
 				 literals)"
 			}
 			ReturnStruct => {
-				"Cannot return struct from function due to ABI limitation. Maybe try having an \
-				 out pointer parametre instead? (Sorry)"
+				"Cannot return struct from function due to ABI limitation. Maybe try having an out \
+				 pointer parametre instead? (Sorry)"
 			}
 			TypeMismatch => "Type mismatch",
 			AssignmentToConstant => "Assignment to constant",
@@ -314,4 +314,3 @@ impl fmt::Display for CflispError {
 }
 
 impl error::Error for CflispError {}
-

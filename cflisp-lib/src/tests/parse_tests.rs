@@ -5,8 +5,7 @@ use std::{
 	collections::{HashMap, HashSet},
 };
 
-use super::super::*;
-
+use super::{super::*, *};
 /*
 	Yeah, this is terrible to write. Currently done by copying the current
 	result and then used as a regression test rather than a target

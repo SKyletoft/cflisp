@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use crate::{structless_language::State, *};
+use super::*;
+use crate::*;
 
 ///Tree structure to represent a statement. Boolean and bitwise logic are combined
 #[derive(Debug, Clone, PartialEq)]

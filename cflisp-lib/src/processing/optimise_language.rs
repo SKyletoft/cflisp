@@ -3,6 +3,7 @@ use std::{
 	slice,
 };
 
+use super::*;
 use crate::*;
 
 pub fn all_optimisations(elements: &mut Vec<StructlessLanguage>) -> Result<()> {

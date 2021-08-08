@@ -362,8 +362,8 @@ pub(crate) fn verify_function_return_type<'a>(
 
 fn ptr_type_promotion<'a>(lhs: Type<'a>, rhs: Type<'a>) -> Option<Type<'a>> {
 	match (&lhs, &rhs) {
-		(Type::Ptr(_) | Type::Arr(_, _), Type::Int | Type::Uint) => Some(lhs),
-		(Type::Int | Type::Uint, Type::Ptr(_) | Type::Arr(_, _)) => Some(rhs),
+		(Type::Ptr(_) | Type::Arr(..), Type::Int | Type::Uint) => Some(lhs),
+		(Type::Int | Type::Uint, Type::Ptr(_) | Type::Arr(..)) => Some(rhs),
 		_ => None,
 	}
 }

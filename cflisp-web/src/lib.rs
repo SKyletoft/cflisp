@@ -3,9 +3,8 @@
 use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
-	optimise_language, parser,
-	structless_language::StructlessLanguage,
-	type_checker,
+	parsing::{language_element, parser},
+	processing::{optimise_language, structless_language::StructlessLanguage, type_checker},
 };
 use wasm_bindgen::prelude::*;
 
@@ -82,7 +81,7 @@ fn compile_to_text(
 		return Ok(format!(
 			"{}{}",
 			WARNING,
-			cflisp_lib::language_element::LanguageBlock(&tree)
+			language_element::LanguageBlock(&tree)
 		));
 	}
 	let mut structless =
@@ -97,7 +96,7 @@ fn compile_to_text(
 		return Ok(format!(
 			"{}{}",
 			WARNING,
-			cflisp_lib::structless_language::StructlessLanguage::Block {
+			StructlessLanguage::Block {
 				block: structless,
 				scope_name: "global".into(),
 			}

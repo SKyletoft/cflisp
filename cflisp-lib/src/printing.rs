@@ -671,7 +671,7 @@ impl DisplayWithIndent for Type<'_> {
 	}
 }
 
-impl fmt::Display for language_element::LanguageBlock<'_> {
+impl fmt::Display for parsing::language_element::LanguageBlock<'_> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write_slice(self.0, f, "\n", 0)
 	}
@@ -792,7 +792,7 @@ impl fmt::Display for BinOp {
 	}
 }
 
-impl fmt::Display for parser::StaticConstVolatile {
+impl fmt::Display for StaticConstVolatile {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		DisplayWithIndent::fmt(self, f, 0)
 	}

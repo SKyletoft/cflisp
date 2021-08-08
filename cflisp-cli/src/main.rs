@@ -3,9 +3,8 @@ use std::{env, fs, path::PathBuf, process, process::Command};
 use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
-	optimise_language, parser,
-	structless_language::StructlessLanguage,
-	type_checker,
+	parsing::parser,
+	processing::{optimise_language, structless_language::StructlessLanguage, type_checker},
 };
 
 const PATH: &str = "PATH";
