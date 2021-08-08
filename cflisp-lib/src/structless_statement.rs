@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
 use crate::{structless_language::State, *};
 
@@ -189,34 +189,6 @@ impl<'a> StructlessStatement<'a> {
 			| StructlessStatement::Array(_)
 			| StructlessStatement::Deref(_)
 			| StructlessStatement::AdrOf(_) => None,
-		}
-	}
-}
-
-impl fmt::Display for StructlessStatement<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		use StructlessStatement::*;
-		match self {
-			BinOp { op, lhs, rhs, .. } => {
-				write!(f, "({}) {} ({})", lhs, op, rhs)
-			}
-			FunctionCall { name, parametres } => {
-				write!(f, "{}(", name)?;
-				helper::write_token_slice(parametres, f, ", ")?;
-				write!(f, ")")
-			}
-			Not(inner) => write!(f, "!({})", inner),
-			Var(name) => write!(f, "{}", name),
-			Num(Number { val, .. }) => write!(f, "{}", val),
-			Char(c) => write!(f, "{}", c),
-			Bool(b) => write!(f, "{}", b),
-			Array(arr) => {
-				write!(f, "{{",)?;
-				helper::write_token_slice(arr, f, ", ")?;
-				write!(f, "}}")
-			}
-			Deref(adr) => write!(f, "*({})", adr),
-			AdrOf(name) => write!(f, "&{}", name),
 		}
 	}
 }

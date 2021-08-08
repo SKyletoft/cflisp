@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
 pub(crate) fn merge_name_and_field<'a>(name: &str, field: &str) -> Cow<'a, str> {
 	Cow::Owned(format!("{}::{}", name, field))
@@ -18,19 +18,4 @@ macro_rules! merge_comments {
 			$lhs.clone().or_else(|| rest.clone())
 		}
 	}};
-}
-
-pub(crate) fn write_token_slice<T: fmt::Display>(
-	tokens: &[T],
-	f: &mut fmt::Formatter<'_>,
-	separator: &str,
-) -> fmt::Result {
-	if let [start @ .., end] = tokens {
-		for token in start.iter() {
-			write!(f, "{}{}", token, separator)?;
-		}
-		write!(f, "{}", end)
-	} else {
-		Ok(())
-	}
 }

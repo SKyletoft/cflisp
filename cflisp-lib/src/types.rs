@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp, collections::HashMap, default::Default, fmt, ops};
+use std::{borrow::Cow, cmp, collections::HashMap, default::Default, ops};
 
 use crate::*;
 
@@ -7,12 +7,6 @@ use crate::*;
 pub struct Variable<'a> {
 	pub typ: Type<'a>,
 	pub name: &'a str,
-}
-
-impl fmt::Display for Variable<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{} {}", self.typ, self.name)
-	}
 }
 
 impl<'a> Variable<'a> {
@@ -46,12 +40,6 @@ impl<'a> From<Variable<'a>> for NativeVariable<'a> {
 			typ: var.typ.into(),
 			name: Cow::Borrowed(var.name),
 		}
-	}
-}
-
-impl fmt::Display for NativeVariable<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{} {}", self.typ, self.name)
 	}
 }
 
@@ -183,34 +171,6 @@ pub enum NativeType {
 impl NativeType {
 	pub(crate) fn ptr(target: NativeType) -> NativeType {
 		NativeType::Ptr(Box::new(target))
-	}
-}
-
-impl fmt::Display for NativeType {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			NativeType::Uint => write!(f, "uint"),
-			NativeType::Int => write!(f, "int"),
-			NativeType::Char => write!(f, "char"),
-			NativeType::Bool => write!(f, "bool"),
-			NativeType::Void => write!(f, "void"),
-			NativeType::Ptr(inner) => write!(f, "{}*", inner),
-		}
-	}
-}
-
-impl fmt::Display for Type<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Type::Uint => write!(f, "uint"),
-			Type::Int => write!(f, "int"),
-			Type::Char => write!(f, "char"),
-			Type::Bool => write!(f, "bool"),
-			Type::Void => write!(f, "void"),
-			Type::Ptr(inner) => write!(f, "{}*", inner),
-			Type::Struct(name) => write!(f, "{}", name),
-			Type::Arr(typ, len) => write!(f, "{}[{}]", typ, len),
-		}
 	}
 }
 
@@ -511,12 +471,6 @@ impl cmp::PartialOrd for Number {
 	}
 }
 
-impl fmt::Display for Number {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.val)
-	}
-}
-
 impl Number {
 	pub const ZERO: Self = Number {
 		val: 0,
@@ -546,31 +500,6 @@ pub enum BinOp {
 	LessThanEqual,
 	Cmp,
 	NotCmp,
-}
-
-impl fmt::Display for BinOp {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		use BinOp::*;
-		let token = match self {
-			Add => "+",
-			Sub => "-",
-			Mul => "*",
-			Div => "/",
-			Mod => "%",
-			LShift => "<<",
-			RShift => ">>",
-			And => "&&",
-			Or => "||",
-			Xor => "^",
-			GreaterThan => ">",
-			LessThan => "<",
-			GreaterThanEqual => ">=",
-			LessThanEqual => "<=",
-			Cmp => "==",
-			NotCmp => "!=",
-		};
-		write!(f, "{}", token)
-	}
 }
 
 pub type TokenSlice<'a, 'b> = &'b [Token<'a>];

@@ -125,24 +125,6 @@ impl<'a> From<&Variable<'a>> for ErrorInfo<'a> {
 	}
 }
 
-impl fmt::Display for ErrorInfo<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			ErrorInfo::Source(a) => write!(f, "{}", a),
-			ErrorInfo::Token(a) => helper::write_token_slice(a, f, ", "),
-			ErrorInfo::Statement(a) => write!(f, "{}", a),
-			ErrorInfo::Language(a) => write!(f, "{}", a),
-			ErrorInfo::StructlessStatement(a) => write!(f, "{}", a),
-			ErrorInfo::StructlessLanguage(a) => write!(f, "{}", a),
-			ErrorInfo::UnTree(a, b) => write!(f, "{}{}", b, a),
-			ErrorInfo::BinTree(a, b, c) => write!(f, "{}{:?}{}", a, c, b),
-			ErrorInfo::StatementToken(a) => helper::write_token_slice(a, f, " "),
-			ErrorInfo::MaybeParsed(a) => helper::write_token_slice(a, f, " "),
-			ErrorInfo::Variable(a) => write!(f, "{}", a),
-		}
-	}
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct CflispError {
 	pub info: String,
@@ -332,3 +314,4 @@ impl fmt::Display for CflispError {
 }
 
 impl error::Error for CflispError {}
+

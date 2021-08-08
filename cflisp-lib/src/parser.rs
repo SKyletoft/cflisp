@@ -437,10 +437,20 @@ fn remove_multiline_comments(mut s: Cow<str>) -> Cow<str> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-struct StaticConstVolatile {
+pub(crate) struct StaticConstVolatile {
 	pub is_static: bool,
 	pub is_const: bool,
 	pub is_volatile: bool,
+}
+
+impl From<(&bool, &bool, &bool)> for StaticConstVolatile {
+	fn from((s, c, v): (&bool, &bool, &bool)) -> Self {
+		StaticConstVolatile {
+			is_static: *s,
+			is_const: *c,
+			is_volatile: *v,
+		}
+	}
 }
 
 impl StaticConstVolatile {

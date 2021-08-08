@@ -9,6 +9,9 @@ use cflisp_lib::{
 };
 use wasm_bindgen::prelude::*;
 
+const WARNING: &str =
+	"Note that compilation errors might've occured in later compilation steps\n\n";
+
 #[wasm_bindgen]
 pub fn add(a: i32, b: i32) -> i32 {
 	a + b
@@ -73,11 +76,12 @@ fn compile_to_text(
 		type_checker::type_check(&tree).map_err(|err| format!("{}", err))?;
 	}
 	if output_type == 1 {
-		return Ok(format!("{:#?}", tree));
+		return Ok(format!("{}{:#?}", WARNING, tree));
 	}
 	if output_type == 2 {
 		return Ok(format!(
-			"{}",
+			"{}{}",
+			WARNING,
 			cflisp_lib::language_element::LanguageBlock(&tree)
 		));
 	}
@@ -87,11 +91,12 @@ fn compile_to_text(
 		optimise_language::all_optimisations(&mut structless).map_err(|err| format!("{}", err))?;
 	}
 	if output_type == 3 {
-		return Ok(format!("{:#?}", structless));
+		return Ok(format!("{}{:#?}", WARNING, structless));
 	}
 	if output_type == 4 {
 		return Ok(format!(
-			"{}",
+			"{}{}",
+			WARNING,
 			cflisp_lib::structless_language::StructlessLanguage::Block {
 				block: structless,
 				scope_name: "global".into(),

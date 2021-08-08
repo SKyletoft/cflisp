@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::*;
 
 ///A reduced set of tokens for use in statements
@@ -142,77 +140,5 @@ impl<'a> StatementToken<'a> {
 				| StatementToken::BitNot
 				| StatementToken::BoolNot
 		)
-	}
-}
-
-impl fmt::Display for StatementToken<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		use StatementToken::*;
-		match self {
-			Add => write!(f, "+"),
-			BitAnd => write!(f, "&",),
-			BitNot => write!(f, "~",),
-			BitOr => write!(f, "|",),
-			Bool(b) => write!(f, "{}", b),
-			BoolAnd => write!(f, "&&",),
-			BoolNot => write!(f, "!"),
-			BoolOr => write!(f, "||"),
-			Char(c) => write!(f, "{}", c),
-			Cmp => write!(f, "=="),
-			Div => write!(f, "/"),
-			FieldAccess => write!(f, "."),
-			FieldPointerAccess => write!(f, "->"),
-			GreaterThan => write!(f, ">"),
-			GreaterThanEqual => write!(f, ">="),
-			LessThan => write!(f, "<"),
-			LessThanEqual => write!(f, "<="),
-			LShift => write!(f, "<<"),
-			Mod => write!(f, "%"),
-			Mul => write!(f, "*"),
-			NotCmp => write!(f, "!="),
-			Num(n) => write!(f, "{}", n),
-			RShift => write!(f, ">>"),
-			Sub => write!(f, "-"),
-			Xor => write!(f, "^"),
-			Parentheses(block) => {
-				write!(f, "(")?;
-				helper::write_token_slice(block, f, " ")?;
-				write!(f, ")")
-			}
-			ArrayAccess(block) => {
-				write!(f, "[")?;
-				helper::write_token_slice(block, f, " ")?;
-				write!(f, "]")
-			}
-			Ternary(block) => {
-				write!(f, "? ")?;
-				helper::write_token_slice(block, f, " ")?;
-				write!(f, " :")
-			}
-			Var(n) => write!(f, "{}", n),
-			FunctionCall(n, args) => {
-				write!(f, "{}(", n)?;
-				if let [start @ .., end] = args.as_slice() {
-					for item in start.iter() {
-						helper::write_token_slice(item, f, " ")?;
-						write!(f, ", ")?;
-					}
-					helper::write_token_slice(end, f, " ")?;
-				}
-				write!(f, ")")
-			}
-			Cast(typ) => write!(f, "({})", typ),
-			Array(arr) => {
-				write!(f, "{{")?;
-				if let [start @ .., end] = arr.as_slice() {
-					for item in start.iter() {
-						helper::write_token_slice(item, f, " ")?;
-						write!(f, ", ")?;
-					}
-					helper::write_token_slice(end, f, " ")?;
-				}
-				write!(f, "}}")
-			}
-		}
 	}
 }

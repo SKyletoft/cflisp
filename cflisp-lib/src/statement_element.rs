@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt};
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::*;
 
@@ -117,15 +117,6 @@ pub(crate) enum MaybeParsed<'a> {
 	Unparsed(StatementToken<'a>),
 }
 use MaybeParsed::*;
-
-impl fmt::Display for MaybeParsed<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Parsed(a) => write!(f, "{}", a),
-			Unparsed(a) => write!(f, "{}", a),
-		}
-	}
-}
 
 impl<'a> MaybeParsed<'a> {
 	fn map_unparsed<T>(&self, f: fn(&StatementToken<'a>) -> T) -> Option<T> {
@@ -441,58 +432,6 @@ impl<'a, 'b> Parsable<'a, 'b> for Vec<StatementElement<'a>> {
 			.map(filter)
 			.collect::<Result<Vec<_>>>()?;
 		Ok((vec, &[]))
-	}
-}
-
-impl fmt::Display for StatementElement<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			StatementElement::Add { lhs, rhs } => write!(f, "({}) + ({})", lhs, rhs),
-			StatementElement::Sub { lhs, rhs } => write!(f, "({}) - ({})", lhs, rhs),
-			StatementElement::Mul { lhs, rhs } => write!(f, "({}) * ({})", lhs, rhs),
-			StatementElement::Div { lhs, rhs } => write!(f, "({}) / ({})", lhs, rhs),
-			StatementElement::Mod { lhs, rhs } => write!(f, "({}) % ({})", lhs, rhs),
-			StatementElement::LShift { lhs, rhs } => write!(f, "({}) << ({})", lhs, rhs),
-			StatementElement::RShift { lhs, rhs } => write!(f, "({}) >> ({})", lhs, rhs),
-			StatementElement::BitAnd { lhs, rhs } => write!(f, "({}) & ({})", lhs, rhs),
-			StatementElement::BitOr { lhs, rhs } => write!(f, "({}) | ({})", lhs, rhs),
-			StatementElement::BoolAnd { lhs, rhs } => write!(f, "({}) && ({})", lhs, rhs),
-			StatementElement::BoolOr { lhs, rhs } => write!(f, "({}) || ({})", lhs, rhs),
-			StatementElement::Xor { lhs, rhs } => write!(f, "({}) ^ ({})", lhs, rhs),
-			StatementElement::GreaterThan { lhs, rhs } => write!(f, "({}) > ({})", lhs, rhs),
-			StatementElement::LessThan { lhs, rhs } => write!(f, "({}) < ({})", lhs, rhs),
-			StatementElement::GreaterThanEqual { lhs, rhs } => write!(f, "({}) <= ({})", lhs, rhs),
-			StatementElement::LessThanEqual { lhs, rhs } => write!(f, "({}) >= ({})", lhs, rhs),
-			StatementElement::Cmp { lhs, rhs } => write!(f, "({}) == ({})", lhs, rhs),
-			StatementElement::NotCmp { lhs, rhs } => write!(f, "({}) != ({})", lhs, rhs),
-			StatementElement::Cast { typ, value } => write!(f, "(({}) ({}))", typ, value),
-			StatementElement::Ternary { cond, lhs, rhs } => {
-				write!(f, "(({}) ? ({}) : ({}))", cond, lhs, rhs)
-			}
-			StatementElement::FunctionCall { name, parametres } => {
-				write!(f, "({}(", name)?;
-				for parametre in parametres.iter() {
-					write!(f, "({}), ", parametre)?;
-				}
-				write!(f, "))")
-			}
-			StatementElement::BitNot(val) => write!(f, "(~{})", val),
-			StatementElement::BoolNot(val) => write!(f, "(!{})", val),
-			StatementElement::Var(val) => write!(f, "{}", val),
-			StatementElement::Num(val) => write!(f, "{}", val),
-			StatementElement::Char(val) => write!(f, "'{}'", val),
-			StatementElement::Bool(val) => write!(f, "{}", val),
-			StatementElement::Array(arr) => {
-				write!(f, "[")?;
-				for item in arr.iter() {
-					write!(f, "{}, ", item)?;
-				}
-				write!(f, "]")
-			}
-			StatementElement::Deref(val) => write!(f, "(*{})", val),
-			StatementElement::AdrOf(val) => write!(f, "(&{})", val),
-			StatementElement::FieldPointerAccess(ptr, field) => write!(f, "({}->{})", ptr, field),
-		}
 	}
 }
 
