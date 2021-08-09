@@ -1,4 +1,7 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
 use super::*;
 use crate::*;
@@ -37,6 +40,7 @@ pub fn compile<'a>(
 			typ: NativeType::Int,
 		}],
 	);
+	let std_functions = HashSet::new();
 	compile_elements(
 		program,
 		&mut State {
@@ -49,6 +53,7 @@ pub fn compile<'a>(
 		},
 		0,
 		flags.optimise >= 1,
+		&std_functions,
 	)
 }
 
@@ -57,6 +62,7 @@ fn compile_elements<'a>(
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
+	std_functions: &HashSet<&'static str>,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let mut instructions = vec![(Instruction::Label(state.scope_name.clone()), None)];
 	for (i, e) in block.iter().enumerate() {
@@ -68,7 +74,7 @@ fn compile_elements<'a>(
 			scope_name: state.scope_name.clone(),
 			line_id: i,
 		};
-		let line = &mut compile_element(e, &mut new_state, stack_base, optimise)?;
+		let line = &mut compile_element(e, &mut new_state, stack_base, optimise, std_functions)?;
 		if optimise {
 			optimise_flisp::all_optimisations(line)?;
 		}
@@ -84,6 +90,7 @@ fn compile_element<'a>(
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
+	std_functions: &HashSet<&'static str>,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let res = match element {
 		StructlessLanguage::VariableLabelTag {
@@ -153,7 +160,7 @@ fn compile_element<'a>(
 				state.global_variables,
 				*state.stack_size,
 			)?;
-			let mut statement = compile_statement(value, state)?;
+			let mut statement = compile_statement(value, state, std_functions)?;
 			statement.push((Instruction::STA(adr), Some(Cow::Borrowed(name.as_ref()))));
 			statement
 		}
@@ -207,7 +214,7 @@ fn compile_element<'a>(
 					//Rev because the stack grows down and we don't want to invert indexing
 					for element in elements.iter().rev() {
 						let stack_copy = *state.stack_size;
-						statement.append(&mut compile_statement(element, state)?);
+						statement.append(&mut compile_statement(element, state, std_functions)?);
 						assert_eq!(*state.stack_size, stack_copy);
 						*state.stack_size += 1;
 						statement.push((Instruction::PSHA, Some(Cow::Borrowed(name.as_ref()))));
@@ -221,7 +228,7 @@ fn compile_element<'a>(
 					statement
 				} else {
 					let stack_copy = *state.stack_size;
-					let mut statement = compile_statement(value, state)?;
+					let mut statement = compile_statement(value, state, std_functions)?;
 					assert_eq!(*state.stack_size, stack_copy);
 					state.variables.insert(
 						Cow::Borrowed(name.as_ref()),
@@ -245,7 +252,7 @@ fn compile_element<'a>(
 					Some((StructlessStatement::Num(idx), StructlessStatement::Var(name)))
 					| Some((StructlessStatement::Var(name), StructlessStatement::Num(idx))),
 				) => {
-					let mut statement = compile_statement(value, state)?;
+					let mut statement = compile_statement(value, state, std_functions)?;
 					statement.append(&mut vec![
 						(
 							Instruction::LDX(adr_for_name(
@@ -265,8 +272,8 @@ fn compile_element<'a>(
 				}
 
 				_ => {
-					let mut value = compile_statement(value, state)?;
-					let mut load_ptr = compile_statement(ptr, state)?;
+					let mut value = compile_statement(value, state, std_functions)?;
+					let mut load_ptr = compile_statement(ptr, state, std_functions)?;
 					load_ptr.push((Instruction::PSHA, Some(Cow::Borrowed("A to X part 1"))));
 					load_ptr.push((Instruction::PULX, Some(Cow::Borrowed("A to X part 2"))));
 					load_ptr.append(&mut value);
@@ -306,6 +313,7 @@ fn compile_element<'a>(
 				},
 				args_base,
 				false,
+				std_functions,
 			)?;
 			function_body.insert(0, (Instruction::Label(Cow::Borrowed("\n")), None));
 			if args_count != args_base {
@@ -330,11 +338,12 @@ fn compile_element<'a>(
 		} => {
 			let else_str = Cow::Owned(format!("if_else_{}_{}", state.scope_name, state.line_id));
 			let end_str = format!("if_end_{}_{}", state.scope_name, state.line_id);
-			let mut cond = compile_statement(condition, state)?;
+			let mut cond = compile_statement(condition, state, std_functions)?;
 			cond.push((Instruction::TSTA, None));
-			let mut then_block = compile_element(then, state, stack_base, optimise)?;
+			let mut then_block = compile_element(then, state, stack_base, optimise, std_functions)?;
 			if let Some(v) = else_then {
-				let mut else_block = compile_element(v, state, stack_base, optimise)?;
+				let mut else_block =
+					compile_element(v, state, stack_base, optimise, std_functions)?;
 				cond.push((Instruction::BEQ(Addressing::Label(else_str)), None));
 				cond.append(&mut then_block);
 				cond.push((
@@ -357,13 +366,19 @@ fn compile_element<'a>(
 			let cond_str = format!("cond_{}", state.scope_name);
 			let end_str = format!("end_{}", state.scope_name);
 			let mut instructions = vec![(Instruction::Label(Cow::Owned(cond_str.clone())), None)];
-			instructions.append(&mut compile_statement(condition, state)?);
+			instructions.append(&mut compile_statement(condition, state, std_functions)?);
 			instructions.push((Instruction::TSTA, None));
 			instructions.push((
 				Instruction::BEQ(Addressing::Label(Cow::Owned(end_str.clone()))),
 				None,
 			));
-			instructions.append(&mut compile_element(body, state, stack_base, optimise)?);
+			instructions.append(&mut compile_element(
+				body,
+				state,
+				stack_base,
+				optimise,
+				std_functions,
+			)?);
 			instructions.push((
 				Instruction::JMP(Addressing::Label(Cow::Owned(cond_str))),
 				None,
@@ -378,7 +393,7 @@ fn compile_element<'a>(
 				Some(Cow::Borrowed("Clearing variables")),
 			);
 			if let Some(statement) = ret {
-				let mut statement = compile_statement(statement, state)?;
+				let mut statement = compile_statement(statement, state, std_functions)?;
 				statement.push(stack_clear);
 				statement.push((Instruction::RTS, None));
 				statement
@@ -391,7 +406,7 @@ fn compile_element<'a>(
 			if state.scope_name == "global" {
 				return Err(error!(LoneGlobalStatement, element));
 			}
-			compile_statement(statement, state)?
+			compile_statement(statement, state, std_functions)?
 		}
 
 		StructlessLanguage::Block { block, scope_name } => {
@@ -406,7 +421,8 @@ fn compile_element<'a>(
 				stack_size: &mut inner_stack,
 				line_id: state.line_id,
 			};
-			let mut instructions = compile_elements(block, &mut inner_state, stack_base, optimise)?;
+			let mut instructions =
+				compile_elements(block, &mut inner_state, stack_base, optimise, std_functions)?;
 			let stack_diff = inner_stack - *state.stack_size;
 			if stack_diff != 0 {
 				instructions.push((Instruction::LEASP(Addressing::SP(stack_diff)), None));
@@ -420,6 +436,7 @@ fn compile_element<'a>(
 fn compile_statement<'a>(
 	statement: &'a StructlessStatement<'a>,
 	state: &mut State<'a, '_, '_, '_, '_>,
+	std_functions: &HashSet<&'static str>,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
@@ -433,7 +450,8 @@ fn compile_statement<'a>(
 			line_id: state.line_id,
 		},
 		&mut tmps.clone(), //Will start by -1.
-		                   // Counts down so that positions closest to the stack are used first which helps optimisation to save memory
+		// Counts down so that positions closest to the stack are used first which helps optimisation to save memory
+		std_functions,
 	)?;
 	if tmps > 0 {
 		let mut block = vec![(
@@ -455,6 +473,7 @@ fn compile_statement_inner<'a>(
 	statement: &'a StructlessStatement,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
+	std_functions: &HashSet<&'static str>,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let instructions = match statement {
 		//Commutative operations
@@ -480,7 +499,7 @@ fn compile_statement_inner<'a>(
 			} else {
 				(rhs.as_ref(), lhs.as_ref())
 			};
-			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
+			let mut instructions = compile_statement_inner(left, state, tmps_used, std_functions)?;
 			let mut right_instructions_plus_one = || {
 				*tmps_used -= 1;
 				let res = compile_statement_inner(
@@ -494,6 +513,7 @@ fn compile_statement_inner<'a>(
 						line_id: state.line_id,
 					},
 					tmps_used,
+					std_functions,
 				);
 				*tmps_used += 1;
 				res
@@ -520,7 +540,8 @@ fn compile_statement_inner<'a>(
 				//default:
 				_ => {
 					*tmps_used -= 1;
-					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
+					let mut right_instructions =
+						compile_statement_inner(right, state, tmps_used, std_functions)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((
 							Instruction::from_statement_element_structless(statement, adr.clone())?,
@@ -568,7 +589,7 @@ fn compile_statement_inner<'a>(
 		} => {
 			let signed = matches!(*signedness, NumberType::Signed | NumberType::Unknown);
 			let (left, right) = (lhs.as_ref(), rhs.as_ref());
-			let mut instructions = compile_statement_inner(left, state, tmps_used)?;
+			let mut instructions = compile_statement_inner(left, state, tmps_used, std_functions)?;
 			let mut right_instructions_plus_one = || {
 				*tmps_used -= 1;
 				let res = compile_statement_inner(
@@ -582,6 +603,7 @@ fn compile_statement_inner<'a>(
 						line_id: state.line_id,
 					},
 					tmps_used,
+					std_functions,
 				);
 				*tmps_used += 1;
 				res
@@ -620,7 +642,8 @@ fn compile_statement_inner<'a>(
 					op_as_function_call(function_name, comment, true)?;
 				}
 				BinOp::RShift | BinOp::LShift => {
-					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
+					let mut right_instructions =
+						compile_statement_inner(right, state, tmps_used, std_functions)?;
 					if let StructlessStatement::Num(n) = rhs.as_ref() {
 						if *n < Number::ZERO {
 							return Err(error!(NegativeShift, statement));
@@ -665,7 +688,8 @@ fn compile_statement_inner<'a>(
 				}
 				_ => {
 					*tmps_used -= 1;
-					let mut right_instructions = compile_statement_inner(right, state, tmps_used)?;
+					let mut right_instructions =
+						compile_statement_inner(right, state, tmps_used, std_functions)?;
 					if let [(Instruction::LDA(adr), comment)] = &right_instructions.as_slice() {
 						instructions.push((
 							Instruction::from_statement_element_structless(statement, adr.clone())?,
@@ -689,6 +713,12 @@ fn compile_statement_inner<'a>(
 			instructions
 		}
 
+		StructlessStatement::FunctionCall { name, parametres }
+			if std_functions.contains(name as &str) =>
+		{
+			unreachable!("No std functions have been added yet")
+		}
+
 		StructlessStatement::FunctionCall { name, parametres } => {
 			let mut instructions = Vec::new();
 			let arg_names = state
@@ -700,7 +730,7 @@ fn compile_statement_inner<'a>(
 					.iter()
 					.filter(|NativeVariable { typ, name: _ }| !matches!(typ, NativeType::Void)),
 			) {
-				instructions.append(&mut compile_statement(statement, state)?);
+				instructions.append(&mut compile_statement(statement, state, std_functions)?);
 				instructions.push((
 					Instruction::PSHA,
 					Some(helper::merge_name_and_field(name, v_name)),
@@ -772,7 +802,7 @@ fn compile_statement_inner<'a>(
 						state.global_variables,
 						*state.stack_size,
 					)?;
-					let mut statement = compile_statement(rhs, state)?;
+					let mut statement = compile_statement(rhs, state, std_functions)?;
 					statement.append(&mut vec![
 						(Instruction::LDY(adr), Some(Cow::Borrowed(name.as_ref()))),
 						(Instruction::LDA(Addressing::AY), None),
@@ -785,7 +815,7 @@ fn compile_statement_inner<'a>(
 					Some((StructlessStatement::Num(idx), rhs))
 					| Some((rhs, StructlessStatement::Num(idx))),
 				) => {
-					let mut statement = compile_statement(rhs, state)?;
+					let mut statement = compile_statement(rhs, state, std_functions)?;
 					statement.append(&mut vec![
 						(Instruction::LDY(Addressing::Data(idx.val)), None),
 						(Instruction::LDA(Addressing::AY), None),
@@ -794,7 +824,8 @@ fn compile_statement_inner<'a>(
 				}
 				//General case
 				_ => {
-					let mut instructions = compile_statement_inner(adr.as_ref(), state, tmps_used)?;
+					let mut instructions =
+						compile_statement_inner(adr.as_ref(), state, tmps_used, std_functions)?;
 					instructions.push((Instruction::PSHA, Some(Cow::Borrowed("A to Y transfer"))));
 					instructions
 						.push((Instruction::PULY, Some(Cow::Borrowed("A to Y  continued"))));
@@ -834,7 +865,7 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::Not(lhs) => {
-			let mut instructions = compile_statement_inner(lhs, state, tmps_used)?;
+			let mut instructions = compile_statement_inner(lhs, state, tmps_used, std_functions)?;
 			instructions.push((Instruction::COMA, None));
 			instructions
 		}
