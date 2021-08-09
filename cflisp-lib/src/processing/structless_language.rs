@@ -456,7 +456,7 @@ fn per_element<'a>(
 				state.structs_and_struct_pointers.insert(name.clone(), n);
 			}
 			let typ = NativeType::ptr(t.as_ref().into());
-			let alloc_name: Cow<'a, str> = Cow::Owned(format!("{}_alloc", name));
+			let alloc_name: Cow<'a, str> = Cow::Owned(format!("_{}_alloc", name));
 			state.symbols.insert(alloc_name.clone(), t.as_ref().into());
 			state.symbols.insert(name.clone(), typ.clone());
 			new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
@@ -959,6 +959,17 @@ fn per_element<'a>(
 				args: new_args,
 				block,
 			})
+		}
+
+		LanguageElement::FunctionSignatureDeclaration { name, args, .. } => {
+			state.functions.insert(name.clone(), args.clone());
+			let mut new_structs_and_struct_pointers = state.structs_and_struct_pointers.clone();
+			for (name, typ) in args
+				.iter()
+				.filter_map(|v| v.typ.get_struct_recursive().map(|t| (v.name, t)))
+			{
+				new_structs_and_struct_pointers.insert(Cow::Borrowed(name), typ);
+			}
 		}
 
 		LanguageElement::IfStatement {

@@ -98,6 +98,26 @@ fn parse_variable_and_function_declarations<'a, 'b>(
 			)
 		}
 
+		[Token::Parentheses(args), Token::NewLine, tail @ ..] => {
+			//Check type to refuse arrays
+			if matches!(var.typ, Type::Arr(_, _)) {
+				return Err(error!(BadType, var_tail));
+			}
+			//No static/const/volatile allowed on functions
+			if tokens != scv_tail {
+				return Err(error!(InvalidToken, var_tail));
+			}
+			let args = parse_argument_declaration(args)?;
+			(
+				LanguageElement::FunctionSignatureDeclaration {
+					typ: var.typ,
+					name: Cow::Borrowed(var.name),
+					args,
+				},
+				tail,
+			)
+		}
+
 		_ => return Err(error!(None)),
 	};
 	Ok(res)

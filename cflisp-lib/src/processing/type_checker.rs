@@ -135,6 +135,32 @@ pub(crate) fn language_element<'a>(
 				)?;
 			}
 
+			LanguageElement::FunctionSignatureDeclaration { typ, name, args } => {
+				let name: &str = name;
+				functions.insert(
+					name,
+					Function {
+						return_type: typ.clone(),
+						name,
+						parametres: args.to_vec(),
+					},
+				);
+				if args
+					.iter()
+					.any(|Variable { typ, name: _ }| typ == &Type::Void)
+				{
+					return Err(error!(IllegalVoidArgument, line));
+				}
+				if name == "interrupt" {
+					if typ != &Type::Void {
+						return Err(error!(MalformedInterruptHandlerReturn, line));
+					}
+					if !args.is_empty() {
+						return Err(error!(MalformedInterruptHandlerArguments, line));
+					}
+				}
+			}
+
 			LanguageElement::IfStatement {
 				condition,
 				then,

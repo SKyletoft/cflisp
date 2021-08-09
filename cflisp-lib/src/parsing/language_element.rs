@@ -54,6 +54,11 @@ pub enum LanguageElement<'a> {
 		args: Vec<Variable<'a>>,
 		block: Block<'a>,
 	},
+	FunctionSignatureDeclaration {
+		typ: Type<'a>,
+		name: Cow<'a, str>,
+		args: Vec<Variable<'a>>,
+	},
 	StructDefinition {
 		name: Cow<'a, str>,
 		members: Vec<NativeVariable<'a>>,
@@ -108,6 +113,7 @@ impl<'a> LanguageElement<'a> {
 				}
 				statement.rename(from, to);
 			}
+			//Todo: Maybe handle arguments?
 			LanguageElement::FunctionDeclaration {
 				name,
 				block: statements,
@@ -117,6 +123,12 @@ impl<'a> LanguageElement<'a> {
 					*name = Cow::Owned(to.to_string());
 				}
 				rename_many(statements, from, to);
+			}
+			//Todo: Maybe handle arguments?
+			LanguageElement::FunctionSignatureDeclaration { name, .. } => {
+				if name == from {
+					*name = Cow::Owned(to.to_string());
+				}
 			}
 			LanguageElement::StructAssignment {
 				name,
