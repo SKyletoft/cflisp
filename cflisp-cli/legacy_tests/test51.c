@@ -1,3 +1,4 @@
+// test51.c
 struct Foo {
 	int a;
 	int b;
