@@ -1,0 +1,12 @@
+_mirror	LDA	#9	; Mirrors the value pointed to by X in place
+	PSHA
+_mirchk	DECA
+	BEQ	_mirret
+	ROR	0,X
+	ROL	0,SP
+	JMP	_mirchk
+_mirret	PULA
+	STA	0,X
+	RTS
+
+

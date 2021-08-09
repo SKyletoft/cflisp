@@ -1,0 +1,19 @@
+_mirror	CLRA		; Loads a mirrored version of the byte pointed to by X into A
+	LSR	0,X	; Destroys the original value in the process
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+	LSR	0,X
+	ROLA
+
+
