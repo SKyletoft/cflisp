@@ -92,14 +92,16 @@ fn get_prio_section(start: char, end: char, s: &str) -> Option<(&str, &str)> {
 	if !s.starts_with(start) {
 		return None;
 	}
-	let mut parentheses = 0;
-	let mut len = 0;
-	for c in s.chars() {
+	let mut parentheses = 1;
+	let mut len = 1;
+	for c in s.chars().skip(1) {
 		len += 1;
-		if c == start {
-			parentheses += 1;
-		} else if c == end {
+		//Check end first because start might be equal to end (in the case of strings for instance)
+		//Todo: Handle nested strings
+		if c == end {
 			parentheses -= 1;
+		} else if c == start {
+			parentheses += 1;
 		}
 		if parentheses == 0 {
 			break;
