@@ -3,6 +3,7 @@ use std::{borrow::Cow, fmt};
 use crate::*;
 
 //When try blocks are stablised: Convert to try block for clear error handling at call site
+///Contains `?` but doesn't return `Result<_, _>` because of macro issues
 macro_rules! write_indented {
 	($f:expr, $i:expr, $t:expr) => {
 		DisplayWithIndent::fmt($t, $f, $i)?;
@@ -96,22 +97,19 @@ impl DisplayWithIndent for StatementToken<'_> {
 				Ok(())
 			}
 			ArrayAccess(block) => {
-				write!(f, "[")?;
-				write_slice(block, f, " ", indent + 1)?;
-				write!(f, "]")
+				write_indented!(f, indent, "[", &(block.as_slice(), " ", 1), "]");
+				Ok(())
 			}
 			Ternary(block) => {
-				write!(f, "? ")?;
-				write_slice(block, f, " ", indent + 1)?;
-				write!(f, " :")
+				write_indented!(f, indent, "? ", &(block.as_slice(), " ", 1), " :");
+				Ok(())
 			}
 			Var(n) => write!(f, "{}", n),
 			FunctionCall(n, args) => {
 				write!(f, "{}(", n)?;
 				if let [start @ .., end] = args.as_slice() {
 					for item in start.iter() {
-						write_slice(item, f, " ", indent + 1)?;
-						write!(f, ", ")?;
+						write_indented!(f, indent, &(item.as_slice(), " ", 1), ", ");
 					}
 					write_slice(end, f, " ", indent + 1)?;
 				}
@@ -122,8 +120,7 @@ impl DisplayWithIndent for StatementToken<'_> {
 				write!(f, "{{")?;
 				if let [start @ .., end] = arr.as_slice() {
 					for item in start.iter() {
-						write_slice(item, f, " ", indent + 1)?;
-						write!(f, ", ")?;
+						write_indented!(f, indent, &(item.as_slice(), " ", 1), ", ");
 					}
 					write_slice(end, f, " ", indent + 1)?;
 				}
@@ -219,24 +216,20 @@ impl DisplayWithIndent for Token<'_> {
 			While => write!(f, "while"),
 			Xor => write!(f, "^"),
 			Parentheses(block) => {
-				write!(f, "(")?;
-				write_slice(block, f, " ", 0)?;
-				write!(f, ")")
+				write_indented!(f, 0, "(", &(block.as_slice(), " ", 0), ")");
+				Ok(())
 			}
 			Source(block) | Block(block) => {
-				write!(f, "{{")?;
-				write_slice(block, f, " ", 0)?;
-				write!(f, "}}")
+				write_indented!(f, 0, "{", &(block.as_slice(), " ", 0), "}");
+				Ok(())
 			}
 			ArrayAccess(block) => {
-				write!(f, "[")?;
-				write_slice(block, f, " ", 0)?;
-				write!(f, "]")
+				write_indented!(f, 0, "[", &(block.as_slice(), " ", 0), "]");
+				Ok(())
 			}
 			Ternary(block) => {
-				write!(f, "? ")?;
-				write_slice(block, f, " ", 0)?;
-				write!(f, " :")
+				write_indented!(f, 0, "? ", &(block.as_slice(), " ", 0), " :");
+				Ok(())
 			}
 		}
 	}
@@ -331,6 +324,23 @@ impl DisplayWithIndent for LanguageElement<'_> {
 				);
 				Ok(())
 			}
+			LanguageElement::FunctionSignatureDeclaration { typ, name, args } => {
+				write_indented!(f, indent, typ, " ", name);
+				if args.is_empty() {
+					write_indented!(f, indent, "();");
+				} else {
+					write_indented!(
+						f,
+						indent,
+						"(\n",
+						&(args.as_slice(), ",\n", 1),
+						"\n",
+						&indent,
+						");"
+					);
+				}
+				Ok(())
+			}
 			LanguageElement::StructDefinition { name, members } => {
 				write_indented!(
 					f,
@@ -416,7 +426,6 @@ impl DisplayWithIndent for LanguageElement<'_> {
 				write!(f, ";")
 			}
 			LanguageElement::Statement(statement) => {
-				DisplayWithIndent::fmt(&indent, f, 0)?;
 				write!(f, "{};", statement)
 			}
 		}
@@ -606,7 +615,13 @@ impl DisplayWithIndent for StructlessStatement<'_> {
 			Not(inner) => write!(f, "!({})", inner),
 			Var(name) => write!(f, "{}", name),
 			Num(Number { val, .. }) => write!(f, "{}", val),
-			Char(c) => write!(f, "{}", c),
+			Char(c) => {
+				if c.is_ascii_alphanumeric() {
+					write!(f, "'{}'", c)
+				} else {
+					write!(f, "{}", *c as usize)
+				}
+			}
 			Bool(b) => write!(f, "{}", b),
 			Array(arr) => {
 				write!(f, "{{",)?;
