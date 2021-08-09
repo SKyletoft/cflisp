@@ -106,6 +106,7 @@ impl<'a> StatementToken<'a> {
 				Token::StringLiteral(s) => StatementToken::Array(
 					s.chars()
 						.map(|c| vec![StatementToken::Char(c)])
+						.chain([vec![StatementToken::Char(0 as char)]])
 						.collect::<Vec<_>>(),
 				),
 				_ => {
