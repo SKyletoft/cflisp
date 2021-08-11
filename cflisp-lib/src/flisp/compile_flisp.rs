@@ -860,8 +860,9 @@ fn compile_statement_inner<'a>(
 			match adr {
 				Addressing::SP(n) => {
 					vec![
-						(Instruction::STSP(Addressing::SP(ABOVE_STACK_OFFSET)), None),
-						(Instruction::LDA(Addressing::SP(ABOVE_STACK_OFFSET)), None),
+						(Instruction::LEASP(Addressing::SP(-1)), None),
+						(Instruction::STSP(Addressing::SP(0)), None),
+						(Instruction::PULA, None),
 						(Instruction::ADDA(Addressing::Data(n)), None),
 					]
 				}
