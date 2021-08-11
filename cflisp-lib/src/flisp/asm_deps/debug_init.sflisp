@@ -4,4 +4,5 @@ __init_	LDA	#0
 	LDSP	#$FB
 	JSR	main
 __end__	JMP	__end__
+__err__	JMP	__err__
 
