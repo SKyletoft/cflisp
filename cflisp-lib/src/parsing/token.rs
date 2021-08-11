@@ -96,7 +96,7 @@ pub enum Token<'a> {
 impl<'a> Token<'a> {
 	///Splits a string into a list of tokens by matching pattern by pattern instead of
 	/// splitting and then converting into tokens
-	pub(crate) fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>> {
+	pub fn by_byte(source: &'a str) -> Result<Vec<Token<'a>>> {
 		if source.is_empty() {
 			return Ok(Vec::new());
 		}

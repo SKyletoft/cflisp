@@ -1,3 +1,4 @@
+#pragma once
 // mirror.h
 
 /// Mirrors the value pointed at by a in place

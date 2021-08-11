@@ -1,7 +1,4 @@
-use std::{
-	borrow::Cow,
-	collections::{HashMap, HashSet},
-};
+use std::{borrow::Cow, collections::HashMap};
 
 use super::*;
 use crate::*;
@@ -18,8 +15,19 @@ type GlobalVariables<'a, 'b> = &'b mut HashMap<Cow<'a, str>, NativeType>;
 ///Name, Argument list (not named)
 type Functions<'a, 'b> = &'b mut HashMap<Cow<'a, str>, &'a [NativeVariable<'a>]>;
 
+#[allow(clippy::type_complexity)]
+const STANDARD_FUNCTIONS: [(
+	&str,
+	&dyn for<'a> Fn(
+		&'a [StructlessStatement<'a>],
+		&mut State<'a, '_, '_, '_, '_>,
+		&mut isize,
+		bool,
+	) -> Result<Vec<CommentedInstruction<'a>>>,
+); 2] = [("swap", &swap), ("mirror_in_place", &mirror)];
+
 #[derive(Debug, PartialEq)]
-struct State<'a, 'b, 'c, 'd, 'e> {
+pub(crate) struct State<'a, 'b, 'c, 'd, 'e> {
 	variables: Variables<'a, 'b>,
 	global_variables: GlobalVariables<'a, 'c>,
 	functions: Functions<'a, 'd>,
@@ -40,7 +48,6 @@ pub fn compile<'a>(
 			typ: NativeType::Int,
 		}],
 	);
-	let std_functions = HashSet::new();
 	compile_elements(
 		program,
 		&mut State {
@@ -53,7 +60,7 @@ pub fn compile<'a>(
 		},
 		0,
 		flags.optimise >= 1,
-		&std_functions,
+		true,
 	)
 }
 
@@ -62,7 +69,7 @@ fn compile_elements<'a>(
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
-	std_functions: &HashSet<&'static str>,
+	std_functions: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let mut instructions = vec![(Instruction::Label(state.scope_name.clone()), None)];
 	for (i, e) in block.iter().enumerate() {
@@ -90,7 +97,7 @@ fn compile_element<'a>(
 	state: &mut State<'a, '_, '_, '_, '_>,
 	stack_base: isize,
 	optimise: bool,
-	std_functions: &HashSet<&'static str>,
+	std_functions: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let res = match element {
 		StructlessLanguage::VariableLabelTag {
@@ -436,7 +443,7 @@ fn compile_element<'a>(
 fn compile_statement<'a>(
 	statement: &'a StructlessStatement<'a>,
 	state: &mut State<'a, '_, '_, '_, '_>,
-	std_functions: &HashSet<&'static str>,
+	std_functions: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let tmps = (statement.depth() as isize - 2).max(0); //Minus 2 because bottom is value and ops keep one value in memory
 	let mut statement_instructions = compile_statement_inner(
@@ -473,7 +480,7 @@ fn compile_statement_inner<'a>(
 	statement: &'a StructlessStatement,
 	state: &mut State<'a, '_, '_, '_, '_>,
 	tmps_used: &mut isize,
-	std_functions: &HashSet<&'static str>,
+	std_functions: bool,
 ) -> Result<Vec<CommentedInstruction<'a>>> {
 	let instructions = match statement {
 		//Commutative operations
@@ -714,9 +721,16 @@ fn compile_statement_inner<'a>(
 		}
 
 		StructlessStatement::FunctionCall { name, parametres }
-			if std_functions.contains(name as &str) =>
+			if STANDARD_FUNCTIONS
+				.iter()
+				.any(|(fn_name, _)| fn_name == name) =>
 		{
-			unreachable!("No std functions have been added yet")
+			//Yes, we loop twice, but the list is short...
+			let (_, f) = STANDARD_FUNCTIONS
+				.iter()
+				.find(|(fn_name, _)| fn_name == name)
+				.expect("Already checked by pattern");
+			f(parametres, state, tmps_used, std_functions)?
 		}
 
 		StructlessStatement::FunctionCall { name, parametres } => {
@@ -874,7 +888,7 @@ fn compile_statement_inner<'a>(
 }
 
 ///Returns addressing for a name. Stack offset for locals and a Label for globals (and not an absolute address)
-fn adr_for_name<'a>(
+pub(crate) fn adr_for_name<'a>(
 	name: &'a str,
 	variables: &HashMap<Cow<'a, str>, (NativeType, isize)>,
 	global_variables: &HashMap<Cow<'a, str>, NativeType>,
@@ -891,4 +905,64 @@ fn adr_for_name<'a>(
 	} else {
 		return Err(error!(UndefinedVariable, name));
 	}
+}
+
+/*
+Template signature
+pub(crate) fn _<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	todo!()
+}
+*/
+
+pub(crate) fn mirror<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	if parametres.len() != 1 {
+		return Err(error!(MissingArguments));
+	}
+	let mut instructions =
+		compile_statement_inner(&parametres[0], state, tmps_used, std_functions)?;
+	instructions.push((Instruction::PSHA, None));
+	instructions.push((Instruction::PULX, None));
+	instructions.push((
+		Instruction::JSR(Addressing::Label(Cow::Borrowed("_mirsmal"))),
+		None,
+	));
+	Ok(instructions)
+}
+
+pub(crate) fn swap<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	if parametres.len() != 2 {
+		return Err(error!(MissingArguments));
+	}
+	let mut instructions =
+		compile_statement_inner(&parametres[0], state, tmps_used, std_functions)?;
+	instructions.push((Instruction::PSHA, None));
+	instructions.push((Instruction::PULX, None));
+	instructions.append(&mut compile_statement_inner(
+		&parametres[1],
+		state,
+		tmps_used,
+		std_functions,
+	)?);
+	instructions.push((Instruction::PSHA, None));
+	instructions.push((Instruction::PULY, None));
+	instructions.push((
+		Instruction::JSR(Addressing::Label(Cow::Borrowed("__swap_"))),
+		None,
+	));
+	Ok(instructions)
 }

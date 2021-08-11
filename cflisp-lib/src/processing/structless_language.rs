@@ -963,13 +963,6 @@ fn per_element<'a>(
 
 		LanguageElement::FunctionSignatureDeclaration { name, args, .. } => {
 			state.functions.insert(name.clone(), args.clone());
-			let mut new_structs_and_struct_pointers = state.structs_and_struct_pointers.clone();
-			for (name, typ) in args
-				.iter()
-				.filter_map(|v| v.typ.get_struct_recursive().map(|t| (v.name, t)))
-			{
-				new_structs_and_struct_pointers.insert(Cow::Borrowed(name), typ);
-			}
 		}
 
 		LanguageElement::IfStatement {

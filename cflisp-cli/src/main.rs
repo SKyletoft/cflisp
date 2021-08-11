@@ -3,7 +3,7 @@ use std::{env, fs, path::PathBuf, process, process::Command};
 use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
-	parsing::parser,
+	parsing::{parser, preprocessing},
 	processing::{optimise_language, structless_language::StructlessLanguage, type_checker},
 };
 
@@ -64,7 +64,8 @@ fn main() {
 		}
 		s
 	};
-	let no_comments = parser::remove_comments(&source);
+	let no_comments = preprocessing::preprocess(&source)
+		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 
 	let parsed = parser::parse(&no_comments, !flags.debug)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));

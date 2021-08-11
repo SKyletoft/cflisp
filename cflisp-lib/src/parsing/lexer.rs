@@ -232,7 +232,7 @@ pub(crate) fn get_token(s: &str) -> Result<(Token, &str)> {
 		.ok_or_else(|| error!(TokenFail, s))
 }
 
-const FORBIDDEN_CHARACTERS: &[char] = &[
+pub(crate) const FORBIDDEN_CHARACTERS: &[char] = &[
 	'+', '-', '/', '*', '.', ',', '!', '~', '<', '>', '&', '|', '\\', '\'', '"', '(', ')', '[',
 	']', '{', '}', '`', '´', '?', '=', '@', '£', '#', '$', '¤', '%', '¨', '§', ';', ':',
 ];

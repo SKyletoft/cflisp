@@ -3,13 +3,25 @@
 use cflisp_lib::{
 	flags::Flags,
 	flisp::{compile_flisp, optimise_flisp, text},
-	parsing::{language_element, parser},
+	parsing::{language_element, parser, preprocessing, token::Token},
 	processing::{optimise_language, structless_language::StructlessLanguage, type_checker},
 };
 use wasm_bindgen::prelude::*;
 
 const WARNING: &str =
 	"Note that compilation errors might've occured in later compilation steps\n\n";
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum OutputType {
+	FlispAssembly,
+	Preprocessed,
+	TokenStream,
+	RawAST,
+	ReconstructedAST,
+	IntermediateRepresentation,
+	ReconstructedIR,
+}
 
 #[wasm_bindgen]
 pub fn add(a: i32, b: i32) -> i32 {
@@ -26,7 +38,7 @@ pub fn run_cc(
 	comments: bool,
 	show_imports: bool,
 	continue_interrupts: bool,
-	output_type: u8,
+	output_type: OutputType,
 ) -> String {
 	match compile_to_text(
 		source,
@@ -53,7 +65,7 @@ fn compile_to_text(
 	comments: bool,
 	show_imports: bool,
 	continue_interrupts: bool,
-	output_type: u8,
+	output_type: OutputType,
 ) -> Result<String, String> {
 	let flags = Flags {
 		hex,
@@ -69,15 +81,22 @@ fn compile_to_text(
 		inline: false,
 		kill_interrupts: !continue_interrupts,
 	};
-	let stripped_comments = parser::remove_comments(source);
+	let stripped_comments = preprocessing::preprocess(source).map_err(|err| format!("{}", err))?;
+	if output_type == OutputType::Preprocessed {
+		return Ok(format!("{}{}", WARNING, stripped_comments));
+	}
+	let tokens = Token::by_byte(&stripped_comments).map_err(|err| format!("{}", err))?;
+	if output_type == OutputType::TokenStream {
+		return Ok(format!("{}{:#?}", WARNING, tokens));
+	}
 	let tree = parser::parse(&stripped_comments, flags.debug).map_err(|err| format!("{}", err))?;
 	if type_check {
 		type_checker::type_check(&tree).map_err(|err| format!("{}", err))?;
 	}
-	if output_type == 1 {
+	if output_type == OutputType::RawAST {
 		return Ok(format!("{}{:#?}", WARNING, tree));
 	}
-	if output_type == 2 {
+	if output_type == OutputType::ReconstructedAST {
 		return Ok(format!(
 			"{}{}",
 			WARNING,
@@ -86,13 +105,13 @@ fn compile_to_text(
 	}
 	let mut structless =
 		StructlessLanguage::from_language_elements(tree).map_err(|err| format!("{}", err))?;
-	if optimise >= 2 {
+	if optimise >= 4 {
 		optimise_language::all_optimisations(&mut structless).map_err(|err| format!("{}", err))?;
 	}
-	if output_type == 3 {
+	if output_type == OutputType::IntermediateRepresentation {
 		return Ok(format!("{}{:#?}", WARNING, structless));
 	}
-	if output_type == 4 {
+	if output_type == OutputType::ReconstructedIR {
 		return Ok(format!(
 			"{}{}",
 			WARNING,
@@ -117,7 +136,7 @@ fn compile_to_text(
 	if flags.debug {
 		text.insert_str(0, "\tORG\t$20\n");
 	}
-	if output_type == 0 {
+	if output_type == OutputType::FlispAssembly {
 		return Ok(text);
 	}
 	Err("Front end error: Invalid index from dropdown menu".to_string())

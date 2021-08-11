@@ -28,7 +28,7 @@ fn init_native_variables() {
 fn legacy_dont_crash() {
 	let run = |file| {
 		let flags = Flags::default();
-		let no_comments = parser::remove_comments(file);
+		let no_comments = preprocessing::remove_comments(file);
 		let parsed = parser::parse(&no_comments, false).unwrap();
 		let type_checked = type_checker::type_check(&parsed);
 		assert!(type_checked.is_ok(), "Type check failed");
@@ -182,7 +182,7 @@ fn comments() {
 		"keep /* /* /* /* NESTED COMMENTS! */ */ */ */this and this",
 	];
 	for &case in cases_1.iter() {
-		let result = parser::remove_comments(case);
+		let result = preprocessing::remove_comments(case);
 		assert_eq!(result, expected_1, "\n{:?}", case);
 	}
 
@@ -191,13 +191,13 @@ fn comments() {
 		"a//hi//continued\nb//more comments \nc\n",
 	];
 	for &case in cases_2.iter() {
-		let result = parser::remove_comments(case);
+		let result = preprocessing::remove_comments(case);
 		assert_eq!(result, expected_2, "\n{:?}", case);
 	}
 
 	let case_3 = include_str!("commented.txt");
 	let expected_3 = include_str!("commentless.txt");
-	let result_3 = parser::remove_comments(case_3);
+	let result_3 = preprocessing::remove_comments(case_3);
 	assert_eq!(result_3, expected_3);
 }
 

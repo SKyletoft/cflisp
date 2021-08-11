@@ -1,3 +1,4 @@
+#pragma once
 // builtins.h
 
 /// bool cast

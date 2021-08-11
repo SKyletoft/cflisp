@@ -222,6 +222,7 @@ pub enum ErrorTypes {
 	InvalidAddressOf,
 	InternalOpOfFunction,
 	InternalOpOfLiteral,
+	InvalidImport,
 }
 
 impl fmt::Display for ErrorTypes {
@@ -298,6 +299,7 @@ impl fmt::Display for ErrorTypes {
 			InternalOpOfFunction => "Internal error: function call, not instruction?",
 			InvalidAddressOf => "Invalid address of operation (should've failed in parse)",
 			InternalOpOfLiteral => "Internal error: special cases and literals, not instructions?",
+			InvalidImport => "Cannot find file to import",
 		};
 		write!(f, "{}", msg)
 	}

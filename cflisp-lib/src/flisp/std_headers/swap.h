@@ -1,3 +1,4 @@
+#pragma once
 // swap.h
 
 /// Swaps the values pointed at by a and b

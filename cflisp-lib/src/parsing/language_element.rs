@@ -224,6 +224,7 @@ pub(crate) fn move_declarations_first(block: &mut Block) {
 			} => 2,
 
 			LanguageElement::FunctionDeclaration { .. } => 3,
+			LanguageElement::FunctionSignatureDeclaration { .. } => 3,
 			_ => 4,
 		}
 	};
