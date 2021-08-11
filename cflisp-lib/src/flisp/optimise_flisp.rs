@@ -322,6 +322,16 @@ fn load_a(instructions: &mut Vec<CommentedInstruction>) {
 				continue;
 			}
 		}
+		//Remove immediate pull and push
+		if let ((Instruction::PULA, first), (Instruction::PSHA, second)) =
+			(&instructions[idx], &instructions[idx + 1])
+		{
+			instructions[idx] = (
+				Instruction::LDA(Addressing::SP(0)),
+				merge_comments!(first, second),
+			);
+			instructions.remove(idx + 1);
+		}
 		idx += 1;
 	}
 }
