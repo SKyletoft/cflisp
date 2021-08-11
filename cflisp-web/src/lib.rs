@@ -89,7 +89,7 @@ fn compile_to_text(
 	if output_type == OutputType::TokenStream {
 		return Ok(format!("{}{:#?}", WARNING, tokens));
 	}
-	let tree = parser::parse(&stripped_comments, flags.debug).map_err(|err| format!("{}", err))?;
+	let tree = parser::parse(&stripped_comments, !flags.debug).map_err(|err| format!("{}", err))?;
 	if type_check {
 		type_checker::type_check(&tree).map_err(|err| format!("{}", err))?;
 	}
