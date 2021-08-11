@@ -3,12 +3,14 @@
 
 An experimental C compiler for Digiflisp written in Rust.
 
-Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `float`s and `double`s are not supported at all, nor is the preprocessor.
-`struct`s are supported, but cannot be nested or returned from functions.
+Parses and compiles a subset of C to flisp assembly. All supported types are one byte large. Non native operators are supported via function calls. The example below is what you should expect when compiling with optimisations. `float`s and `double`s are not supported at all.
+`struct`s are supported, but cannot be nested or returned from functions. The preprocessor only supports `#define`, `#include` and `#pragma once`.
 
 Basic maths, function calls (even recursive function calls), if-else-statements (even if-else-if-else-statements), for and while (not do-while) loops, arbitrary levels of pointers, comments, hex and decimal printing are all supported and tested features. The ternary operator is missing. On Linux you can even call qaflisp to assemble it directly with the `-a` flag (untested on Windows/Mac).
 
 Interrupts are supported. The `interrupt` function (`void interrupt()`) is called when triggered. The interrupt enable flag is set automatically if the interrupt function exists.
+
+A minimal standard library is included, with optimised functions for swapping
 
 ## How do I run it?
 Install the rust toolchain from rust-lang.org, clone this repo and then just run `cargo run --release` from the cflisp-cli folder. There are also binary releases from the github releases page. Alternatively there is a WIP web interface like Godbolt's Compiler Explorer. A hosted version can be found at https://eli.nu/grudat/cflisp.
