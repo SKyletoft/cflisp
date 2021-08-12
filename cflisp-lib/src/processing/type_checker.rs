@@ -425,10 +425,22 @@ pub(crate) fn type_of<'a>(
 		)
 		.unwrap_or(Type::Int),
 		StatementElement::BitNot(val) => type_of(val, variables, functions, structs)?,
+		StatementElement::BoolAnd { lhs, rhs } | StatementElement::BoolOr { lhs, rhs } => {
+			let lhs_t = type_of(lhs, variables, functions, structs)?;
+			let rhs_t = type_of(rhs, variables, functions, structs)?;
+			if lhs_t != Type::Bool || rhs_t != Type::Bool {
+				return Err(error!(TypeMismatch, elem));
+			}
+			Type::Bool
+		}
+		StatementElement::BoolNot(val) => {
+			let val_t = type_of(val, variables, functions, structs)?;
+			if val_t != Type::Bool {
+				return Err(error!(TypeMismatch, elem));
+			}
+			Type::Bool
+		}
 		StatementElement::Bool(_)
-		| StatementElement::BoolAnd { .. }
-		| StatementElement::BoolOr { .. }
-		| StatementElement::BoolNot(_)
 		| StatementElement::GreaterThan { .. }
 		| StatementElement::LessThan { .. }
 		| StatementElement::GreaterThanEqual { .. }
@@ -540,8 +552,6 @@ pub fn statement_element(
 		| StatementElement::Mod { lhs, rhs }
 		| StatementElement::LShift { lhs, rhs }
 		| StatementElement::RShift { lhs, rhs }
-		| StatementElement::BoolAnd { lhs, rhs }
-		| StatementElement::BoolOr { lhs, rhs }
 		| StatementElement::GreaterThan { lhs, rhs }
 		| StatementElement::LessThan { lhs, rhs }
 		| StatementElement::Cmp { lhs, rhs }
@@ -553,12 +563,35 @@ pub fn statement_element(
 		| StatementElement::NotCmp { lhs, rhs } => {
 			statement_element(lhs, variables, functions, structs)?;
 			statement_element(rhs, variables, functions, structs)?;
+			let lhs_t = type_of(lhs, variables, functions, structs)?;
+			let rhs_t = type_of(rhs, variables, functions, structs)?;
+			if lhs_t != rhs_t
+				|| !matches!(lhs_t, Type::Int | Type::Uint | Type::Char)
+				|| !matches!(rhs_t, Type::Int | Type::Uint | Type::Char)
+			{
+				return Err(error!(TypeMismatch, elem));
+			}
 		}
 
-		StatementElement::Deref(lhs)
-		| StatementElement::BitNot(lhs)
-		| StatementElement::BoolNot(lhs) => {
+		StatementElement::BitNot(lhs) | StatementElement::Deref(lhs) => {
 			statement_element(lhs, variables, functions, structs)?;
+		}
+
+		StatementElement::BoolNot(lhs) => {
+			statement_element(lhs, variables, functions, structs)?;
+			if type_of(lhs, variables, functions, structs)? != Type::Bool {
+				return Err(error!(TypeMismatch, elem));
+			}
+		}
+
+		StatementElement::BoolAnd { lhs, rhs } | StatementElement::BoolOr { lhs, rhs } => {
+			statement_element(lhs, variables, functions, structs)?;
+			statement_element(rhs, variables, functions, structs)?;
+			if type_of(lhs, variables, functions, structs)? != Type::Bool
+				|| type_of(rhs, variables, functions, structs)? != Type::Bool
+			{
+				return Err(error!(TypeMismatch, elem));
+			}
 		}
 
 		StatementElement::Cast { value, .. } => {

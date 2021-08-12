@@ -1,11 +1,6 @@
 labels/gotos
 
-Cast to bool: Bit-and with itself and then TRF C -> A
-maybe?
-
 Optimisation: copy out a single calculation of address when array is used a lot
-
-Separate out the repeated operator function call code in codegen
 
 Assign struct to any non named pointer
 
