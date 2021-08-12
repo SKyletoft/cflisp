@@ -105,7 +105,7 @@ fn compile_to_text(
 	}
 	let mut structless =
 		StructlessLanguage::from_language_elements(tree).map_err(|err| format!("{}", err))?;
-	if optimise >= 4 {
+	if optimise >= 2 {
 		optimise_language::all_optimisations(&mut structless).map_err(|err| format!("{}", err))?;
 	}
 	if output_type == OutputType::IntermediateRepresentation {

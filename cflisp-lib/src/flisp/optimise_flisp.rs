@@ -145,10 +145,9 @@ fn repeat_a(instructions: &mut Vec<CommentedInstruction>) {
 				if comment.is_some() && Some(comment) == instructions.get(last_load).map(|(_, c)| c)
 				{
 					instructions.remove(idx);
-					idx -= 1;
-				} else {
-					last_load = idx;
+					continue;
 				}
+				last_load = idx;
 			}
 			(Instruction::ADDA(_), _)
 			| (Instruction::SUBA(_), _)

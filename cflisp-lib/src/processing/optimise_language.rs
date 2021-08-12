@@ -93,9 +93,11 @@ pub(crate) fn dead_code_elimination(elements: &mut Vec<StructlessLanguage>) {
 					elements.pop();
 				}
 			}
-			StructlessLanguage::Statement(_) => {
-				elements.remove(idx);
-				continue;
+			StructlessLanguage::Statement(s) => {
+				if !matches!(s, StructlessStatement::FunctionCall { .. }) {
+					elements.remove(idx);
+					continue;
+				}
 			}
 
 			_ => {}
@@ -195,18 +197,22 @@ fn find_variables_se<'a>(vars: &mut HashSet<String>, element: &'a StructlessStat
 		StructlessStatement::Deref(lhs) | StructlessStatement::Not(lhs) => {
 			find_variables_se(vars, lhs);
 		}
-		StructlessStatement::FunctionCall { .. }
-		| StructlessStatement::Num(_)
-		| StructlessStatement::Char(_)
-		| StructlessStatement::Bool(_) => {}
+		StructlessStatement::FunctionCall { parametres, .. } => {
+			for parametre in parametres.iter() {
+				find_variables_se(vars, parametre);
+			}
+		}
 		StructlessStatement::Array(statements) => {
 			for statement in statements {
-				find_variables_se(vars, statement)
+				find_variables_se(vars, statement);
 			}
 		}
 		StructlessStatement::AdrOf(n) | StructlessStatement::Var(n) => {
 			vars.insert(n.to_string());
 		}
+		StructlessStatement::Num(_)
+		| StructlessStatement::Char(_)
+		| StructlessStatement::Bool(_) => {}
 	}
 }
 
