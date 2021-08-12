@@ -2,6 +2,7 @@
 use std::borrow::Cow;
 
 use super::{super::*, *};
+use crate::types::AssignmentType;
 
 #[test]
 fn fast_mul() {
@@ -264,6 +265,7 @@ fn extract_statics() {
 			LanguageElement::VariableAssignment {
 				name: Cow::Borrowed("alpha_beta_gamma"),
 				value: StatementElement::Num(3.into()),
+				assignment_type: AssignmentType::Normal,
 			},
 		],
 	}];

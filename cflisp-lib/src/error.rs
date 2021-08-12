@@ -223,6 +223,7 @@ pub enum ErrorTypes {
 	InternalOpOfFunction,
 	InternalOpOfLiteral,
 	InvalidImport,
+	BadAssignmentType,
 }
 
 impl fmt::Display for ErrorTypes {
@@ -300,6 +301,7 @@ impl fmt::Display for ErrorTypes {
 			InvalidAddressOf => "Invalid address of operation (should've failed in parse)",
 			InternalOpOfLiteral => "Internal error: special cases and literals, not instructions?",
 			InvalidImport => "Cannot find file to import",
+			BadAssignmentType => "Token wasn't an assign type",
 		};
 		write!(f, "{}", msg)
 	}

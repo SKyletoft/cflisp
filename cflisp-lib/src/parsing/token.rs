@@ -6,6 +6,7 @@ use crate::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'a> {
 	Add,
+	AddAssign,
 	AdrOf,
 	AlignAs,
 	AlignOf,
@@ -14,8 +15,10 @@ pub enum Token<'a> {
 	Atomic,
 	Auto,
 	BitAnd,
+	BitAndAssign,
 	BitNot,
 	BitOr,
+	BitOrAssign,
 	Bool(bool),
 	BoolAnd,
 	BoolCast,
@@ -32,9 +35,11 @@ pub enum Token<'a> {
 	Const,
 	Continue,
 	Decl(NativeType),
+	Decrement,
 	Default,
 	Deref,
 	Div,
+	DivAssign,
 	Do,
 	Double,
 	Else,
@@ -50,14 +55,18 @@ pub enum Token<'a> {
 	GreaterThanEqual,
 	If,
 	Imaginary,
+	Increment,
 	Inline,
 	IntCast,
 	LessThan,
 	LessThanEqual,
 	Long,
 	LShift,
+	LShiftAssign,
 	Mod,
+	ModAssign,
 	Mul,
+	MulAssign,
 	Name(&'a str),
 	Namespace,
 	NamespaceSplitter,
@@ -69,6 +78,7 @@ pub enum Token<'a> {
 	Restrict,
 	Return,
 	RShift,
+	RShiftAssign,
 	Short,
 	Signed,
 	SizeOf,
@@ -77,6 +87,7 @@ pub enum Token<'a> {
 	StringLiteral(&'a str),
 	Struct,
 	Sub,
+	SubAssign,
 	Switch,
 	ThreadLocal,
 	Ternary(Vec<Token<'a>>),
@@ -91,6 +102,7 @@ pub enum Token<'a> {
 	Volatile,
 	While,
 	Xor,
+	XorAssign,
 }
 
 impl<'a> Token<'a> {
@@ -108,5 +120,25 @@ impl<'a> Token<'a> {
 			src = rest.trim_start();
 		}
 		Ok(vec)
+	}
+
+	///Matches against the different assignment types
+	///
+	/// `=` `+=` `-=` `*=` `/=` `%=` `&=` `|=` `^=` `<<=` `>>=`
+	pub(crate) fn is_assign(&self) -> bool {
+		matches!(
+			self,
+			&Token::Assign
+				| &Token::AddAssign
+				| &Token::SubAssign
+				| &Token::MulAssign
+				| &Token::DivAssign
+				| &Token::BitAndAssign
+				| &Token::BitOrAssign
+				| &Token::XorAssign
+				| &Token::LShiftAssign
+				| &Token::RShiftAssign
+				| &Token::ModAssign
+		)
 	}
 }

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use crate::*;
 
@@ -335,8 +335,22 @@ fn per_element<'a>(
 			});
 		}
 
-		LanguageElement::VariableAssignment { name, value } => {
+		LanguageElement::VariableAssignment {
+			name,
+			value,
+			assignment_type,
+		} => {
 			if let Some(struct_type) = state.structs_and_struct_pointers.get(&name) {
+				if assignment_type != AssignmentType::Normal {
+					return Err(error!(
+						TypeMismatch,
+						&LanguageElement::VariableAssignment {
+							name,
+							value,
+							assignment_type,
+						}
+					));
+				}
 				let struct_type: &str = struct_type;
 				let struct_fields = if let Some(struct_fields) = state.struct_types.get(struct_type)
 				{
@@ -344,7 +358,11 @@ fn per_element<'a>(
 				} else {
 					return Err(error!(
 						BadStructName,
-						&LanguageElement::VariableAssignment { name, value }
+						&LanguageElement::VariableAssignment {
+							name,
+							value,
+							assignment_type,
+						}
 					));
 				};
 				let rhs_name = if let StatementElement::Var(name) = value {
@@ -352,7 +370,11 @@ fn per_element<'a>(
 				} else {
 					return Err(error!(
 						InternalNotStruct,
-						&LanguageElement::VariableAssignment { name, value }
+						&LanguageElement::VariableAssignment {
+							name,
+							value,
+							assignment_type,
+						}
 					));
 				};
 				for NativeVariable { name: field, .. } in struct_fields.iter() {
@@ -364,9 +386,22 @@ fn per_element<'a>(
 					})
 				}
 			} else {
+				let mut new_value = StructlessStatement::from(&value, state)?;
+				if assignment_type != AssignmentType::Normal {
+					let name_var = StructlessStatement::Var(name.clone());
+					let op = assignment_type
+						.try_into()
+						.expect("Assignment type already checked");
+					new_value = StructlessStatement::BinOp {
+						lhs: Box::new(name_var),
+						rhs: Box::new(new_value),
+						op,
+						signedness: value.signedness(state.symbols)?,
+					};
+				}
 				new_elements.push(StructlessLanguage::VariableAssignment {
 					name,
-					value: StructlessStatement::from(&value, state)?,
+					value: new_value,
 				})
 			}
 		}
@@ -535,6 +570,7 @@ fn per_element<'a>(
 				LanguageElement::PointerAssignment {
 					ptr: StatementElement::Var(name),
 					value,
+					assignment_type: AssignmentType::Normal,
 				},
 				upper,
 				scope,
@@ -596,6 +632,7 @@ fn per_element<'a>(
 				LanguageElement::PointerAssignment {
 					ptr: StatementElement::Var(name),
 					value,
+					assignment_type: AssignmentType::Normal,
 				},
 				upper,
 				scope,
@@ -782,7 +819,11 @@ fn per_element<'a>(
 			structs.insert(name, Cow::Borrowed(struct_type));
 		}
 
-		LanguageElement::PointerAssignment { ptr, value } => {
+		LanguageElement::PointerAssignment {
+			ptr,
+			value,
+			assignment_type,
+		} => {
 			let mut default = || {
 				new_elements.push(StructlessLanguage::PointerAssignment {
 					ptr: StructlessStatement::from(&ptr, state)?,
@@ -800,7 +841,11 @@ fn per_element<'a>(
 					} else {
 						return Err(error!(
 							UndefinedType,
-							&LanguageElement::PointerAssignment { ptr, value }
+							&LanguageElement::PointerAssignment {
+								ptr,
+								value,
+								assignment_type,
+							}
 						));
 					};
 					let rhs_name = if let StatementElement::Var(name) = &value {
@@ -808,20 +853,36 @@ fn per_element<'a>(
 					} else {
 						return Err(error!(
 							WrongTypeWasNative,
-							&LanguageElement::PointerAssignment { ptr, value }
+							&LanguageElement::PointerAssignment {
+								ptr,
+								value,
+								assignment_type,
+							}
 						));
 					};
 					for (idx, NativeVariable { name: field, .. }) in fields.iter().enumerate() {
+						let mut new_value =
+							StructlessStatement::Var(helper::merge_name_and_field(rhs_name, field));
+						let ptr = StructlessStatement::BinOp {
+							op: BinOp::Add,
+							lhs: Box::new(StructlessStatement::Var(name.clone())),
+							rhs: Box::new(StructlessStatement::Num((idx as isize).into())),
+							signedness: NumberType::Unsigned,
+						};
+						if assignment_type != AssignmentType::Normal {
+							let op = assignment_type
+								.try_into()
+								.expect("Assignment type already checked");
+							new_value = StructlessStatement::BinOp {
+								lhs: Box::new(StructlessStatement::Deref(Box::new(ptr.clone()))),
+								rhs: Box::new(new_value),
+								op,
+								signedness: value.signedness(state.symbols)?,
+							};
+						}
 						new_elements.push(StructlessLanguage::PointerAssignment {
-							ptr: StructlessStatement::BinOp {
-								op: BinOp::Add,
-								lhs: Box::new(StructlessStatement::Var(name.clone())),
-								rhs: Box::new(StructlessStatement::Num((idx as isize).into())),
-								signedness: NumberType::Unsigned,
-							},
-							value: StructlessStatement::Var(helper::merge_name_and_field(
-								rhs_name, field,
-							)),
+							ptr,
+							value: new_value,
 						});
 					}
 				} else {
@@ -845,7 +906,12 @@ fn per_element<'a>(
 			}
 		}
 
-		LanguageElement::StructFieldPointerAssignment { name, field, value } => {
+		LanguageElement::StructFieldPointerAssignment {
+			name,
+			field,
+			value,
+			assignment_type,
+		} => {
 			let name_borrowed: &str = &name;
 			let struct_type_name = if let Some(struct_type_name) =
 				state.structs_and_struct_pointers.get(name_borrowed)
@@ -854,7 +920,12 @@ fn per_element<'a>(
 			} else {
 				return Err(error!(
 					WrongTypeWasNative,
-					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+					&LanguageElement::StructFieldPointerAssignment {
+						name,
+						field,
+						value,
+						assignment_type,
+					}
 				));
 			};
 			let fields = if let Some(fields) = state.struct_types.get(struct_type_name) {
@@ -862,7 +933,12 @@ fn per_element<'a>(
 			} else {
 				return Err(error!(
 					UndefinedType,
-					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+					&LanguageElement::StructFieldPointerAssignment {
+						name,
+						field,
+						value,
+						assignment_type,
+					}
 				));
 			};
 			let idx = if let Some(idx) = fields
@@ -873,27 +949,36 @@ fn per_element<'a>(
 			} else {
 				return Err(error!(
 					UndefinedStructField,
-					&LanguageElement::StructFieldPointerAssignment { name, field, value }
+					&LanguageElement::StructFieldPointerAssignment {
+						name,
+						field,
+						value,
+						assignment_type,
+					}
 				));
 			};
 			let signedness = NumberType::from(&fields[idx].typ);
-			//Todo: Maybe remove this and tell users to just enable opt?
-			// Does it even make a difference? Or will it just generate
-			// LDA X, idx
-			// regardless?
-			let new_ptr = if idx == 0 {
-				StructlessStatement::Var(name)
-			} else {
-				StructlessStatement::BinOp {
-					op: BinOp::Add,
-					lhs: Box::new(StructlessStatement::Num((idx as isize).into())),
-					rhs: Box::new(StructlessStatement::Var(name)),
-					signedness,
-				}
+			let new_ptr = StructlessStatement::BinOp {
+				op: BinOp::Add,
+				lhs: Box::new(StructlessStatement::Num((idx as isize).into())),
+				rhs: Box::new(StructlessStatement::Var(name)),
+				signedness,
 			};
+			let mut new_value = StructlessStatement::from(&value, state)?;
+			if assignment_type != AssignmentType::Normal {
+				let op = assignment_type
+					.try_into()
+					.expect("Assignment type already checked");
+				new_value = StructlessStatement::BinOp {
+					lhs: Box::new(StructlessStatement::Deref(Box::new(new_ptr.clone()))),
+					rhs: Box::new(new_value),
+					op,
+					signedness: value.signedness(state.symbols)?,
+				};
+			}
 			new_elements.push(StructlessLanguage::PointerAssignment {
 				ptr: new_ptr,
-				value: StructlessStatement::from(&value, state)?,
+				value: new_value,
 			});
 		}
 
@@ -1148,6 +1233,7 @@ fn replace_returns(elements: &mut Vec<LanguageElement>) {
 				elements[idx] = LanguageElement::PointerAssignment {
 					ptr: StatementElement::Var(Cow::Borrowed("__ret__")),
 					value: statement.take().expect("It's already matches as a Some(_)"),
+					assignment_type: AssignmentType::Normal,
 				};
 				elements.insert(idx + 1, LanguageElement::Return(None));
 			}

@@ -1,4 +1,11 @@
-use std::{borrow::Cow, cmp, collections::HashMap, default::Default, ops};
+use std::{
+	borrow::Cow,
+	cmp,
+	collections::HashMap,
+	convert::{TryFrom, TryInto},
+	default::Default,
+	ops, slice,
+};
 
 use crate::*;
 
@@ -503,3 +510,68 @@ pub enum BinOp {
 }
 
 pub type TokenSlice<'a, 'b> = &'b [Token<'a>];
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AssignmentType {
+	Normal,
+	Add,
+	Sub,
+	Mul,
+	Div,
+	Mod,
+	LShift,
+	RShift,
+	And,
+	Or,
+	Xor,
+}
+
+impl TryFrom<&Token<'_>> for AssignmentType {
+	type Error = CflispError;
+
+	fn try_from(from: &Token<'_>) -> Result<Self> {
+		let val = match from {
+			Token::AddAssign => AssignmentType::Add,
+			Token::Assign => AssignmentType::Normal,
+			Token::BitAndAssign => AssignmentType::And,
+			Token::BitOrAssign => AssignmentType::Or,
+			Token::DivAssign => AssignmentType::Div,
+			Token::LShiftAssign => AssignmentType::LShift,
+			Token::ModAssign => AssignmentType::Mod,
+			Token::MulAssign => AssignmentType::Mul,
+			Token::RShiftAssign => AssignmentType::RShift,
+			Token::XorAssign => AssignmentType::Xor,
+			_ => return Err(error!(BadAssignmentType, slice::from_ref(from))),
+		};
+		Ok(val)
+	}
+}
+
+impl TryFrom<Token<'_>> for AssignmentType {
+	type Error = CflispError;
+
+	fn try_from(from: Token<'_>) -> Result<Self> {
+		(&from).try_into()
+	}
+}
+
+impl TryFrom<AssignmentType> for BinOp {
+	type Error = CflispError;
+
+	fn try_from(value: AssignmentType) -> Result<Self> {
+		let ret = match value {
+			AssignmentType::Add => BinOp::Add,
+			AssignmentType::Sub => BinOp::Sub,
+			AssignmentType::Mul => BinOp::Mul,
+			AssignmentType::Div => BinOp::Div,
+			AssignmentType::Mod => BinOp::Mod,
+			AssignmentType::LShift => BinOp::LShift,
+			AssignmentType::RShift => BinOp::RShift,
+			AssignmentType::And => BinOp::And,
+			AssignmentType::Or => BinOp::Or,
+			AssignmentType::Xor => BinOp::Xor,
+			_ => return Err(error!(BadAssignmentType)),
+		};
+		Ok(ret)
+	}
+}

@@ -135,6 +135,7 @@ impl DisplayWithIndent for Token<'_> {
 		use Token::*;
 		match self {
 			Add => write!(f, "+"),
+			AddAssign => write!(f, "+="),
 			AdrOf => write!(f, "&",),
 			AlignAs => write!(f, "_Alignas",),
 			AlignOf => write!(f, "_Alignof",),
@@ -143,8 +144,10 @@ impl DisplayWithIndent for Token<'_> {
 			Atomic => write!(f, "_Atomic",),
 			Auto => write!(f, "auto",),
 			BitAnd => write!(f, "&",),
+			BitAndAssign => write!(f, "&=",),
 			BitNot => write!(f, "~",),
 			BitOr => write!(f, "|",),
+			BitOrAssign => write!(f, "|=",),
 			Bool(b) => write!(f, "{}", b),
 			BoolAnd => write!(f, "&&",),
 			BoolCast => write!(f, "(bool)",),
@@ -161,9 +164,11 @@ impl DisplayWithIndent for Token<'_> {
 			Const => write!(f, "const"),
 			Continue => write!(f, "continue"),
 			Decl(t) => write!(f, "{}", t),
+			Decrement => write!(f, "--"),
 			Default => write!(f, "default"),
 			Deref => write!(f, "*"),
 			Div => write!(f, "/"),
+			DivAssign => write!(f, "/="),
 			Do => write!(f, "do"),
 			Double => write!(f, "double"),
 			Else => write!(f, "else"),
@@ -179,14 +184,18 @@ impl DisplayWithIndent for Token<'_> {
 			GreaterThanEqual => write!(f, ">="),
 			If => write!(f, "if"),
 			Imaginary => write!(f, "_Imaginary"),
+			Increment => write!(f, "++"),
 			Inline => write!(f, "inline"),
 			IntCast => write!(f, "(int)"),
 			LessThan => write!(f, "<"),
 			LessThanEqual => write!(f, "<="),
 			Long => write!(f, "long"),
 			LShift => write!(f, "<<"),
+			LShiftAssign => write!(f, "<<="),
 			Mod => write!(f, "%"),
+			ModAssign => write!(f, "%="),
 			Mul => write!(f, "*"),
+			MulAssign => write!(f, "*="),
 			Name(n) => write!(f, "{}", n),
 			Namespace => write!(f, "namespace"),
 			NamespaceSplitter => write!(f, "::"),
@@ -198,6 +207,7 @@ impl DisplayWithIndent for Token<'_> {
 			Restrict => write!(f, "restrict"),
 			Return => write!(f, "return"),
 			RShift => write!(f, ">>"),
+			RShiftAssign => write!(f, ">>="),
 			Short => write!(f, "short"),
 			Signed => write!(f, "signed"),
 			SizeOf => write!(f, "sizeof"),
@@ -206,6 +216,7 @@ impl DisplayWithIndent for Token<'_> {
 			StringLiteral(s) => write!(f, "\"{}\"", s),
 			Struct => write!(f, "struct"),
 			Sub => write!(f, "-"),
+			SubAssign => write!(f, "-="),
 			Switch => write!(f, "switch"),
 			ThreadLocal => write!(f, "Thread_local"),
 			TypeDef => write!(f, "typedef"),
@@ -215,6 +226,7 @@ impl DisplayWithIndent for Token<'_> {
 			Volatile => write!(f, "volatile"),
 			While => write!(f, "while"),
 			Xor => write!(f, "^"),
+			XorAssign => write!(f, "^="),
 			Parentheses(block) => {
 				write_indented!(f, 0, "(", &(block.as_slice(), " ", 0), ")");
 				Ok(())
@@ -248,8 +260,12 @@ impl DisplayWithIndent for LanguageElement<'_> {
 				let scv: StaticConstVolatile = (is_static, is_const, is_volatile).into();
 				write!(f, "{}{} {};", scv, typ, name)
 			}
-			LanguageElement::VariableAssignment { name, value } => {
-				write!(f, "{} = {};", name, value)
+			LanguageElement::VariableAssignment {
+				name,
+				value,
+				assignment_type,
+			} => {
+				write!(f, "{} {} {};", name, assignment_type, value)
 			}
 			LanguageElement::StructAssignment { name, value } => {
 				write_indented!(f, 0, name, " = {", &(value.as_slice(), ", ", 1), "};");
@@ -288,11 +304,20 @@ impl DisplayWithIndent for LanguageElement<'_> {
 				);
 				Ok(())
 			}
-			LanguageElement::PointerAssignment { ptr, value } => {
-				write!(f, "*{} = {};", ptr, value)
+			LanguageElement::PointerAssignment {
+				ptr,
+				value,
+				assignment_type,
+			} => {
+				write!(f, "*{} {} {};", ptr, assignment_type, value)
 			}
-			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
-				write!(f, "{}->{} = {};", name, field, value)
+			LanguageElement::StructFieldPointerAssignment {
+				name,
+				field,
+				value,
+				assignment_type,
+			} => {
+				write!(f, "{}->{} {} {};", name, field, assignment_type, value)
 			}
 			LanguageElement::FunctionDeclaration {
 				typ,
@@ -696,7 +721,7 @@ impl fmt::Display for ErrorInfo<'_> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			ErrorInfo::Source(a) => write!(f, "{}", a),
-			ErrorInfo::Token(a) => write_slice(a, f, ", ", 0),
+			ErrorInfo::Token(a) => write_slice(a, f, " ", 0),
 			ErrorInfo::Statement(a) => write!(f, "{}", a),
 			ErrorInfo::Language(a) => write!(f, "{}", a),
 			ErrorInfo::StructlessStatement(a) => write!(f, "{}", a),
@@ -810,5 +835,24 @@ impl fmt::Display for BinOp {
 impl fmt::Display for StaticConstVolatile {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		DisplayWithIndent::fmt(self, f, 0)
+	}
+}
+
+impl fmt::Display for AssignmentType {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let s = match self {
+			AssignmentType::Normal => "=",
+			AssignmentType::Add => "+=",
+			AssignmentType::Sub => "-=",
+			AssignmentType::Mul => "*=",
+			AssignmentType::Div => "/=",
+			AssignmentType::Mod => "%=",
+			AssignmentType::LShift => "<<=",
+			AssignmentType::RShift => ">>=",
+			AssignmentType::And => "&=",
+			AssignmentType::Or => "|=",
+			AssignmentType::Xor => "^=",
+		};
+		write!(f, "{}", s)
 	}
 }

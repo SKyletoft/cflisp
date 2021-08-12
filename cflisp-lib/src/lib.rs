@@ -23,6 +23,6 @@ use processing::{
 	structless_language::StructlessLanguage, structless_statement::StructlessStatement,
 };
 use types::{
-	BinOp, Block, BlockStructless, Function, NativeType, NativeVariable, Number, NumberType,
-	Statement, TokenSlice, Type, Variable,
+	AssignmentType, BinOp, Block, BlockStructless, Function, NativeType, NativeVariable, Number,
+	NumberType, Statement, TokenSlice, Type, Variable,
 };

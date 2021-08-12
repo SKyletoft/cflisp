@@ -1,4 +1,4 @@
-use std::{borrow::Cow, marker::PhantomData};
+use std::{borrow::Cow, convert::TryInto, marker::PhantomData};
 
 use super::*;
 use crate::*;
@@ -132,17 +132,24 @@ fn parse_language_pattern<'a, 'b>(
 ) -> Result<(LanguageElement<'a>, TokenSlice<'a, 'b>)> {
 	let res: (LanguageElement<'a>, TokenSlice<'a, 'b>) = match tokens {
 		//Struct member assignment
-		[Token::Name(n), Token::FieldAccess, Token::Name(field), Token::Assign, tail @ ..] => {
+		[Token::Name(n), Token::FieldAccess, Token::Name(field), assign, tail @ ..]
+			if assign.is_assign() =>
+		{
 			let name = helper::merge_name_and_field(n, field);
 			let (rhs, rest) = StatementElement::parse(tail)?;
 			(
-				LanguageElement::VariableAssignment { name, value: rhs },
+				LanguageElement::VariableAssignment {
+					name,
+					value: rhs,
+					assignment_type: assign.try_into().expect("Already checked by pattern"),
+				},
 				rest,
 			)
 		}
 
 		//Struct member assignment through pointer
-		[Token::Name(n), Token::FieldPointerAccess, Token::Name(field), Token::Assign, tail @ ..] =>
+		[Token::Name(n), Token::FieldPointerAccess, Token::Name(field), assign, tail @ ..]
+			if assign.is_assign() =>
 		{
 			let (rhs, rest) = StatementElement::parse(tail)?;
 			(
@@ -150,25 +157,27 @@ fn parse_language_pattern<'a, 'b>(
 					name: Cow::Borrowed(n),
 					field: Cow::Borrowed(field),
 					value: rhs,
+					assignment_type: assign.try_into().expect("Already checked by pattern"),
 				},
 				rest,
 			)
 		}
 
 		//Variable assignment
-		[Token::Name(n), Token::Assign, tail @ ..] => {
+		[Token::Name(n), assign, tail @ ..] if assign.is_assign() => {
 			let (rhs, rest) = StatementElement::parse(tail)?;
 			(
 				LanguageElement::VariableAssignment {
 					name: Cow::Borrowed(n),
 					value: rhs,
+					assignment_type: assign.try_into().expect("Already checked by pattern"),
 				},
 				rest,
 			)
 		}
 
 		//Array assignment
-		[Token::Name(n), Token::ArrayAccess(idx), Token::Assign, tail @ ..] => {
+		[Token::Name(n), Token::ArrayAccess(idx), assign, tail @ ..] if assign.is_assign() => {
 			let (mut idx_arr, _) = Vec::<StatementElement>::parse(idx)?;
 			//yes, C interprets [0,1,2] as just [2]
 			let lhs = idx_arr
@@ -188,6 +197,7 @@ fn parse_language_pattern<'a, 'b>(
 						rhs: Box::new(StatementElement::Var(Cow::Borrowed(n))),
 					},
 					value: rhs,
+					assignment_type: assign.try_into().expect("Already checked by pattern"),
 				},
 				rest,
 			)
@@ -344,7 +354,7 @@ fn parse_pointer_assignment<'a, 'b>(
 	let tokens = &tokens[1..];
 	let assign_position = tokens
 		.iter()
-		.position(|t| t == &Token::Assign)
+		.position(Token::is_assign)
 		.ok_or(error!(None))?;
 	let lhs = StatementElement::parse_with_no_tail(&tokens[..assign_position])?;
 	let (rhs, rhs_rest) = StatementElement::parse(&tokens[assign_position + 1..])?;
@@ -352,6 +362,9 @@ fn parse_pointer_assignment<'a, 'b>(
 		LanguageElement::PointerAssignment {
 			ptr: lhs,
 			value: rhs,
+			assignment_type: (&tokens[assign_position])
+				.try_into()
+				.expect("Already checked by pattern"),
 		},
 		rhs_rest,
 	))

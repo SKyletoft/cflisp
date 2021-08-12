@@ -18,6 +18,7 @@ pub enum LanguageElement<'a> {
 	VariableAssignment {
 		name: Cow<'a, str>,
 		value: StatementElement<'a>,
+		assignment_type: AssignmentType,
 	},
 	StructAssignment {
 		name: Cow<'a, str>,
@@ -42,11 +43,13 @@ pub enum LanguageElement<'a> {
 	PointerAssignment {
 		ptr: StatementElement<'a>,
 		value: StatementElement<'a>,
+		assignment_type: AssignmentType,
 	},
 	StructFieldPointerAssignment {
 		name: Cow<'a, str>,
 		field: Cow<'a, str>,
 		value: StatementElement<'a>,
+		assignment_type: AssignmentType,
 	},
 	FunctionDeclaration {
 		typ: Type<'a>,
@@ -147,7 +150,7 @@ impl<'a> LanguageElement<'a> {
 					.iter_mut()
 					.for_each(|statement| statement.rename(from, to));
 			}
-			LanguageElement::PointerAssignment { ptr, value } => {
+			LanguageElement::PointerAssignment { ptr, value, .. } => {
 				ptr.rename(from, to);
 				value.rename(from, to);
 			}

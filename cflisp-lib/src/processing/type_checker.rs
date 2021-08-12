@@ -70,7 +70,7 @@ pub(crate) fn language_element<'a>(
 				}
 			}
 
-			LanguageElement::PointerAssignment { ptr, value } => {
+			LanguageElement::PointerAssignment { ptr, value, .. } => {
 				statement_element(ptr, variables, functions, structs)?;
 				statement_element(value, variables, functions, structs)?;
 				let correct_type = type_of(ptr, variables, functions, structs)?
@@ -292,7 +292,9 @@ pub(crate) fn language_element<'a>(
 				}
 			}
 
-			LanguageElement::StructFieldPointerAssignment { name, field, value } => {
+			LanguageElement::StructFieldPointerAssignment {
+				name, field, value, ..
+			} => {
 				let name: &str = name;
 				let field: &str = field;
 				let fields = structs
