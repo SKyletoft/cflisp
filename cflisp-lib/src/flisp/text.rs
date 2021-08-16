@@ -37,11 +37,11 @@ pub fn instructions_to_text<'a>(
 			(false, false) => output.push_str(&format!("{}", i)),
 		}
 
-		if !matches!(i, Instruction::Label(n) if n.len() < 8)
+		let newline_exception = !matches!(i, Instruction::Label(l) if l.strip_prefix("global::").unwrap_or(l).len() < 8)
 			|| matches!((i, next), (Instruction::RTS, Instruction::Label(lbl)) if !(lbl.starts_with("if") || lbl.starts_with("for") || lbl.starts_with("while")))
 			|| matches!((i, next), (Instruction::FCB(_), Instruction::Label(_)))
-			|| matches!((i, next), (Instruction::Label(_), Instruction::Label(lbl)) if !lbl.starts_with('\n'))
-		{
+			|| matches!((i, next), (Instruction::Label(_), Instruction::Label(lbl)) if !lbl.starts_with('\n'));
+		if newline_exception {
 			output.push('\n');
 		}
 	}
