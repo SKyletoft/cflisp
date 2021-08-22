@@ -610,7 +610,7 @@ pub fn statement_element(
 					return Err(error!(AssignmentToConstant, elem));
 				}
 			}
-			if !matches!(typ, Type::Int | Type::Uint | Type::Char) {
+			if !matches!(typ, Type::Int | Type::Uint | Type::Char | Type::Ptr(_)) {
 				return Err(error!(TypeMismatch, elem));
 			}
 		}
