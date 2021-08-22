@@ -1,7 +1,4 @@
 __gtu_	CMPA	1,SP	; Greater than (unsigned). Compares 1,SP to A -> A
-	BHI	__gtsu	; (0,SP is the return adr)
-	LDA	#$00
-	RTS
-__gtsu	LDA	#$FF
-	RTS
+	BHI	_ret_t	; (0,SP is the return adr)
+	JMP	_ret_f
 

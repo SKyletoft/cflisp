@@ -1,7 +1,4 @@
 __gts_	CMPA	1,SP	; Greater than (signed). Compares 1,SP to A -> A
-	BGT	__gts1	; (0,SP is the return adr)
-	LDA	#$00
-	RTS
-__gts1	LDA	#$FF
-	RTS
+	BGT	_ret_t	; (0,SP is the return adr)
+	JMP	_ret_f
 

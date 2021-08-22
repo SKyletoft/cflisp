@@ -1,0 +1,6 @@
+_ret_f	CLRA		; Return false
+	RTS
+
+_ret_t	LDA	#$FF	; Return true
+	RTS
+
