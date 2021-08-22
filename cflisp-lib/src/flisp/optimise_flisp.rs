@@ -28,6 +28,7 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	clra(instructions);
 	remove_post_early_return_code(instructions);
 	while_true(instructions);
+	global_ret_bool(instructions);
 
 	Ok(())
 }
@@ -776,6 +777,32 @@ fn while_true(instructions: &mut Vec<CommentedInstruction>) {
 				instructions.remove(idx + 2);
 				instructions.remove(idx + 1);
 				instructions.remove(idx);
+			}
+			_ => {}
+		}
+		idx += 1;
+	}
+}
+
+///Use the global `_ret_t` and `_ret_f`
+fn global_ret_bool(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while instructions.len() >= 2 && idx <= instructions.len() - 2 {
+		match &instructions[idx..idx + 2] {
+			[(Instruction::LDA(Addressing::Data(0xFF)), comment_a), (Instruction::RTS, comment_b)] =>
+			{
+				instructions[idx] = (
+					Instruction::JMP(Addressing::Label(Cow::Borrowed("_ret_t"))),
+					merge_comments!(comment_a, comment_b),
+				);
+				instructions.remove(idx + 1);
+			}
+			[(Instruction::LDA(Addressing::Data(0)), comment_a), (Instruction::RTS, comment_b)] => {
+				instructions[idx] = (
+					Instruction::JMP(Addressing::Label(Cow::Borrowed("_ret_f"))),
+					merge_comments!(comment_a, comment_b),
+				);
+				instructions.remove(idx + 1);
 			}
 			_ => {}
 		}
