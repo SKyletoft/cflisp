@@ -1,5 +1,4 @@
-_print_	CLRA		; Prints string pointed to by X. Continues till null byte
-	CMPA	0,X
+_print_	TST	0,X	; Prints string pointed to by X. Continues till null byte
 	BEQ	_print1
 	LDA	,X+
 	STA	$FB
