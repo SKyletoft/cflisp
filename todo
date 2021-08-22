@@ -5,3 +5,6 @@ Optimisation: copy out a single calculation of address when array is used a lot
 Assign struct to any non named pointer
 
 Optimise statement: Remove add/sub/mul 0 and mul/div 1
+
+Investigate tree eval. If only the latest stored value is read, swap LDA 0,SP and STA 0,SP with PULA and PSHA.
+	This saves memory storing the instructions and saves performance since you don't need leading and following LEASPs
