@@ -294,7 +294,9 @@ impl fmt::Display for ErrorTypes {
 			ProgramTooLarge => "Program is too large for digiflisp!",
 			DuplicateName => "Name already exists in scope!",
 			LoneGlobalStatement => "Lone statement in global scope",
-			NonConstInConstInit => "Non constant in constant initialisation",
+			NonConstInConstInit => {
+				"Non constant in constant initialisation (non static global array?)"
+			}
 			NegativeShift => "Cannot shift by negative amount",
 			IllegalArrayLiteral => "Illegal array literal",
 			InternalOpOfFunction => "Internal error: function call, not instruction?",
