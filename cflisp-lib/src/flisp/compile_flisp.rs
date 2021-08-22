@@ -191,10 +191,10 @@ fn compile_element<'a>(
 				if state.global_variables.contains_key(name) {
 					return Err(error!(DuplicateName, element));
 				}
+				state
+					.global_variables
+					.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 				if let StructlessStatement::Array(elements) = value {
-					state
-						.global_variables
-						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					let values = elements
 						.iter()
 						.map(global_def)
@@ -204,9 +204,6 @@ fn compile_element<'a>(
 						(Instruction::FCB(values), None),
 					]
 				} else {
-					state
-						.global_variables
-						.insert(Cow::Borrowed(name.as_ref()), typ.clone());
 					vec![
 						(Instruction::Label(name.clone()), None),
 						(Instruction::FCB(vec![global_def(value)?]), None),
