@@ -16,4 +16,3 @@ _mirror	CLRA		; Loads a mirrored version of the byte pointed to by X into A
 	LSR	0,X
 	ROLA
 
-
