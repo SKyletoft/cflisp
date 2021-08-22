@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+	borrow::Cow,
+	collections::{HashMap, HashSet},
+};
 
 use crate::*;
 
@@ -15,7 +18,7 @@ pub fn type_check(block: &[LanguageElement]) -> Result<()> {
 ///The maps are out parametres because of loops
 pub(crate) fn language_element<'a>(
 	block: &'a [LanguageElement<'a>],
-	variables: &mut HashMap<&'a str, Type<'a>>,
+	variables: &mut HashMap<Cow<'a, str>, Type<'a>>,
 	functions: &mut HashMap<&'a str, Function<'a>>,
 	structs: &mut HashMap<&'a str, Vec<NativeVariable<'a>>>,
 	constants: &mut HashSet<&'a str>,
@@ -29,7 +32,7 @@ pub(crate) fn language_element<'a>(
 				..
 			} => {
 				let name: &str = name;
-				variables.insert(name, typ.clone());
+				variables.insert(name.into(), typ.clone());
 				if *is_const {
 					constants.insert(name);
 				}
@@ -58,9 +61,8 @@ pub(crate) fn language_element<'a>(
 				is_const,
 				..
 			} => {
-				let name: &str = name;
 				statement_element(value, variables, functions, structs, constants)?;
-				variables.insert(name, typ.clone());
+				variables.insert(name.clone(), typ.clone());
 				if *is_const {
 					constants.insert(name);
 				}
@@ -88,7 +90,6 @@ pub(crate) fn language_element<'a>(
 				args,
 				block,
 			} => {
-				let name: &str = name;
 				functions.insert(
 					name,
 					Function {
@@ -113,9 +114,23 @@ pub(crate) fn language_element<'a>(
 				}
 
 				let mut inner_variables = variables.clone();
-				args.iter().cloned().for_each(|Variable { name, typ }| {
-					inner_variables.insert(name, typ);
-				});
+				for Variable { name, typ } in args.iter().cloned() {
+					if let Some(struct_type) = typ.get_struct() {
+						let fields = structs
+							.get(struct_type)
+							.ok_or_else(|| error!(UndefinedType, line))?;
+						for NativeVariable {
+							name: field_name,
+							typ,
+						} in fields.iter()
+						{
+							let field_name = helper::merge_name_and_field(name, field_name);
+							let field_type: Type = typ.into();
+							inner_variables.insert(field_name, field_type);
+						}
+					}
+					inner_variables.insert(name.into(), typ);
+				}
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
 				let mut inner_constants = constants.clone();
@@ -248,10 +263,10 @@ pub(crate) fn language_element<'a>(
 				)?;
 			}
 
-			//Is handled by function def instead
-			LanguageElement::Return(_) => {}
+			//Function def handles correct return types, here we only need to check if the statement is valid
+			LanguageElement::Return(None) => {}
 
-			LanguageElement::Statement(statement) => {
+			LanguageElement::Return(Some(statement)) | LanguageElement::Statement(statement) => {
 				statement_element(statement, variables, functions, structs, constants)?;
 			}
 
@@ -274,8 +289,7 @@ pub(crate) fn language_element<'a>(
 			LanguageElement::StructDeclarationAssignment {
 				typ, name, value, ..
 			} => {
-				let name: &str = name;
-				variables.insert(name, typ.clone());
+				variables.insert(name.clone(), typ.clone());
 				let struct_type = typ.get_struct().ok_or_else(|| error!(TypeMismatch, line))?;
 				let fields = structs
 					.get(struct_type)
@@ -325,7 +339,7 @@ pub(crate) fn language_element<'a>(
 
 pub(crate) fn verify_function_return_type<'a>(
 	elems: &[LanguageElement<'a>],
-	variables: &'a HashMap<&'a str, Type>,
+	variables: &'a HashMap<Cow<'a, str>, Type>,
 	functions: &'a HashMap<&'a str, Function>,
 	structs: &'a HashMap<&'a str, Vec<NativeVariable<'a>>>,
 	correct_return: &Type,
@@ -399,7 +413,7 @@ fn ptr_type_promotion<'a>(lhs: Type<'a>, rhs: Type<'a>) -> Option<Type<'a>> {
 
 pub(crate) fn type_of<'a>(
 	elem: &StatementElement<'a>,
-	variables: &'a HashMap<&'a str, Type>,
+	variables: &'a HashMap<Cow<'a, str>, Type>,
 	functions: &'a HashMap<&'a str, Function>,
 	structs: &'a HashMap<&'a str, Vec<NativeVariable<'a>>>,
 ) -> Result<Type<'a>> {
@@ -526,7 +540,7 @@ pub(crate) fn type_of<'a>(
 
 pub fn statement_element(
 	elem: &StatementElement,
-	variables: &HashMap<&str, Type>,
+	variables: &HashMap<Cow<str>, Type>,
 	functions: &HashMap<&str, Function>,
 	structs: &HashMap<&str, Vec<NativeVariable>>,
 	constants: &HashSet<&str>,
