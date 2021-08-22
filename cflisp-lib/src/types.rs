@@ -307,10 +307,7 @@ impl NumberType {
 		if other == NumberType::Unknown {
 			return self;
 		}
-		if self != other {
-			return NumberType::Signed;
-		}
-		unreachable!()
+		NumberType::Signed
 	}
 
 	fn make_in_range(&self, n: isize) -> isize {
@@ -540,6 +537,7 @@ impl TryFrom<&Token<'_>> for AssignmentType {
 			Token::ModAssign => AssignmentType::Mod,
 			Token::MulAssign => AssignmentType::Mul,
 			Token::RShiftAssign => AssignmentType::RShift,
+			Token::SubAssign => AssignmentType::Sub,
 			Token::XorAssign => AssignmentType::Xor,
 			_ => return Err(error!(BadAssignmentType, slice::from_ref(from))),
 		};
