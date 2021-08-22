@@ -115,6 +115,9 @@ fn preproc(
 					"builtins.h" => include_str!("../flisp/std_headers/builtins.h"),
 					"mirror.h" => include_str!("../flisp/std_headers/mirror.h"),
 					"swap.h" => include_str!("../flisp/std_headers/swap.h"),
+					"stdin.h" => include_str!("../flisp/std_headers/stdin.h"),
+					"stdout.h" => include_str!("../flisp/std_headers/stdout.h"),
+					"stdio.h" => include_str!("../flisp/std_headers/stdio.h"),
 					_ => return Err(error!(InvalidImport, line)),
 				}
 				.into()

@@ -79,6 +79,12 @@ pub fn automatic_imports(instructions: &mut String, debug: bool, kill_interrupts
 	if instructions.contains("_mirror") {
 		instructions.push_str(include_str!("asm_deps/mirror_small.sflisp"));
 	}
+	if instructions.contains("_print_") {
+		instructions.push_str(include_str!("asm_deps/print.sflisp"));
+	}
+	if instructions.contains("__read_") {
+		instructions.push_str(include_str!("asm_deps/read.sflisp"));
+	}
 	if !instructions.contains("__init_") {
 		let interrupts = instructions.contains("interrupt");
 		let init = match (interrupts, debug, kill_interrupts) {

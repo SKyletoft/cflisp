@@ -1,0 +1,15 @@
+; This is completely flawed as the terminal does not buffer characters and instead just keeps the single latest character
+
+__read_	CLRA		; Reads string from terminal to address pointed to by X.
+	PSHA		; Continues till nullbyte (which is also stored).
+_read_1	LDA	$FC	; Returns the amount of read characters
+	INC	0,SP
+	STA	,X+
+	TSTA
+	BEQ	_read_2
+	CLRA
+	STA	$FC
+	JMP	_read_1
+_read_2	PULA
+	RTS
+

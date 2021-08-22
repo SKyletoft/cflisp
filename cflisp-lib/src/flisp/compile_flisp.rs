@@ -24,7 +24,12 @@ const STANDARD_FUNCTIONS: [(
 		&mut isize,
 		bool,
 	) -> Result<Vec<CommentedInstruction<'a>>>,
-); 2] = [("swap", &swap), ("mirror_in_place", &mirror)];
+); 4] = [
+	("swap", &swap),
+	("mirror_in_place", &mirror),
+	("read_str", &read_string),
+	("print", &print),
+];
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct State<'a, 'b, 'c, 'd, 'e> {
@@ -917,26 +922,6 @@ pub(crate) fn _<'a>(
 }
 */
 
-pub(crate) fn mirror<'a>(
-	parametres: &'a [StructlessStatement],
-	state: &mut State<'a, '_, '_, '_, '_>,
-	tmps_used: &mut isize,
-	std_functions: bool,
-) -> Result<Vec<CommentedInstruction<'a>>> {
-	if parametres.len() != 1 {
-		return Err(error!(MissingArguments));
-	}
-	let mut instructions =
-		compile_statement_inner(&parametres[0], state, tmps_used, std_functions)?;
-	instructions.push((Instruction::PSHA, None));
-	instructions.push((Instruction::PULX, None));
-	instructions.push((
-		Instruction::JSR(Addressing::Label(Cow::Borrowed("_mirsmal"))),
-		None,
-	));
-	Ok(instructions)
-}
-
 pub(crate) fn swap<'a>(
 	parametres: &'a [StructlessStatement],
 	state: &mut State<'a, '_, '_, '_, '_>,
@@ -960,6 +945,54 @@ pub(crate) fn swap<'a>(
 	instructions.push((Instruction::PULY, None));
 	instructions.push((
 		Instruction::JSR(Addressing::Label(Cow::Borrowed("__swap_"))),
+		None,
+	));
+	Ok(instructions)
+}
+
+pub(crate) fn mirror<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	custom_abi_single_instruction_in_x(parametres, state, tmps_used, std_functions, "_mirsmal")
+}
+
+pub(crate) fn read_string<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	custom_abi_single_instruction_in_x(parametres, state, tmps_used, std_functions, "__read_")
+}
+
+pub(crate) fn print<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	custom_abi_single_instruction_in_x(parametres, state, tmps_used, std_functions, "_print_")
+}
+
+fn custom_abi_single_instruction_in_x<'a>(
+	parametres: &'a [StructlessStatement],
+	state: &mut State<'a, '_, '_, '_, '_>,
+	tmps_used: &mut isize,
+	std_functions: bool,
+	function: &'static str,
+) -> Result<Vec<CommentedInstruction<'a>>> {
+	if parametres.len() != 1 {
+		return Err(error!(MissingArguments));
+	}
+	let mut instructions =
+		compile_statement_inner(&parametres[0], state, tmps_used, std_functions)?;
+	instructions.push((Instruction::PSHA, None));
+	instructions.push((Instruction::PULX, None));
+	instructions.push((
+		Instruction::JSR(Addressing::Label(Cow::Borrowed(function))),
 		None,
 	));
 	Ok(instructions)

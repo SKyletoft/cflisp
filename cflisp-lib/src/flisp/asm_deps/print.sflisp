@@ -1,0 +1,8 @@
+_print_	CLRA		; Prints string pointed to by X. Continues till null byte
+	CMPA	0,X
+	BEQ	_print1
+	LDA	,X+
+	STA	$FB
+	JMP	_print_
+_print1	RTS
+
