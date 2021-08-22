@@ -96,7 +96,11 @@ pub enum Type<'a> {
 impl PartialEq for Type<'_> {
 	fn eq(&self, other: &Self) -> bool {
 		match self {
-			Type::Ptr(_) | Type::Uint | Type::Int => {
+			Type::Ptr(a) => {
+				matches!(other, Type::Ptr(_) | Type::Uint | Type::Int)
+					|| matches!(other, Type::Arr(b, _) if a == b)
+			}
+			Type::Uint | Type::Int => {
 				matches!(other, Type::Ptr(_) | Type::Uint | Type::Int)
 			}
 			Type::Char => matches!(other, Type::Char),
