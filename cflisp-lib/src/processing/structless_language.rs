@@ -250,8 +250,8 @@ fn per_element<'a>(
 			});
 			let converted_t = NativeType::from(t);
 			for idx in 0..len {
-				let new_element_name = format!("{}::{}[{}]", &scope, &name, idx);
-				rename_map.insert(format!("{}[{}]", &name, idx), new_element_name.clone());
+				let new_element_name = format!("{}::{}_{}", &scope, &name, idx);
+				rename_map.insert(format!("{}_{}", &name, idx), new_element_name.clone());
 				state
 					.symbols
 					.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
@@ -275,7 +275,7 @@ fn per_element<'a>(
 			let converted_t = NativeType::from(t.as_ref());
 			state.symbols.insert(name.clone(), t.as_ref().into());
 			for idx in (0..len).rev() {
-				let new_element_name = format!("{}[{}]", &name, idx);
+				let new_element_name = format!("{}_{}", &name, idx);
 				state
 					.symbols
 					.insert(Cow::Owned(new_element_name.clone()), converted_t.clone());
@@ -287,7 +287,7 @@ fn per_element<'a>(
 					is_volatile,
 				});
 			}
-			let target_name = Cow::Owned(format!("{}[0]", &name));
+			let target_name = Cow::Owned(format!("{}_0", &name));
 			new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 				typ: NativeType::ptr(converted_t),
 				name,
