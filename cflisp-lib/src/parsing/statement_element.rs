@@ -90,6 +90,11 @@ pub enum StatementElement<'a> {
 		name: Cow<'a, str>,
 		parametres: Vec<StatementElement<'a>>,
 	},
+	IncDec {
+		statement: Box<StatementElement<'a>>,
+		timing: IncDecTiming,
+		inc_or_dec: IncDec,
+	},
 	BitNot(Box<StatementElement<'a>>),
 	BoolNot(Box<StatementElement<'a>>),
 	Var(Cow<'a, str>),
@@ -100,6 +105,18 @@ pub enum StatementElement<'a> {
 	Deref(Box<StatementElement<'a>>),
 	AdrOf(Cow<'a, str>),
 	FieldPointerAccess(Cow<'a, str>, Cow<'a, str>),
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum IncDecTiming {
+	Before,
+	After,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum IncDec {
+	Increment,
+	Decrement,
 }
 
 ///Takes two `StatementElement`s and returns a single `StatementElement`. All lifetimes are the same
@@ -229,12 +246,13 @@ impl<'a> StatementElement<'a> {
 			.map(StatementElement::from_token)
 			.collect::<Result<Vec<_>>>()?;
 
-		for token in working_tokens.iter_mut() {
+		let do_parenthesis = |token: &mut MaybeParsed| -> Result<()> {
 			if let Unparsed(StatementToken::Parentheses(p)) = token {
 				let next = StatementElement::from_statement_tokens(p.clone())?;
 				*token = Parsed(next);
 			}
-		}
+			Ok(())
+		};
 
 		let ptr_ops: [(MaybeParsed, OpFnPtr); 2] = [
 			(Unparsed(StatementToken::FieldAccess), |l, r| {
@@ -324,6 +342,11 @@ impl<'a> StatementElement<'a> {
 			gen_bin_op!(BoolOr),
 		];
 
+		for token in working_tokens.iter_mut() {
+			do_parenthesis(token)?;
+		}
+		left_inc_dec(&mut working_tokens)?;
+		right_inc_dec(&mut working_tokens)?;
 		for (from, to) in ptr_ops.iter() {
 			do_binary_operation(&mut working_tokens, from, *to)?;
 		}
@@ -366,7 +389,8 @@ impl<'a> StatementElement<'a> {
 			}
 			StatementElement::LShift { lhs, .. }
 			| StatementElement::RShift { lhs, .. }
-			| StatementElement::BitNot(lhs) => lhs.signedness(symbols)?,
+			| StatementElement::BitNot(lhs)
+			| StatementElement::IncDec { statement: lhs, .. } => lhs.signedness(symbols)?,
 			StatementElement::GreaterThan { .. }
 			| StatementElement::LessThan { .. }
 			| StatementElement::GreaterThanEqual { .. }
@@ -562,5 +586,62 @@ fn do_array_access(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
 		}
 		idx = idx.wrapping_sub(1);
 	}
+	Ok(())
+}
+
+// Left as in [++] [EXPR]
+fn left_inc_dec(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
+	let mut idx = tokens.len().wrapping_sub(2);
+	while idx < tokens.len() {
+		let inc_or_dec = match tokens[idx] {
+			Unparsed(StatementToken::Decrement) => IncDec::Decrement,
+			Unparsed(StatementToken::Increment) => IncDec::Increment,
+			_ => {
+				idx = idx.wrapping_sub(1);
+				continue;
+			}
+		};
+		if let Parsed(right) = tokens.remove(idx + 1) {
+			let new = StatementElement::IncDec {
+				statement: Box::new(right),
+				timing: IncDecTiming::Before,
+				inc_or_dec,
+			};
+			tokens[idx] = Parsed(new);
+		} else {
+			return Err(error!(TreeConstructionFail, tokens.as_slice()));
+		}
+		idx = idx.wrapping_sub(1);
+	}
+
+	Ok(())
+}
+
+// Left as in [EXPR] [++]
+fn right_inc_dec(tokens: &mut Vec<MaybeParsed>) -> Result<()> {
+	let mut idx = 0;
+	while idx < tokens.len() {
+		let inc_or_dec = match tokens[idx] {
+			Unparsed(StatementToken::Decrement) => IncDec::Decrement,
+			Unparsed(StatementToken::Increment) => IncDec::Increment,
+			_ => {
+				idx = idx.wrapping_add(1);
+				continue;
+			}
+		};
+		if let Parsed(right) = tokens.remove(idx - 1) {
+			let new = StatementElement::IncDec {
+				statement: Box::new(right),
+				timing: IncDecTiming::After,
+				inc_or_dec,
+			};
+			// Minus one because the remove above shifted everything
+			tokens[idx - 1] = Parsed(new);
+		} else {
+			return Err(error!(TreeConstructionFail, tokens.as_slice()));
+		}
+		idx = idx.wrapping_add(1);
+	}
+
 	Ok(())
 }

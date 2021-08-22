@@ -37,7 +37,7 @@ pub(crate) fn language_element<'a>(
 
 			LanguageElement::VariableAssignment { name, value, .. } => {
 				let name: &str = name;
-				statement_element(value, variables, functions, structs)?;
+				statement_element(value, variables, functions, structs, constants)?;
 				let correct_type = variables
 					.get(name)
 					.ok_or_else(|| error!(UndefinedVariable, line))?;
@@ -59,7 +59,7 @@ pub(crate) fn language_element<'a>(
 				..
 			} => {
 				let name: &str = name;
-				statement_element(value, variables, functions, structs)?;
+				statement_element(value, variables, functions, structs, constants)?;
 				variables.insert(name, typ.clone());
 				if *is_const {
 					constants.insert(name);
@@ -71,8 +71,8 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::PointerAssignment { ptr, value, .. } => {
-				statement_element(ptr, variables, functions, structs)?;
-				statement_element(value, variables, functions, structs)?;
+				statement_element(ptr, variables, functions, structs, constants)?;
+				statement_element(value, variables, functions, structs, constants)?;
 				let correct_type = type_of(ptr, variables, functions, structs)?
 					.get_ptr_inner()
 					.ok_or_else(|| error!(InternalPointerAssignmentToNonPointer, line))?;
@@ -166,7 +166,7 @@ pub(crate) fn language_element<'a>(
 				then,
 				else_then,
 			} => {
-				statement_element(condition, variables, functions, structs)?;
+				statement_element(condition, variables, functions, structs, constants)?;
 				let mut inner_variables = variables.clone();
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
@@ -215,6 +215,7 @@ pub(crate) fn language_element<'a>(
 					&inner_variables,
 					&inner_functions,
 					&inner_structs,
+					constants,
 				)?;
 				language_element(
 					post,
@@ -233,7 +234,7 @@ pub(crate) fn language_element<'a>(
 			}
 
 			LanguageElement::While { condition, body } => {
-				statement_element(condition, variables, functions, structs)?;
+				statement_element(condition, variables, functions, structs, constants)?;
 				let mut inner_variables = variables.clone();
 				let mut inner_functions = functions.clone();
 				let mut inner_structs = structs.clone();
@@ -251,7 +252,7 @@ pub(crate) fn language_element<'a>(
 			LanguageElement::Return(_) => {}
 
 			LanguageElement::Statement(statement) => {
-				statement_element(statement, variables, functions, structs)?;
+				statement_element(statement, variables, functions, structs, constants)?;
 			}
 
 			LanguageElement::StructAssignment { name, value } => {
@@ -263,7 +264,7 @@ pub(crate) fn language_element<'a>(
 					return Err(error!(MissingStructFields, line));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					statement_element(value, variables, functions, structs)?;
+					statement_element(value, variables, functions, structs, constants)?;
 					if type_of(value, variables, functions, structs)? != field.typ {
 						return Err(error!(TypeMismatch, line));
 					}
@@ -283,7 +284,7 @@ pub(crate) fn language_element<'a>(
 					return Err(error!(MissingStructFields, line));
 				}
 				for (field, value) in fields.iter().zip(value.iter()) {
-					statement_element(value, variables, functions, structs)?;
+					statement_element(value, variables, functions, structs, constants)?;
 					let actual_type = type_of(value, variables, functions, structs)?;
 					let correct_type = &field.typ;
 					if &actual_type != correct_type {
@@ -304,7 +305,7 @@ pub(crate) fn language_element<'a>(
 					.iter()
 					.find(|NativeVariable { name, .. }| name == field)
 					.ok_or_else(|| error!(UndefinedField, line))?;
-				statement_element(value, variables, functions, structs)?;
+				statement_element(value, variables, functions, structs, constants)?;
 				let actual_type = type_of(value, variables, functions, structs)?;
 				let correct_type = &field_type.typ;
 				if &actual_type != correct_type {
@@ -426,7 +427,9 @@ pub(crate) fn type_of<'a>(
 			type_of(rhs, variables, functions, structs)?,
 		)
 		.unwrap_or(Type::Int),
-		StatementElement::BitNot(val) => type_of(val, variables, functions, structs)?,
+		StatementElement::IncDec { statement: val, .. } | StatementElement::BitNot(val) => {
+			type_of(val, variables, functions, structs)?
+		}
 		StatementElement::BoolAnd { lhs, rhs } | StatementElement::BoolOr { lhs, rhs } => {
 			let lhs_t = type_of(lhs, variables, functions, structs)?;
 			let rhs_t = type_of(rhs, variables, functions, structs)?;
@@ -526,6 +529,7 @@ pub fn statement_element(
 	variables: &HashMap<&str, Type>,
 	functions: &HashMap<&str, Function>,
 	structs: &HashMap<&str, Vec<NativeVariable>>,
+	constants: &HashSet<&str>,
 ) -> Result<()> {
 	let res = match elem {
 		StatementElement::FunctionCall { name, parametres } => {
@@ -563,8 +567,8 @@ pub fn statement_element(
 		| StatementElement::GreaterThanEqual { lhs, rhs }
 		| StatementElement::LessThanEqual { lhs, rhs }
 		| StatementElement::NotCmp { lhs, rhs } => {
-			statement_element(lhs, variables, functions, structs)?;
-			statement_element(rhs, variables, functions, structs)?;
+			statement_element(lhs, variables, functions, structs, constants)?;
+			statement_element(rhs, variables, functions, structs, constants)?;
 			let lhs_t = type_of(lhs, variables, functions, structs)?;
 			let rhs_t = type_of(rhs, variables, functions, structs)?;
 			if lhs_t != rhs_t
@@ -575,20 +579,22 @@ pub fn statement_element(
 			}
 		}
 
-		StatementElement::BitNot(lhs) | StatementElement::Deref(lhs) => {
-			statement_element(lhs, variables, functions, structs)?;
+		StatementElement::BitNot(lhs)
+		| StatementElement::Deref(lhs)
+		| StatementElement::Cast { value: lhs, .. } => {
+			statement_element(lhs, variables, functions, structs, constants)?;
 		}
 
 		StatementElement::BoolNot(lhs) => {
-			statement_element(lhs, variables, functions, structs)?;
+			statement_element(lhs, variables, functions, structs, constants)?;
 			if type_of(lhs, variables, functions, structs)? != Type::Bool {
 				return Err(error!(TypeMismatch, elem));
 			}
 		}
 
 		StatementElement::BoolAnd { lhs, rhs } | StatementElement::BoolOr { lhs, rhs } => {
-			statement_element(lhs, variables, functions, structs)?;
-			statement_element(rhs, variables, functions, structs)?;
+			statement_element(lhs, variables, functions, structs, constants)?;
+			statement_element(rhs, variables, functions, structs, constants)?;
 			if type_of(lhs, variables, functions, structs)? != Type::Bool
 				|| type_of(rhs, variables, functions, structs)? != Type::Bool
 			{
@@ -596,13 +602,23 @@ pub fn statement_element(
 			}
 		}
 
-		StatementElement::Cast { value, .. } => {
-			statement_element(value, variables, functions, structs)?;
+		StatementElement::IncDec { statement, .. } => {
+			statement_element(statement, variables, functions, structs, constants)?;
+			let typ = type_of(statement, variables, functions, structs)?;
+			if let StatementElement::Var(name) = statement.as_ref() {
+				if constants.contains(name as &str) {
+					return Err(error!(AssignmentToConstant, elem));
+				}
+			}
+			if !matches!(typ, Type::Int | Type::Uint | Type::Char) {
+				return Err(error!(TypeMismatch, elem));
+			}
 		}
 
 		StatementElement::Array(arr) => {
-			arr.iter()
-				.try_for_each(|elem| statement_element(elem, variables, functions, structs))?;
+			arr.iter().try_for_each(|elem| {
+				statement_element(elem, variables, functions, structs, constants)
+			})?;
 		}
 
 		StatementElement::Var(name) | StatementElement::AdrOf(name) => {

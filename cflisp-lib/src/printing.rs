@@ -92,6 +92,8 @@ impl DisplayWithIndent for StatementToken<'_> {
 			RShift => write!(f, ">>"),
 			Sub => write!(f, "-"),
 			Xor => write!(f, "^"),
+			Increment => write!(f, "++"),
+			Decrement => write!(f, "--"),
 			Parentheses(block) => {
 				write_indented!(f, indent, "(", &(block.as_slice(), " ", 1), ")");
 				Ok(())
@@ -609,6 +611,16 @@ impl DisplayWithIndent for StatementElement<'_> {
 			StatementElement::Deref(val) => write!(f, "(*({}))", val),
 			StatementElement::AdrOf(val) => write!(f, "(&{})", val),
 			StatementElement::FieldPointerAccess(ptr, field) => write!(f, "({}->{})", ptr, field),
+			StatementElement::IncDec {
+				statement,
+				timing: IncDecTiming::After,
+				inc_or_dec,
+			} => write!(f, "{}{}", statement, inc_or_dec),
+			StatementElement::IncDec {
+				statement,
+				timing: IncDecTiming::Before,
+				inc_or_dec,
+			} => write!(f, "{}{}", inc_or_dec, statement),
 		}
 	}
 }
@@ -854,5 +866,14 @@ impl fmt::Display for AssignmentType {
 			AssignmentType::Xor => "^=",
 		};
 		write!(f, "{}", s)
+	}
+}
+
+impl fmt::Display for IncDec {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			IncDec::Increment => write!(f, "++"),
+			IncDec::Decrement => write!(f, "--"),
+		}
 	}
 }

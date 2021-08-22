@@ -30,12 +30,14 @@ impl<'a> StructlessStatement<'a> {
 	pub(crate) fn from(
 		other: &StatementElement<'a>,
 		state: &State<'a, '_, '_, '_, '_>,
+		pre_inc: &mut Vec<StructlessLanguage<'a>>,
+		post_inc: &mut Vec<StructlessLanguage<'a>>,
 	) -> Result<Self> {
-		let bin_op = |op, lhs, rhs| {
+		let mut bin_op = |op, lhs, rhs| {
 			Ok(StructlessStatement::BinOp {
 				op,
-				lhs: Box::new(StructlessStatement::from(lhs, state)?),
-				rhs: Box::new(StructlessStatement::from(rhs, state)?),
+				lhs: Box::new(StructlessStatement::from(lhs, state, pre_inc, post_inc)?),
+				rhs: Box::new(StructlessStatement::from(rhs, state, pre_inc, post_inc)?),
 				signedness: lhs
 					.signedness(state.symbols)?
 					.promote(rhs.signedness(state.symbols)?),
@@ -43,7 +45,12 @@ impl<'a> StructlessStatement<'a> {
 		};
 		macro_rules! un_op {
 			($i: ident, $lhs: expr) => {
-				StructlessStatement::$i(Box::new(StructlessStatement::from($lhs.as_ref(), state)?))
+				StructlessStatement::$i(Box::new(StructlessStatement::from(
+					$lhs.as_ref(),
+					state,
+					pre_inc,
+					post_inc,
+				)?))
 			};
 		}
 
@@ -96,7 +103,8 @@ impl<'a> StructlessStatement<'a> {
 							new_parametres.push(StructlessStatement::Var(param_name))
 						}
 					} else {
-						new_parametres.push(StructlessStatement::from(param, state)?);
+						new_parametres
+							.push(StructlessStatement::from(param, state, pre_inc, post_inc)?);
 					}
 				}
 				StructlessStatement::FunctionCall {
@@ -110,7 +118,7 @@ impl<'a> StructlessStatement<'a> {
 			StatementElement::Bool(b) => StructlessStatement::Bool(*b),
 			StatementElement::Array(arr) => StructlessStatement::Array(
 				arr.iter()
-					.map(|parametre| StructlessStatement::from(parametre, state))
+					.map(|parametre| StructlessStatement::from(parametre, state, pre_inc, post_inc))
 					.collect::<Result<_>>()?,
 			),
 			StatementElement::Deref(n) => un_op!(Deref, n),
@@ -138,12 +146,51 @@ impl<'a> StructlessStatement<'a> {
 				}))
 			}
 
+			StatementElement::IncDec {
+				statement,
+				timing,
+				inc_or_dec,
+			} => {
+				let op = match inc_or_dec {
+					IncDec::Increment => BinOp::Add,
+					IncDec::Decrement => BinOp::Sub,
+				};
+				let signedness = statement.signedness(state.symbols)?;
+				let new_statement = StructlessStatement::from(statement, state, pre_inc, post_inc)?;
+				let new_value = StructlessStatement::BinOp {
+					lhs: Box::new(StructlessStatement::Num(1.into())),
+					rhs: Box::new(new_statement),
+					op,
+					signedness,
+				};
+				let language_elem = match statement.as_ref() {
+					StatementElement::Var(name) => StructlessLanguage::VariableAssignment {
+						name: name.clone(),
+						value: new_value,
+					},
+					StatementElement::Deref(ptr) => {
+						let new_ptr = StructlessStatement::from(ptr, state, pre_inc, post_inc)?;
+						StructlessLanguage::PointerAssignment {
+							ptr: new_ptr,
+							value: new_value,
+						}
+					}
+					_ => return Err(error!(BadAssignmentType)),
+				};
+				match timing {
+					IncDecTiming::Before => pre_inc.push(language_elem),
+					IncDecTiming::After => post_inc.push(language_elem),
+				}
+
+				StructlessStatement::from(statement, state, pre_inc, post_inc)?
+			}
+
 			StatementElement::Cast {
 				typ: NativeType::Bool,
 				value,
 			} => StructlessStatement::FunctionCall {
 				name: Cow::Borrowed("__tb__"),
-				parametres: vec![StructlessStatement::from(value, state)?],
+				parametres: vec![StructlessStatement::from(value, state, pre_inc, post_inc)?],
 			},
 
 			StatementElement::Cast {
@@ -153,7 +200,7 @@ impl<'a> StructlessStatement<'a> {
 			| StatementElement::Cast {
 				typ: NativeType::Int,
 				value,
-			} => StructlessStatement::from(value, state)?,
+			} => StructlessStatement::from(value, state, pre_inc, post_inc)?,
 
 			StatementElement::Cast { .. } | StatementElement::Ternary { .. } => todo!(),
 		};

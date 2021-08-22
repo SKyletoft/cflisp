@@ -133,6 +133,7 @@ fn per_element<'a>(
 	new_elements: &mut Vec<StructlessLanguage<'a>>,
 	structs: &mut HashMap<Cow<'a, str>, Cow<'a, str>>,
 ) -> Result<()> {
+	let mut post_inc = Vec::new();
 	match element {
 		LanguageElement::StructDefinition { name, members } => {
 			state.struct_types.insert(name, members);
@@ -338,33 +339,22 @@ fn per_element<'a>(
 		LanguageElement::VariableAssignment {
 			name,
 			value,
-			assignment_type,
+			assignment_type: AssignmentType::Normal,
 		} => {
 			if let Some(struct_type) = state.structs_and_struct_pointers.get(&name) {
-				if assignment_type != AssignmentType::Normal {
-					return Err(error!(
-						TypeMismatch,
-						&LanguageElement::VariableAssignment {
-							name,
-							value,
-							assignment_type,
-						}
-					));
-				}
-				let struct_type: &str = struct_type;
-				let struct_fields = if let Some(struct_fields) = state.struct_types.get(struct_type)
-				{
-					struct_fields
-				} else {
-					return Err(error!(
-						BadStructName,
-						&LanguageElement::VariableAssignment {
-							name,
-							value,
-							assignment_type,
-						}
-					));
-				};
+				let struct_fields =
+					if let Some(struct_fields) = state.struct_types.get(struct_type as &str) {
+						struct_fields
+					} else {
+						return Err(error!(
+							BadStructName,
+							&LanguageElement::VariableAssignment {
+								name,
+								value,
+								assignment_type: AssignmentType::Normal,
+							}
+						));
+					};
 				let rhs_name = if let StatementElement::Var(name) = value {
 					name
 				} else {
@@ -373,7 +363,7 @@ fn per_element<'a>(
 						&LanguageElement::VariableAssignment {
 							name,
 							value,
-							assignment_type,
+							assignment_type: AssignmentType::Normal,
 						}
 					));
 				};
@@ -386,24 +376,47 @@ fn per_element<'a>(
 					})
 				}
 			} else {
-				let mut new_value = StructlessStatement::from(&value, state)?;
-				if assignment_type != AssignmentType::Normal {
-					let name_var = StructlessStatement::Var(name.clone());
-					let op = assignment_type
-						.try_into()
-						.expect("Assignment type already checked");
-					new_value = StructlessStatement::BinOp {
-						lhs: Box::new(name_var),
-						rhs: Box::new(new_value),
-						op,
-						signedness: value.signedness(state.symbols)?,
-					};
-				}
+				let new_value =
+					StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
 				new_elements.push(StructlessLanguage::VariableAssignment {
 					name,
 					value: new_value,
 				})
 			}
+		}
+
+		LanguageElement::VariableAssignment {
+			name,
+			value,
+			assignment_type, //Not `AssignmentType::Normal`
+		} => {
+			if state.structs_and_struct_pointers.contains_key(&name) {
+				return Err(error!(
+					TypeMismatch,
+					&LanguageElement::VariableAssignment {
+						name,
+						value,
+						assignment_type,
+					}
+				));
+			}
+			let mut new_value =
+				StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
+			let name_var = StructlessStatement::Var(name.clone());
+			let op = assignment_type
+				.try_into()
+				.expect("Assignment type already checked");
+			new_value = StructlessStatement::BinOp {
+				lhs: Box::new(name_var),
+				rhs: Box::new(new_value),
+				op,
+				signedness: value.signedness(state.symbols)?,
+			};
+
+			new_elements.push(StructlessLanguage::VariableAssignment {
+				name,
+				value: new_value,
+			})
 		}
 
 		LanguageElement::StructAssignment { name, value } => {
@@ -431,9 +444,10 @@ fn per_element<'a>(
 				));
 			};
 			for (val, field) in value.into_iter().zip(fields.iter()) {
+				let value = StructlessStatement::from(&val, state, new_elements, &mut post_inc)?;
 				new_elements.push(StructlessLanguage::VariableAssignment {
 					name: helper::merge_name_and_field(name, &field.name),
-					value: StructlessStatement::from(&val, state)?,
+					value,
 				});
 			}
 		}
@@ -451,7 +465,8 @@ fn per_element<'a>(
 			state
 				.symbols
 				.insert(Cow::Owned(new_name.clone()), t.as_ref().into());
-			let mut value = StructlessStatement::from(&value, state)?;
+			// Is this really correct? Can this happen in upper? Or should it be rejected by the type checker?
+			let mut value = StructlessStatement::from(&value, state, upper, &mut post_inc)?;
 			if let StructlessStatement::Array(arr) = &mut value {
 				while arr.len() < len as usize {
 					arr.push(StructlessStatement::Num(Number::ZERO));
@@ -480,7 +495,7 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let mut value = StructlessStatement::from(&value, state)?;
+			let mut value = StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
 			if let StructlessStatement::Array(arr) = &mut value {
 				while arr.len() < len as usize {
 					arr.push(StructlessStatement::Num(Number::ZERO));
@@ -651,7 +666,8 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let value = StructlessStatement::from(&value, state)?;
+			//Maybe reject anything that writes to upper or post here?
+			let value = StructlessStatement::from(&value, state, upper, &mut post_inc)?;
 			let new_name = format!("{}::{}", scope, name);
 			rename_map.insert(name.to_string(), new_name.clone());
 			state.symbols.insert(name.clone(), (&typ).into());
@@ -676,7 +692,7 @@ fn per_element<'a>(
 			is_const,
 			is_volatile,
 		} => {
-			let value = StructlessStatement::from(&value, state)?;
+			let value = StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
 			state.symbols.insert(name.clone(), (&typ).into());
 			new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 				typ: typ.into(),
@@ -743,9 +759,11 @@ fn per_element<'a>(
 				state
 					.symbols
 					.insert(new_field_name.clone(), (&field.typ).clone());
+				//Maybe reject upper
+				let value = StructlessStatement::from(&val, state, upper, &mut post_inc)?;
 				upper.push(StructlessLanguage::VariableDeclarationAssignment {
 					name: new_field_name,
-					value: StructlessStatement::from(&val, state)?,
+					value,
 					typ: field.typ.clone(),
 					is_static: true,
 					is_const,
@@ -807,9 +825,10 @@ fn per_element<'a>(
 				state
 					.symbols
 					.insert(new_field_name.clone(), (&field.typ).clone());
+				let value = StructlessStatement::from(&val, state, new_elements, &mut post_inc)?;
 				new_elements.push(StructlessLanguage::VariableDeclarationAssignment {
 					name: new_field_name,
-					value: StructlessStatement::from(&val, state)?,
+					value,
 					typ: field.typ.clone(),
 					is_static: false,
 					is_const,
@@ -825,10 +844,9 @@ fn per_element<'a>(
 			assignment_type,
 		} => {
 			let mut default = || {
-				new_elements.push(StructlessLanguage::PointerAssignment {
-					ptr: StructlessStatement::from(&ptr, state)?,
-					value: StructlessStatement::from(&value, state)?,
-				});
+				let ptr = StructlessStatement::from(&ptr, state, new_elements, &mut post_inc)?;
+				let value = StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
+				new_elements.push(StructlessLanguage::PointerAssignment { ptr, value });
 				Ok(())
 			};
 			if let StatementElement::Var(name) = &ptr {
@@ -964,7 +982,8 @@ fn per_element<'a>(
 				rhs: Box::new(StructlessStatement::Var(name)),
 				signedness,
 			};
-			let mut new_value = StructlessStatement::from(&value, state)?;
+			let mut new_value =
+				StructlessStatement::from(&value, state, new_elements, &mut post_inc)?;
 			if assignment_type != AssignmentType::Normal {
 				let op = assignment_type
 					.try_into()
@@ -1055,7 +1074,8 @@ fn per_element<'a>(
 			then,
 			else_then,
 		} => {
-			let condition = StructlessStatement::from(&condition, state)?;
+			let condition =
+				StructlessStatement::from(&condition, state, new_elements, &mut post_inc)?;
 			let mut inner_then_rename_map = rename_map.clone();
 			let mut inner_then_structs_and_struct_pointers =
 				state.structs_and_struct_pointers.clone();
@@ -1126,7 +1146,8 @@ fn per_element<'a>(
 				&mut new_state,
 			)?;
 			//Can't be moved to be first so that `new_state` takes variables from `init_block` into consideration
-			let condition = StructlessStatement::from(&condition, &new_state)?;
+			let condition =
+				StructlessStatement::from(&condition, &new_state, &mut init_block, &mut post_inc)?;
 			let mut body = StructlessLanguage::from_language_elements_internal(
 				body,
 				upper,
@@ -1158,7 +1179,8 @@ fn per_element<'a>(
 		}
 
 		LanguageElement::While { condition, body } => {
-			let condition = StructlessStatement::from(&condition, state)?;
+			let condition =
+				StructlessStatement::from(&condition, state, new_elements, &mut post_inc)?;
 			let mut inner_rename_map = rename_map.clone();
 			let mut inner_structs_and_struct_pointers = state.structs_and_struct_pointers.clone();
 			let mut inner_state = State {
@@ -1184,17 +1206,24 @@ fn per_element<'a>(
 
 		LanguageElement::Return(ret) => {
 			let ret = if let Some(value) = ret {
-				Some(StructlessStatement::from(&value, state)?)
+				Some(StructlessStatement::from(
+					&value,
+					state,
+					new_elements,
+					&mut post_inc,
+				)?)
 			} else {
 				None
 			};
 			new_elements.push(StructlessLanguage::Return(ret))
 		}
 
-		LanguageElement::Statement(stat) => new_elements.push(StructlessLanguage::Statement(
-			StructlessStatement::from(&stat, state)?,
-		)),
+		LanguageElement::Statement(stat) => {
+			let statement = StructlessStatement::from(&stat, state, new_elements, &mut post_inc)?;
+			new_elements.push(StructlessLanguage::Statement(statement))
+		}
 	}
+	new_elements.append(&mut post_inc);
 	Ok(())
 }
 

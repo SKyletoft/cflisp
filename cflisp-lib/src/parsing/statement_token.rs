@@ -29,6 +29,8 @@ pub enum StatementToken<'a> {
 	NotCmp,
 	BoolNot,
 	BitNot,
+	Increment,
+	Decrement,
 	Parentheses(Vec<StatementToken<'a>>),
 	Ternary(Vec<StatementToken<'a>>),
 	BitAnd,
@@ -74,6 +76,8 @@ impl<'a> StatementToken<'a> {
 				Token::CharCast => StatementToken::Cast(NativeType::Char),
 				Token::IntCast => StatementToken::Cast(NativeType::Int),
 				Token::UintCast => StatementToken::Cast(NativeType::Uint),
+				Token::Increment => StatementToken::Increment,
+				Token::Decrement => StatementToken::Decrement,
 				Token::Ternary(b) => {
 					let as_statement = StatementToken::from_tokens(b)?;
 					StatementToken::Ternary(as_statement)

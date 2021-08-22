@@ -15,7 +15,7 @@ use flisp::flisp_instructions::{Addressing, CommentedInstruction, Instruction};
 use parsing::{
 	language_element::LanguageElement,
 	parser::{Parsable, StaticConstVolatile},
-	statement_element::{MaybeParsed, StatementElement},
+	statement_element::{IncDec, IncDecTiming, MaybeParsed, StatementElement},
 	statement_token::StatementToken,
 	token::Token,
 };
