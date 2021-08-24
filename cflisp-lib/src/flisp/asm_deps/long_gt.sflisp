@@ -1,0 +1,15 @@
+;	ulong
+;	lhs::hi A
+;	lhs::lo 1,SP
+;	rhs::hi 2,SP
+;	rhs::lo 3,SP
+
+_sl_gt_	CMPA	2,SP	; Maybe flip true and false
+	BEQ	_sl_gt1
+	BGT	_ret_t
+	JMP	_ret_f
+_sl_gt1	LDA	1,SP
+	CMPA	3,SP
+	BGT	_ret_t
+	JMP	_ret_f
+

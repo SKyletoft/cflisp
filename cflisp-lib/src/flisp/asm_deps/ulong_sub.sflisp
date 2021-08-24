@@ -1,0 +1,14 @@
+;	ulong
+;	lhs::hi A
+;	lhs::lo 1,SP
+;	rhs::hi 2,SP
+;	rhs::lo 3,SP
+;	ret_ptr X
+
+_ul_add	SUBA	2,SP
+	STA	X,1
+	LDA	1,SP
+	SBCA	3,SP
+	STA	X,0
+	RTS
+

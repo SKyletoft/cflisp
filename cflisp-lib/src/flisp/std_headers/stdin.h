@@ -1,6 +1,8 @@
 #pragma once
 // stdin.h
 
+#include <flisp_imports.h>
+
 // DOES NOT WORK SINCE IT'S BUILT FOR A BUFFERED INPUT SYSTEM
 //
 // Reads string from terminal to address pointed to by X.

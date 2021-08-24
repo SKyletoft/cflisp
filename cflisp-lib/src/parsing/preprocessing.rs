@@ -126,6 +126,8 @@ fn preproc(
 					"stdin.h" => include_str!("../flisp/std_headers/stdin.h"),
 					"stdout.h" => include_str!("../flisp/std_headers/stdout.h"),
 					"stdio.h" => include_str!("../flisp/std_headers/stdio.h"),
+					//"long.h" => include_str!("../flisp/std_headers/long.h"),
+					"flisp_imports.h" => include_str!("../flisp/std_headers/flisp_imports.h"),
 					_ => return Err(error!(InvalidImport, line)),
 				}
 				.into()

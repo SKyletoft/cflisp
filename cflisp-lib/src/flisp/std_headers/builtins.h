@@ -1,6 +1,8 @@
 #pragma once
 // builtins.h
 
+#include <flisp_imports.h>
+
 /// bool cast
 bool __tb__(int a);
 
