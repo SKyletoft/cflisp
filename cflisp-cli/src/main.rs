@@ -66,7 +66,9 @@ fn main() {
 	};
 	let no_comments = preprocessing::preprocess(&source)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
-
+	if flags.preprocessed {
+		eprint!("{}", &no_comments);
+	}
 	let parsed = parser::parse(&no_comments, !flags.debug)
 		.unwrap_or_else(|e| exit_error(&format!("Parse error ({})", e)));
 	if flags.tree {

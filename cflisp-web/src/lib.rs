@@ -80,6 +80,7 @@ fn compile_to_text(
 		optimise: optimise.min(2).max(0),
 		inline: false,
 		kill_interrupts: !continue_interrupts,
+		preprocessed: output_type == OutputType::Preprocessed,
 	};
 	let stripped_comments = preprocessing::preprocess(source).map_err(|err| format!("{}", err))?;
 	if output_type == OutputType::Preprocessed {

@@ -15,6 +15,7 @@ pub struct Flags {
 	pub optimise: u8,
 	pub inline: bool,
 	pub kill_interrupts: bool,
+	pub preprocessed: bool,
 }
 
 impl Default for Flags {
@@ -32,6 +33,7 @@ impl Default for Flags {
 			inline: false,
 			kill_interrupts: true,
 			out: "out.sflisp".to_string(),
+			preprocessed: false,
 		}
 	}
 }
@@ -79,6 +81,9 @@ impl<'a> FromIterator<&'a String> for Flags {
 				}
 				if arg.contains('k') {
 					flags.kill_interrupts = false;
+				}
+				if arg.contains('S') {
+					flags.preprocessed = true;
 				}
 				if arg.contains("O2") {
 					flags.optimise = 2;

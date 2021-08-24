@@ -76,6 +76,7 @@ o|out|Sets the name of the output file (following argument)
 g|debug|Adds debug info. Disables removal of unused names and adds `ORG $20` to the top for easier digiflisp debugging
 O (/O1/O2)|optimise| Enables optimisations. In practice it mostly just fixes bad code generation rather than actually optimising the code. Needs to be its own flag and cannot be grouped with the others (Capital o, not zero)
 k|kill_interrupts|Disables interrupts after main has exited
+S|preprocessed|Print the preprocessed code
 
 ## Dependencies
 ### Cflisp-lib
