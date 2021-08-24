@@ -73,6 +73,7 @@ fn remove_multiline_comments(mut s: Cow<str>) -> Cow<str> {
 
 pub fn preprocess(s: &str) -> Result<String> {
 	let mut defines = HashMap::new();
+	defines.insert("flisp".into(), "".into());
 	let mut included = HashSet::new();
 	let mut out = String::new();
 	preproc(s, &mut out, &mut defines, &mut included, "original source")?;
@@ -96,8 +97,9 @@ fn preproc(
 	included.insert(file_name.into());
 	for mut line in source.lines() {
 		line = line.trim();
-		if line.strip_prefix("#endif").is_some() {
+		if line.starts_with("#endif") {
 			skipping = false;
+			continue;
 		}
 		if skipping {
 			continue;
