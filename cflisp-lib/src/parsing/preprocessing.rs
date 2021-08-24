@@ -79,6 +79,11 @@ pub fn preprocess(s: &str) -> Result<String> {
 	Ok(out)
 }
 
+fn get_def_and_rest(mut line: &str) -> (&str, &str) {
+	line = line.trim();
+	line.split_once(char::is_whitespace).unwrap_or((line, ""))
+}
+
 fn preproc(
 	s: &str,
 	out: &mut String,
@@ -86,25 +91,28 @@ fn preproc(
 	included: &mut HashSet<String>,
 	file_name: &str,
 ) -> Result<()> {
-	if s.starts_with("#pragma once") && included.contains(file_name) {
-		return Ok(());
-	}
+	let mut skipping = false;
 	let source = remove_comments(s);
 	included.insert(file_name.into());
-	for line in source.lines() {
-		//
-		if line.starts_with("#pragma") {
-		} else if let Some(mut line) = line.strip_prefix("#define") {
-			line = line.trim();
-			let mut iter = line.split_whitespace();
-			let def = iter.next().unwrap_or("");
-			let val = iter.next().unwrap_or("");
-			// Throw error instead of just ignoring remaining tokens
-			if iter.next() != None {
+	for mut line in source.lines() {
+		line = line.trim();
+		if line.strip_prefix("#endif").is_some() {
+			skipping = false;
+		}
+		if skipping {
+			continue;
+		}
+		if let Some(line) = line.strip_prefix("#pragma") {
+			let (def, rest) = get_def_and_rest(line);
+			if !rest.is_empty() {
 				return Err(error!(ExcessTokens, line));
 			}
-			defines.insert(def.into(), val.into());
-		//
+			if def == "noflisp" || (def == "once" && included.contains(file_name)) {
+				return Ok(());
+			}
+		} else if let Some(line) = line.strip_prefix("#define") {
+			let (def, rest) = get_def_and_rest(line);
+			defines.insert(def.into(), rest.into());
 		} else if let Some(mut line) = line.strip_prefix("#include") {
 			line = line.trim();
 			let file = line
@@ -129,7 +137,16 @@ fn preproc(
 				return Err(error!(InvalidImport, line));
 			};
 			preproc(&content, out, defines, included, file)?;
-		//
+		} else if let Some(line) = line.strip_prefix("#ifdef") {
+			let (def, _) = get_def_and_rest(line);
+			if !defines.contains_key(def) {
+				skipping = true;
+			}
+		} else if let Some(line) = line.strip_prefix("#ifndef") {
+			let (def, _) = get_def_and_rest(line);
+			if defines.contains_key(def) {
+				skipping = true;
+			}
 		} else {
 			//Applies defines
 			for word in line.split_inclusive(|c: char| {
@@ -144,14 +161,19 @@ fn preproc(
 					})
 					.unwrap_or(word);
 				let suffix = &word[shortened_word.len()..];
-				out.push_str(
-					defines
-						.get(shortened_word)
-						.map(String::as_str)
-						.unwrap_or(shortened_word),
-				);
+				let defined_as = defines
+					.get(shortened_word)
+					.map(String::as_str)
+					.unwrap_or(shortened_word);
+				let replacement = if defined_as.is_empty() {
+					shortened_word
+				} else {
+					defined_as
+				};
+				out.push_str(replacement);
 				out.push_str(suffix);
 			}
+			out.push('\n');
 		}
 	}
 	Ok(())
