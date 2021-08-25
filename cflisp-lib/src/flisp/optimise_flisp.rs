@@ -26,9 +26,10 @@ pub fn all_optimisations(instructions: &mut Vec<CommentedInstruction>) -> Result
 	inca_deca(instructions);
 	clr(instructions);
 	clra(instructions);
-	remove_post_early_return_code(instructions);
 	while_true(instructions);
 	global_ret_bool(instructions);
+	jump_to_jump(instructions);
+	remove_post_early_return_code(instructions);
 
 	Ok(())
 }
@@ -803,6 +804,60 @@ fn global_ret_bool(instructions: &mut Vec<CommentedInstruction>) {
 					merge_comments!(comment_a, comment_b),
 				);
 				instructions.remove(idx + 1);
+			}
+			_ => {}
+		}
+		idx += 1;
+	}
+}
+
+///Removes jumps to jumps by jumping to the last branch directly
+fn jump_to_jump(instructions: &mut Vec<CommentedInstruction>) {
+	let mut idx = 0;
+	while idx < instructions.len() {
+		match &instructions[idx].0 {
+			Instruction::JMP(adr)
+			| Instruction::BNE(adr)
+			| Instruction::BEQ(adr)
+			| Instruction::BGE(adr)
+			| Instruction::BLT(adr)
+			| Instruction::BHS(adr)
+			| Instruction::BLO(adr) => {
+				//Replace continues with try blocks when stabilised
+				let label = if let Addressing::Label(label) = adr {
+					label
+				} else {
+					idx += 1;
+					continue;
+				};
+				let mut target_idx = if let Some(target) = instructions
+					.iter()
+					.position(|(inst, _)| matches!(inst, Instruction::Label(lbl) if lbl == label))
+				{
+					target
+				} else {
+					idx += 1;
+					continue;
+				};
+				while matches!(
+					instructions.get(target_idx),
+					Some((Instruction::Label(_), _))
+				) {
+					target_idx += 1;
+				}
+				let target_label =
+					if let Some((Instruction::JMP(adr), _)) = instructions.get(target_idx) {
+						adr
+					} else {
+						idx += 1;
+						continue;
+					}
+					.clone();
+				let adr_ref = instructions[idx]
+					.0
+					.get_adr_mut()
+					.expect("Checked by match pattern");
+				*adr_ref = target_label;
 			}
 			_ => {}
 		}

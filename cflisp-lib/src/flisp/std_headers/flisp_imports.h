@@ -1,5 +1,6 @@
 #pragma noflisp
 
+#include <stdbool.h>
 #include <stdint.h>
 
 //#define int int8_t
